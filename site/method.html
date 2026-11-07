@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>计算方法 · 放假年龄</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="wrap doc">
+    <header class="top">
+      <div class="brand">
+        <h1>计算方法</h1>
+        <p class="sub"><a href="index.html">返回放假年龄</a> · <a href="sources.html">数据来源</a></p>
+      </div>
+    </header>
+    <main>
+      <h2>基本约定</h2>
+      <p>所有金额都按今天的购买力（实际值）计算，内部以工作地货币计算，展示时按当期汇率换算。收益率也都是扣除通胀后的实际值。</p>
+
+      <h2>组合实际收益</h2>
+      <p class="formula">r = w × 股票实际收益 + (1 − w) × (10 年期国债收益率 − 长期通胀) − 税费拖累</p>
+      <p>w 是股票占比。r 是几何（复利）收益，下限为 −50%。股票实际收益默认 5%：美国 1900–2025 年实际年化约 6.6%（<a href="https://www.ubs.com/global/en/media/display-page-ndp/en-20260303-global-investment-returns-yearbook-2026.html" target="_blank" rel="noopener">UBS 全球投资回报年鉴 2026</a>），但美国是幸存者，多数国家更低，所以取保守值。</p>
+      <p class="formula">长期通胀 = (最新 CPI 同比 + 通胀目标) ÷ 2，保留一位小数</p>
+      <p>取中间值，是为了不把一时的高通胀或低通胀外推几十年。</p>
+
+      <h2>积累期</h2>
+      <p class="formula">A(t+1) = A(t) × (1 + r) + S(t)，S(t) = 收入 × (1 + 收入增长)^t − 当前支出</p>
+      <p>储蓄在每年年末投入。支出按实际值保持不变，收入按实际增长率上升。</p>
+
+      <h2>安全提取率</h2>
+      <p>退休期不超过 30 年时默认 3.9%，来自 <a href="https://www.morningstar.com/retirement/whats-safe-retirement-withdrawal-rate-2026" target="_blank" rel="noopener">Morningstar 2026 年度研究</a>（30 年、90% 成功率、通胀调整的固定支出）。更长的退休期按 40 年 3.5%、50 年 3.3%、60 年及以上 3.1% 线性下调。<strong>这个下调是本工具的经验假设，不是 Morningstar 的数据。</strong>专业模式可以关闭自动调整，手动填写。</p>
+
+      <h2>放假所需资产（含养老金桥接）</h2>
+      <p>设 t 年后放假，年支出为 E，养老金为 P，从领取年龄开始领，距离领取还有 b 年，退休期共 H 年：</p>
+      <p class="formula">没有养老金：需求 = E ÷ 提取率(H)</p>
+      <p class="formula">已到领取年龄：需求 = max(E − P, 0) ÷ 提取率(H)</p>
+      <p class="formula">未到领取年龄：需求 = Σ(k=0..b−1) E ÷ (1+r)^k + max(E − P, 0) ÷ 提取率(H−b) ÷ (1+r)^b</p>
+      <p>领取之前的支出全部自己承担，逐年贴现；领取之后只需要覆盖缺口。跨国退休时，E 和 P 先按汇率换成工作地货币，并乘以 (1 + 退休地货币年实际升值)^t。</p>
+
+      <h2>放假年龄</h2>
+      <p>从今年开始逐年比较资产和所需资产，第一个资产不低于所需资产的年份就是放假年份。"提前多少年"用相邻两年的差距线性插值，得到小数年：</p>
+      <p class="formula">t − 1 + 上一年缺口 ÷ (上一年缺口 + 当年盈余)</p>
+
+      <h2>倒推</h2>
+      <ul>
+        <li><strong>多存</strong>：解第一年储蓄 S，使 A(0)(1+r)^n + S × Σ(k=0..n−1)(1+g)^k (1+r)^(n−1−k) 等于所需资产，g 是收入增长率。</li>
+        <li><strong>多赚</strong>：在 −10% 到 30% 之间二分求解所需的实际收益。超出范围会直接提示。</li>
+        <li><strong>少花</strong>：二分求解退休年支出，使所需资产等于当前计划在目标年龄的资产。</li>
+        <li><strong>本金</strong>：所需资产减去未来储蓄的终值，再贴现回今天。</li>
+      </ul>
+
+      <h2>蒙特卡洛</h2>
+      <p>每条路径的年收益服从对数正态分布，中位数按 r 复利。波动率按组合计算：</p>
+      <p class="formula">σ² = w²σ股² + (1−w)²σ债² + 2w(1−w)ρσ股σ债</p>
+      <p>默认股票波动率 17%、债券 6%、相关性 0.2，这些是本工具的假设，可在专业模式修改。模拟 2,000 条路径，随机种子固定为 20261026（mulberry32 生成器，Box-Muller 变换），相同输入得到相同结果。放假之后每年年初取出支出（扣除已领取的养老金）。成功 = 到规划年龄之前资产从未耗尽。</p>
+
+      <h2>退休地支出估算</h2>
+      <p class="formula">退休地支出 = 当前支出 ÷ 工作地汇率 × (退休地价格水平 ÷ 工作地价格水平) × 退休地汇率</p>
+      <p>价格水平 = 世界银行住户消费购买力平价 ÷ 当前市场汇率。这是国家级的粗略估算，不反映城市差异，也不等于你的实际花销，所以页面上标注为估算值，可以改写。</p>
+
+      <h2>国家范围</h2>
+      <p>债券收益率只影响工作地的收益假设，退休地只需要汇率和价格水平。所以新加坡、马来西亚、泰国目前只能选作退休地。中国大陆和中国香港的 10 年期国债没有可再发布的自动来源，使用标明"假设"的固定值，详见<a href="sources.html">数据来源</a>。</p>
+
+      <h2>模型不包含</h2>
+      <ul>
+        <li>具体税法计算（用"税费拖累"近似）</li>
+        <li>自住房价值、一次性大额支出、遗产目标</li>
+        <li>医疗费用的长期超额上涨</li>
+        <li>城市级生活成本</li>
+        <li>动态调整支出的提取策略</li>
+      </ul>
+
+      <h2>如何复现</h2>
+      <p>代码全部开源。在专业模式导出 JSON，里面有全部假设、随机种子、模拟次数和数据版本。每一期数据都归档在 <code>data/</code> 目录下。</p>
+    </main>
+    <footer><p>本工具仅用于教育和测算，不构成投资建议。</p></footer>
+  </div>
+</body>
+</html>

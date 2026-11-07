@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>数据来源 · 放假年龄</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="wrap doc">
+    <header class="top">
+      <div class="brand">
+        <h1>数据来源</h1>
+        <p class="sub"><a href="index.html">返回放假年龄</a> · <a href="method.html">计算方法</a></p>
+      </div>
+    </header>
+    <main>
+      <p>数据版本 <strong id="version"></strong>，每月自动更新。状态说明：<b>官方</b>表示本期从来源抓取；<b>沿用</b>表示本期没取到或数值异常，继续用上一期；<b>假设</b>表示本工具设定的值。</p>
+      <h2>汇率（每 1 美元）</h2>
+      <div class="tbl"><table id="fx"></table></div>
+      <h2>工作地数据</h2>
+      <div class="tbl"><table id="work"></table></div>
+      <h2>价格水平</h2>
+      <p>相对美国，1 表示和美国一样贵。由世界银行住户消费购买力平价除以当前市场汇率得到。</p>
+      <div class="tbl"><table id="price"></table></div>
+      <h2>假设的依据</h2>
+      <div id="assumed"></div>
+      <h2>来源和授权条款</h2>
+      <div id="sources"></div>
+    </main>
+    <footer><p>本工具仅用于教育和测算，不构成投资建议。各数据提供方未对本工具背书。</p></footer>
+  </div>
+  <script type="module" src="js/sources-page.js"></script>
+</body>
+</html>

@@ -74,6 +74,10 @@
           </div>
           <p class="fine" id="mc-note"></p>
           <details><summary>查看数据表</summary><div class="tbl"><table id="pct-table"></table></div></details>
+          <div class="goal-row pro-only" hidden>
+            <button type="button" class="ghost" id="export-csv">导出 CSV</button>
+            <button type="button" class="ghost" id="export-json">导出 JSON</button>
+          </div>
         </section>
 
         <section class="card pro-only" hidden>
@@ -98,6 +102,7 @@
 
     <footer>
       <p>本工具仅用于教育和测算，不构成投资建议。市场数据版本 <span id="data-version"></span>，决策前请核对官方来源。</p>
+      <p><a href="method.html">计算方法</a> · <a href="sources.html">数据来源</a></p>
     </footer>
   </div>
   <script type="module" src="js/app.js"></script>

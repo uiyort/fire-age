@@ -6,6 +6,7 @@ import { rankLevers, impactOf } from './levers.js';
 import { PARAMS } from './params.js';
 import { makeGoal, compareVisit, loadGoal, saveGoal, clearGoal } from './goals.js';
 import { drawChart } from './chart.js';
+import { toCsv, toJson } from './export.js';
 import { copyText, goalCardSpec, renderCard, resultCardSpec, toCardInput } from './card.js';
 import {
   cardBody, goalFor, goalHtml, headlineText, heatHtml, leversHtml, money, pct, pctTableHtml, solvesHtml, tilesHtml, toDisplay, variantsHtml,
@@ -305,7 +306,24 @@ function flushSimulation() {
   renderSimulation();
 }
 
+function download(name, type, text) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function onClick(ev) {
+  if (ev.target.id === 'export-csv' || ev.target.id === 'export-json') {
+    flushSimulation();
+    if (ev.target.id === 'export-csv') download('fire-age.csv', 'text/csv;charset=utf-8', toCsv(latest));
+    else download('fire-age.json', 'application/json', toJson(latest));
+    return;
+  }
   if (ev.target.id === 'share-btn') {
     flushSimulation();
     showCard(resultCardSpec(toCardInput(latest)));
