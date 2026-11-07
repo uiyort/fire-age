@@ -48,6 +48,7 @@
         </div>
         <details id="type-all" class="simple-only"></details>
         <div class="tiles pro-only" id="tiles" hidden></div>
+        <div class="views-banner pro-only" id="views-banner" hidden></div>
       </section>
 
       <section class="inputs" aria-label="输入">
@@ -87,30 +88,24 @@
 
           <div class="card simple-only" id="life-section">
             <h2>平行人生</h2>
-            <p class="sub">同一个计划，碰上不同的年景。前四条靠运气，第五条由你来写。</p>
+            <p class="sub">同一个计划，碰上不同的年景。前四条靠运气，最后一条等你来写。</p>
+            <div class="legend" id="lives-chart-legend"></div>
+            <div class="chart-box">
+              <svg id="lives-chart" role="img" aria-label="选中的人生：资产变化、每年的状态和放假那一年"></svg>
+              <div class="tip" id="lives-tip" hidden></div>
+            </div>
             <div class="zone-grid">
               <div>
-                <div class="life-legend" id="life-legend">
-                  <span><i class="sw r-work"></i>上班</span>
-                  <span><i class="sw r-holiday"></i>放假有钱花</span>
-                  <span><i class="sw r-broke"></i>钱花完</span>
-                  <span><i class="sw r-bad"></i>当年大跌 15% 以上</span>
-                </div>
                 <div class="lives" id="lives"></div>
                 <div id="life-changes"></div>
                 <div class="goal-row"><button type="button" class="ghost" id="life-draw">换一批年景</button></div>
                 <p class="fine" id="life-summary"></p>
               </div>
               <div>
-                <h3 class="lab-title">写你的第五条人生</h3>
-                <p class="sub">先猜再看答案。你选的每一项都会写进第五条，题目用你自己的数字算。</p>
-                <div id="quiz"></div>
+                <h3 class="lab-title">等你来写</h3>
+                <p class="sub">你觉得未来的年景会怎样？每个判断都会写进这条人生。</p>
+                <div id="scenario"></div>
               </div>
-            </div>
-            <div class="legend" id="lives-chart-legend"></div>
-            <div class="chart-box">
-              <svg id="lives-chart" role="img" aria-label="选中的人生和其他人生的资产变化对比"></svg>
-              <div class="tip" id="lives-tip" hidden></div>
             </div>
             <div id="life-story"></div>
             <p class="fine" id="life-seed"></p>
@@ -168,7 +163,7 @@
 
         <section class="card simple-only" id="share-section">
           <h2>生成我的放假卡</h2>
-          <p class="sub">把这一页的结论收进一张图。生成后，专业模式也会打开：全部假设、敏感度表、分位数和 CSV / JSON 导出。公式和数据来源不用解锁，随时在页脚查看。</p>
+          <p class="sub">把这一页的结论收进一张放假通行证。生成后，专业模式也会打开：全部假设、敏感度表、分位数和 CSV / JSON 导出。公式和数据来源不用解锁，随时在页脚查看。</p>
           <p class="pro-lock-note" id="pro-lock-note" role="status" hidden></p>
           <div class="goal-row"><button type="button" class="primary" id="share-btn">生成放假卡</button></div>
           <div class="share" id="share-panel" hidden>

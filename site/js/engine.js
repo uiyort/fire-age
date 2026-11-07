@@ -129,16 +129,21 @@ function mulberry32(seed) {
   };
 }
 
-// Yearly cash flows for a simulated plan.
+export const HARD_FALL = -0.15;
+
+// Yearly cash flows for a simulated plan. Spending after a hard fall can be cut by p.flexCut percent.
 function planFlows(p, retireT, s0) {
-  const spend = [], sav = [];
+  const gross = [], pens = [], sav = [];
   for (let t = 0; t <= p.life - p.age; t++) {
     // Drift stops at retirement, matching fiNeed: the need is fixed in the year the holiday starts.
     const k = retireT == null ? t : Math.min(t, retireT);
-    spend.push(Math.max(spendW(p, k, p.retExp) - (p.age + t >= p.pAge ? pensW(p, k) : 0), 0));
+    gross.push(spendW(p, k, p.retExp));
+    pens.push(p.age + t >= p.pAge ? pensW(p, k) : 0);
     sav.push(savingsAt(p, t, s0));
   }
-  return { spend, sav };
+  const cut = (p.flexCut ?? 0) / 100;
+  const spendAt = (t, afterFall) => Math.max(gross[t] * (afterFall ? 1 - cut : 1) - pens[t], 0);
+  return { spendAt, sav };
 }
 
 // One path of the same simulation monteCarlo runs: same draws, same order, same rules.
@@ -146,9 +151,9 @@ export function lifePath(p, retireT, s0, seed) {
   const Y = p.life - p.age;
   const rnd = mulberry32(seed);
   const mu = Math.log(1 + p.r), s = p.sigma;
-  const { spend, sav } = planFlows(p, retireT, s0);
+  const { spendAt, sav } = planFlows(p, retireT, s0);
   const years = [];
-  let A = p.assets, ruinAge = null;
+  let A = p.assets, ruinAge = null, afterFall = false;
   for (let t = 0; t <= Y; t++) {
     if (t === Y) {
       years.push({ t, age: p.age + t, assets: A, ret: null });
@@ -159,7 +164,7 @@ export function lifePath(p, retireT, s0, seed) {
     const gr = Math.exp(mu + s * z);
     years.push({ t, age: p.age + t, assets: A, ret: gr - 1 });
     if (retireT != null && t >= retireT) {
-      A -= spend[t];
+      A -= spendAt(t, afterFall);
       if (A < 0) {
         A = 0;
         ruinAge ??= p.age + t;
@@ -168,6 +173,7 @@ export function lifePath(p, retireT, s0, seed) {
     } else {
       A = Math.max(A * gr + sav[t], 0);
     }
+    afterFall = gr - 1 <= HARD_FALL;
   }
   return { seed, retireT, years, ruinAge };
 }
@@ -178,10 +184,10 @@ export function monteCarlo(p, retireT, s0 = null, { paths = DEFAULT_PATHS, seed 
   // p.r is a geometric return, so the median path compounds at exactly p.r.
   const mu = Math.log(1 + p.r), s = p.sigma;
   const cols = Array.from({ length: Y + 1 }, () => new Float64Array(paths));
-  const { spend, sav } = planFlows(p, retireT, s0);
+  const { spendAt, sav } = planFlows(p, retireT, s0);
   let ok = 0;
   for (let i = 0; i < paths; i++) {
-    let A = p.assets, alive = true;
+    let A = p.assets, alive = true, afterFall = false;
     for (let t = 0; t <= Y; t++) {
       cols[t][i] = A;
       if (t === Y) break;
@@ -189,13 +195,14 @@ export function monteCarlo(p, retireT, s0 = null, { paths = DEFAULT_PATHS, seed 
       const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
       const gr = Math.exp(mu + s * z);
       if (retireT != null && t >= retireT) {
-        A -= spend[t];
+        A -= spendAt(t, afterFall);
         if (A < 0) { A = 0; alive = false; }
         A *= gr;
       } else {
         A = A * gr + sav[t];
         if (A < 0) A = 0;
       }
+      afterFall = gr - 1 <= HARD_FALL;
     }
     if (alive) ok++;
   }

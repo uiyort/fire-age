@@ -58,6 +58,7 @@ const IMPACT_STEPS = {
 };
 
 const NO_YEARS = {
+  flexCut: '大跌后少花改变的是成功率，不是放假年龄',
   age: '年龄决定你还有多少年可以复利',
   sigEq: '波动率改变的是成功率，不是放假年龄',
   sigBd: '波动率改变的是成功率，不是放假年龄',
@@ -73,7 +74,7 @@ export function impactOf(p, paramId) {
   return { stepLabel: step.stepLabel, note: step.note, gainYears: before === null || after === null ? null : before - after };
 }
 
-const RISK_PARAMS = ['eq', 'sigEq', 'sigBd', 'rho'];
+const RISK_PARAMS = ['eq', 'sigEq', 'sigBd', 'rho', 'flexCut'];
 const TRY_PATHS = 500;
 
 function niceStep(raw) {
@@ -106,6 +107,7 @@ const TRY_RANGES = {
   sigEq: p => ({ min: 0.05, max: 0.35, step: 0.01, value: p.sigEq, unit: '' }),
   sigBd: p => ({ min: 0.01, max: 0.15, step: 0.01, value: p.sigBd, unit: '' }),
   rho: p => ({ min: -1, max: 1, step: 0.1, value: p.rho, unit: '' }),
+  flexCut: p => ({ min: 0, max: 50, step: 5, value: p.flexCut ?? 0, unit: '%' }),
 };
 
 // The slider range for a parameter, always wide enough to include the current value.
@@ -127,9 +129,7 @@ export function tryParam(p, id, value) {
 // What a person can decide. Age, savings already made and the market are not choices, so sliders for those only preview.
 export const LIFE_CHOICES = ['income', 'expense', 'growth', 'retExp', 'life', 'pension', 'pAge', 'swr', 'drag'];
 
-// The plan with lab changes applied: quiz picks first, each once, then slider values on top. The real plan is untouched.
-export function labPlan(p, { steps = [], values = {} } = {}) {
-  let q = p;
-  for (const id of new Set(steps)) q = rebuild(q, IMPACT_STEPS[id].change(q));
-  return rebuild(q, { ...values, ...(values.swr === undefined ? {} : { autoSwr: false }) });
+// The plan with the person's answers and slider values applied. The real plan is untouched.
+export function labPlan(p, { values = {} } = {}) {
+  return rebuild(p, { ...values, ...(values.swr === undefined ? {} : { autoSwr: false }) });
 }

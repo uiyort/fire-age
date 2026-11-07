@@ -24,6 +24,8 @@ export const PARAMS = [
     improve: '查一下自己的累计缴费年限和预估待遇。提前离职可能减少缴费年限，要一起考虑。', noRangeReason: '取决于个人缴费年限和基数，所以不提供默认值。' },
   { id: 'pAge', name: '领取年龄', what: '从几岁开始领养老金。在那之前的支出全部要靠自己的资产。',
     improve: '放假越早，这段自己扛的时间越长，要单独留出这部分钱。', noRangeReason: '按当地常规退休年龄取整，具体以当地制度为准。' },
+  { id: 'flexCut', name: '大跌后少花', what: '组合某年跌超过 15%，第二年的支出少花多少。本工具默认不减，也就是固定支出。',
+    improve: '现实里很少有人大跌后还照常花。留一点可以砍掉的开销，比多攒几年更省力。', noRangeReason: '因人而异，取决于你的支出里有多少可以砍。' },
   { id: 'eq', name: '股票占比', what: '资产里放在股票的比例。比例越高，长期预期收益越高，但中途波动也越大。',
     improve: '这是收益和波动之间的取舍，没有对所有人都对的答案。试着改一下，同时看放假年龄和成功率怎么变。', noRangeReason: '因风险承受能力而异，本工具不给比例建议。' },
   { id: 'eqReal', name: '股票实际收益', what: '扣掉通胀后，股票每年的复合收益假设。本工具默认 5%。',
@@ -50,9 +52,10 @@ export const PARAMS = [
     improve: '这是一个很难预测的假设。试几个不同的值，看结果是否敏感。', noRangeReason: TOOL_ASSUMPTION },
 ];
 
+// Parameters taught by the questions about the years ahead are not listed here.
 export const PARAM_GROUPS = [
-  { name: '攒钱这一段', ids: ['assets', 'income', 'expense', 'growth'] },
+  { name: '攒钱这一段', ids: ['assets', 'income', 'expense'] },
   { name: '放假这一段', ids: ['age', 'retExp', 'life', 'pension', 'pAge', 'swr'] },
-  { name: '市场假设', ids: ['eq', 'eqReal', 'bondY', 'infl', 'drag', 'fxDrift'] },
+  { name: '费用和汇率', ids: ['drag', 'fxDrift'] },
   { name: '风险假设', ids: ['sigEq', 'sigBd', 'rho'] },
 ];

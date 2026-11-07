@@ -4,7 +4,7 @@ import { DEFAULT_SEED, bwdSolve, dualAges, fiNeed, fiYears, fwdSolve, lifePath, 
 import { drawLives, hardestIndex, heroModel, holidayType, lifeName, lifeRibbon, lifeStory, placeRanking } from './holiday.js';
 import { commitField, isProUnlocked, loadState, saveState, safeStorage, setField, unlockPro, setRetireCountry, setWorkCountry, toParams } from './state.js';
 import { LIFE_CHOICES, labPlan, rankLevers, impactOf, tryRange } from './levers.js';
-import { pickedSteps, quizRounds, quizScore, quizTitle } from './quiz.js';
+import { SCENARIOS, answerValues, baselineOf } from './scenario.js';
 import { PARAMS, PARAM_GROUPS } from './params.js';
 import { makeGoal, compareVisit, goalApplies, loadGoal, saveGoal, clearGoal } from './goals.js';
 import { initAnalytics, track } from './analytics.js';
@@ -12,7 +12,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { renderCard, summaryCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, fasterLead, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, quizHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, tryHtml, trySentence, typeHtml, variantsHtml,
+  allTypesHtml, cardBody, fasterLead, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, tryHtml, trySentence, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -38,10 +38,28 @@ let frame = 0;
 let lifeSeed = DEFAULT_SEED;
 let lifeIndex = 0;
 let labValues = {};
-let quizIndex = 0;
-let quizAnswers = {};
+const VIEWS_KEY = 'fire-age-views-v1';
+let scnIndex = 0;
+let scnAnswers = loadAnswers();
 const PLAYED_KEY = 'fire-age-played-v1';
 const played = new Set(loadPlayed());
+
+function loadAnswers() {
+  try {
+    const saved = JSON.parse(storage.getItem(VIEWS_KEY));
+    return saved && typeof saved === 'object' ? saved : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveAnswers() {
+  try {
+    storage.setItem(VIEWS_KEY, JSON.stringify(scnAnswers));
+  } catch {
+    // Answers are a convenience; the page works without them.
+  }
+}
 
 function loadPlayed() {
   try {
@@ -118,7 +136,8 @@ const PRO_FIELDS = [
   { legend: '风险假设', fields: [
     { id: 'sigEq', label: '股票波动率', unit: '小数', step: 0.01 },
     { id: 'sigBd', label: '债券波动率', unit: '小数', step: 0.01 },
-    { id: 'rho', label: '股债相关性', unit: '−1 到 1', step: 0.05, full: true },
+    { id: 'rho', label: '股债相关性', unit: '−1 到 1', step: 0.05 },
+    { id: 'flexCut', label: '大跌后少花', unit: '%', step: 5 },
   ] },
 ];
 
@@ -227,7 +246,6 @@ function renderFast() {
   if (S.mode === 'bwd') $('solves').innerHTML = solvesHtml({ p, bwd, dispCur: cur });
   $('type-now').innerHTML = typeHtml(type);
   document.querySelectorAll('.type-cell').forEach(cell => cell.classList.toggle('mine', cell.dataset.code === type.code));
-  renderQuiz(p);
   $('levers').innerHTML = leversHtml(levers, p, { pro: S.view === 'pro' });
   $('lead-faster').textContent = fasterLead(levers);
   $('places').innerHTML = placesHtml(places, { all: S.view === 'pro' });
@@ -279,20 +297,22 @@ function renderSimulation() {
   renderLives();
 }
 
-function labLabels(p) {
-  const fromQuiz = pickedSteps(latest.quiz, quizAnswers).map(id => impactOf(p, id).stepLabel);
+const baseline = () => baselineOf(DATA, S.workC);
+
+function labLabels() {
+  const fromViews = SCENARIOS.filter(s => scnAnswers[s.id] !== undefined).map(s => paramById[s.param].name);
   const fromSliders = Object.keys(labValues).map(id => paramById[id].name);
-  return [...fromQuiz, ...fromSliders];
+  return [...new Set([...fromViews, ...fromSliders])];
 }
 
-// The fifth life: the hardest of the four years of luck, walked with the person's rewritten plan.
+// The life waiting to be written: the hardest of the four years of luck, walked with the person's own view of the future.
 function fifthLife(p, lives, stories) {
-  const steps = pickedSteps(latest.quiz, quizAnswers);
-  if (!steps.length && !Object.keys(labValues).length) return null;
+  const values = { ...answerValues(scnAnswers, baseline()), ...labValues };
+  if (!Object.keys(values).length) return null;
   const base = hardestIndex(stories);
-  const q = labPlan(p, { steps, values: labValues });
+  const q = labPlan(p, { values });
   const path = lifePath(q, fwdSolve(q), null, lives[base].seed);
-  return { path, story: lifeStory(path, q), base: stories[base], plan: q };
+  return { path, story: lifeStory(path, q), base: stories[base], baseIndex: base, plan: q };
 }
 
 // The drawn lives follow the current plan, so changing an input redraws them with the same seeds.
@@ -308,36 +328,51 @@ function renderLives() {
   latest.fifth = fifth;
   const selectedFifth = fifth && lifeIndex === lives.length;
   $('lives').innerHTML = livesHtml(lives, stories, lifeIndex, { p, dispCur: cur, fifth });
-  $('life-changes').innerHTML = labChangesHtml(labLabels(p));
+  $('life-changes').innerHTML = labChangesHtml(labLabels());
   $('life-summary').textContent = livesSummary(stories, mc);
   const story = selectedFifth ? fifth.story : stories[lifeIndex];
   const compare = fifth ? fifthCompareHtml(fifth.base, fifth.story, [], { p, dispCur: cur }) : '';
   $('life-story').innerHTML = `${selectedFifth ? compare : ''}${storyHtml(story, { p: selectedFifth ? fifth.plan : p, dispCur: cur })}`;
   $('life-seed').textContent = `随机种子 ${lifeSeed} 到 ${lifeSeed + lives.length - 1}，同样的输入可以复现这几条人生。收益是模型抽样，不是历史重演。`;
   const scale = v => toDisplay(v, p, cur);
-  // With the fifth life open, the life it rewrites is the one to compare against.
-  const highlighted = selectedFifth ? hardestIndex(stories) : lifeIndex;
-  const series = lives.map((life, i) => ({ label: lifeName(stories[i]), kind: i === highlighted ? 'selected' : 'other', retireT: life.retireT, values: life.years.map(y => scale(y.assets)) }));
-  if (fifth) series.push({ label: '第五条', kind: 'fifth', retireT: fifth.path.retireT, values: fifth.path.years.map(y => scale(y.assets)) });
-  const chartKey = [
-    `<span><i class="sw line-mid"></i>${selectedFifth ? '原计划' : '选中'}：${lifeName(stories[highlighted])}</span>`,
-    ...(fifth ? ['<span><i class="sw line-fifth"></i>第五条：你改写的</span>'] : []),
+  const series = lives.map((life, i) => {
+    const kind = selectedFifth ? (i === fifth.baseIndex ? 'compare' : 'other') : (i === lifeIndex ? 'selected' : 'other');
+    return { label: lifeName(stories[i]), kind, retireT: life.retireT, cells: lifeRibbon(life), values: life.years.map(y => scale(y.assets)) };
+  });
+  if (selectedFifth) series.push({ label: '等你来写', kind: 'selected', retireT: fifth.path.retireT, cells: lifeRibbon(fifth.path), values: fifth.path.years.map(y => scale(y.assets)) });
+  $('lives-chart-legend').innerHTML = [
+    '<span><i class="sw r-work"></i>上班</span>',
+    '<span><i class="sw r-holiday"></i>放假有钱花</span>',
+    '<span><i class="sw r-broke"></i>钱花完</span>',
+    '<span><i class="sw r-bad"></i>当年大跌 15% 以上</span>',
+    ...(selectedFifth ? [`<span><i class="sw line-compare"></i>原计划：${lifeName(fifth.base)}</span>`] : []),
     '<span><i class="sw line-other"></i>其他几条</span>',
-    '<span><i class="sw dot-retire"></i>放假那年</span>',
-  ];
-  $('lives-chart-legend').innerHTML = chartKey.join('');
+  ].join('');
   drawLivesChart($('lives-chart'), $('lives-tip'), { age: p.age, lives: series, money: v => money(v, cur) });
+  renderScenario();
+}
+
+function renderScenario() {
+  const fifth = latest.fifth;
+  const effect = fifth ? fifthSentence(fifth.base, fifth.story) : '';
+  $('scenario').innerHTML = scenarioHtml({ index: scnIndex, answers: scnAnswers, base: baseline(), effect, params: paramById });
+  renderViewsBanner();
+}
+
+function viewsApplied() {
+  const values = answerValues(scnAnswers, baseline());
+  return Object.entries(values).every(([id, value]) => S[id] === value);
+}
+
+function renderViewsBanner() {
+  $('views-banner').innerHTML = viewsBannerHtml(scnAnswers, baseline(), paramById, viewsApplied());
 }
 
 function clearLab() {
-  quizIndex = 0;
-  quizAnswers = {};
+  scnIndex = 0;
+  scnAnswers = {};
   labValues = {};
-}
-
-function renderQuiz(p) {
-  latest.quiz = quizRounds(p);
-  $('quiz').innerHTML = quizHtml(latest.quiz, quizIndex, quizAnswers);
+  saveAnswers();
 }
 
 function renderGoal(p) {
@@ -467,21 +502,19 @@ function hideCard() {
 }
 
 function summaryInput() {
-  const { mode, p, bwd, type, hero, places, lives, stories, fifth, quiz, dispCur: cur } = latest;
+  const { mode, p, bwd, type, hero, places, lives, stories, fifth, dispCur: cur } = latest;
   const best = places[0], here = places.find(r => r.current);
   const gain = best.years !== null && here?.years != null ? here.years - best.years : 0;
-  const finished = quiz.length > 0 && quizIndex >= quiz.length;
-  const score = finished ? quizScore(quiz, quizAnswers) : 0;
   const achieved = goal && goalApplies(goal, p) && compareVisit(goal, p, today()).achieved;
   const ribbons = lives.map((life, i) => ({ label: lifeName(stories[i]), cells: lifeRibbon(life).map(c => c.state) }));
-  if (fifth) ribbons.push({ label: '第五条', cells: lifeRibbon(fifth.path).map(c => c.state) });
+  if (fifth) ribbons.push({ label: '等你来写', cells: lifeRibbon(fifth.path).map(c => c.state) });
   return {
     mode, type, hero, ribbons,
     enough: bwd.s0 <= 0,
     monthlyText: wholeMoney(toDisplay(Math.max(bwd.s0, 0) / 12, p, cur), cur),
     place: gain >= 0.05 ? { name: best.name, gain } : null,
     fifth: fifth ? fifthSentence(fifth.base, fifth.story) : null,
-    quiz: finished ? { score, total: quiz.length, title: quizTitle(score, quiz.length) } : null,
+    lit: { done: played.size, total: PARAMS.length },
     goal: achieved ? goal.label : null,
   };
 }
@@ -557,33 +590,37 @@ function onClick(ev) {
     hideCard();
     return;
   }
-  if (ev.target.id === 'quiz-restart') {
-    quizIndex = 0;
-    quizAnswers = {};
+  if (ev.target.id === 'scn-restart') {
+    clearLab();
     hideCard();
-    renderQuiz(latest.p);
     renderLives();
     return;
   }
   if (ev.target.id === 'lab-clear') {
     clearLab();
     hideCard();
-    renderQuiz(latest.p);
     renderCards(latest.p);
     renderLives();
     return;
   }
-  if (ev.target.id === 'quiz-next') {
-    quizIndex += 1;
-    if (quizIndex === latest.quiz.length) track('quiz_done');
-    renderQuiz(latest.p);
+  if (ev.target.id === 'scn-next') {
+    scnIndex += 1;
+    if (scnIndex === SCENARIOS.length) track('views_done');
+    renderScenario();
     return;
   }
-  const quizOption = ev.target.closest('[data-quiz]');
-  if (quizOption) {
-    quizAnswers[quizIndex] = quizOption.dataset.quiz;
+  if (ev.target.id === 'views-apply') {
+    for (const [id, value] of Object.entries(answerValues(scnAnswers, baseline()))) S = setField(S, id, String(value), DATA);
+    refresh();
+    return;
+  }
+  const scnOption = ev.target.closest('[data-scn]');
+  if (scnOption) {
+    const scenario = SCENARIOS[scnIndex];
+    scnAnswers = { ...scnAnswers, [scenario.id]: Number(scnOption.dataset.scn) };
+    saveAnswers();
+    markPlayed(scenario.param);
     hideCard();
-    renderQuiz(latest.p);
     renderLives();
     focusFifth();
     return;

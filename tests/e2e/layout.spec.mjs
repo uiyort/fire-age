@@ -57,7 +57,7 @@ test('related things sit together', async ({ page }) => {
   await expect(page.locator('#zone-faster #levers')).toBeVisible();
   await expect(page.locator('#zone-faster #places')).toBeVisible();
   await expect(page.locator('#zone-risk #lives')).toBeVisible();
-  await expect(page.locator('#zone-risk #quiz')).toBeVisible();
+  await expect(page.locator('#zone-risk #scenario')).toBeVisible();
   await expect(page.locator('#zone-learn #cards')).toBeVisible();
 });
 
@@ -74,14 +74,14 @@ test('on a wide screen the inputs stay open and beside the result, and lives sit
   await page.reload();
   await expect(page.locator('#s-assets')).toBeVisible();
   const lives = await page.locator('#lives').boundingBox();
-  const quiz = await page.locator('#quiz').boundingBox();
-  expect(quiz.x).toBeGreaterThan(lives.x + lives.width - 1);
+  const box = await page.locator('#scenario').boundingBox();
+  expect(box.x).toBeGreaterThan(lives.x + lives.width - 1);
 });
 
 test('the section has its new name', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#life-section h2')).toHaveText('平行人生');
-  await expect(page.locator('main')).not.toContainText(/(?<!第)五条人生/);
+  await expect(page.locator('main')).not.toContainText('五条人生');
 });
 
 test.describe('professional view locked', () => {
@@ -131,7 +131,7 @@ test.describe('professional view locked', () => {
 test('the professional view drops the fun and leads with the numbers', async ({ page }) => {
   await page.goto('/');
   await page.click('#to-pro');
-  for (const id of ['#hero', '#type-now', '#type-all', '#life-section', '#quiz', '#goal', '#cards', '#share-section']) {
+  for (const id of ['#hero', '#type-now', '#type-all', '#life-section', '#scenario', '#goal', '#cards', '#share-section']) {
     await expect(page.locator(id)).toBeHidden();
   }
   for (const id of ['#tiles', '#chart', '#variants', '#heat-box', '#sensitivity', '#export-csv']) {
@@ -141,7 +141,7 @@ test('the professional view drops the fun and leads with the numbers', async ({ 
   await expect(page.locator('#headline')).toContainText('财务独立');
   await expect(page.locator('#levers')).not.toContainText('周一');
   await expect(page.locator('#levers [data-goal]')).toHaveCount(0);
-  await expect(page.locator('#sensitivity tbody tr')).toHaveCount(19);
+  await expect(page.locator('#sensitivity tbody tr')).toHaveCount(20);
   await expect(page.locator('#sensitivity')).not.toContainText(/NaN|undefined|null/);
   await expect(page.locator('#places .place:visible')).toHaveCount(11);
   await expect(page.locator('#sticky-result')).toContainText('成功率');
@@ -160,6 +160,5 @@ test('the professional tiles have no Mondays', async ({ page }) => {
 
 test('the empty fifth life points at what really writes it', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('#life-fifth-empty')).not.toContainText('放假实验室');
-  await expect(page.locator('#life-fifth-empty')).toContainText('写你的第五条人生');
+  await expect(page.locator('#life-fifth-empty')).toContainText('年景');
 });

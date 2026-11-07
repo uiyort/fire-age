@@ -9,8 +9,8 @@ const INK = '#14201b', INK_2 = '#48564f', PAPER = '#f4f8f5', ACCENT = '#136f52',
 
 const trimYears = y => String(Math.round(y * 10) / 10);
 
-// One image that gathers the whole result. Only what the person has actually done appears on it.
-export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, enough, place, fifth, quiz, goal }) {
+// One image, shaped like a boarding pass to the holiday. At most one extra line, the most personal available.
+export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, enough, place, fifth, goal, lit = { done: 0, total: 0 } }) {
   let big, sentence;
   if (mode === 'bwd') {
     big = `${hero.holidayAge} 岁`;
@@ -25,19 +25,19 @@ export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, e
     big = `${hero.holidayAge} 岁`;
     sentence = `从 ${hero.holidayAge} 岁起，余生皆假期`;
   }
-  const lines = [];
-  if (hero.mondays) lines.push(`还有 ${hero.mondays.toLocaleString('zh-CN')} 个周一就放假`);
-  if (place) lines.push(`同样的钱去${place.name}，早 ${trimYears(place.gain)} 年`);
-  if (fifth) lines.push(`第五条人生：${fifth}`);
-  if (quiz) lines.push(`放假实验室猜对 ${quiz.score}/${quiz.total}：${quiz.title}`);
-  if (goal) lines.push(`小目标达成：${goal}`);
+  let note = '';
+  if (fifth) note = `等你来写：${fifth}`;
+  else if (place) note = `同样的钱去${place.name}，早 ${trimYears(place.gain)} 年`;
+  else if (goal) note = `小目标达成：${goal}`;
   return {
     kind: 'summary', size: [1080, 1440], brand: BRAND, searchHint: SEARCH_HINT,
-    eyebrow: `${type.emoji} ${type.code} ${type.name} · ${type.group}`,
-    hero: big, sentence, lines, stats: [],
-    lifeBar: { work: hero.workYears, holiday: hero.holidayYears, startAge: hero.startAge, endAge: hero.endAge },
+    eyebrow: `${type.code} ${type.name}`, hero: big, sentence, stats: [],
+    code: type.code, typeName: type.name, emoji: type.emoji, group: type.group,
+    route: { startAge: hero.startAge, holidayAge: hero.holidayAge, endAge: hero.endAge, work: hero.workYears, holiday: hero.holidayYears },
     people: hero.people,
-    peopleText: hero.people === null ? '' : `10 个平行的你，约 ${hero.people} 个的钱够花到 ${hero.endAge} 岁`,
+    mondays: hero.mondays,
+    lit,
+    note,
     ribbons,
   };
 }
@@ -122,12 +122,23 @@ export function fitLines(measure, paragraphs, maxWidth, available, startPx = 42,
   return px;
 }
 
-const HOLIDAY_GREEN = '#1d7a3a', WORK_GREY = '#c4d0c9', BROKE_RED = '#c0352f';
-const CELL_COLORS = { work: WORK_GREY, holiday: HOLIDAY_GREEN, broke: BROKE_RED };
+const DEEP = '#0d4a38', DEEP_2 = '#0a3a2c', CREAM = '#f6f1e3', CREAM_DIM = '#a9c4b4', SUN = '#f2b544';
+const STUB_INK = '#14201b', STUB_MUTED = '#6a7871', STUB_RULE = '#d9d3c1';
+const CELL_COLORS = { work: '#c9c4b4', holiday: '#1d7a3a', broke: '#c0352f' };
 
-function drawPerson(ctx, x, y, size, on) {
-  const unit = size / 28;
-  ctx.fillStyle = on ? ACCENT : RULE;
+function roundedRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawPerson(ctx, x, y, h, colour) {
+  const unit = h / 28;
+  ctx.fillStyle = colour;
   ctx.beginPath();
   ctx.arc(x + 10 * unit, y + 6 * unit, 5 * unit, 0, Math.PI * 2);
   ctx.fill();
@@ -144,79 +155,149 @@ function renderSummary(spec, canvas) {
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d');
-  const margin = 80, inner = W - margin * 2;
   const measureAt = family => (text, px) => { ctx.font = family(px); return ctx.measureText(text).width; };
   const bold = px => `700 ${px}px ${FONT}`;
   const plain = px => `400 ${px}px ${FONT}`;
   const display = px => `900 ${px}px ${SERIF}`;
-  const put = (font, color, text, x, y) => { ctx.font = font; ctx.fillStyle = color; ctx.fillText(text, x, y); };
-
-  ctx.fillStyle = PAPER;
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = ACCENT;
-  ctx.fillRect(0, 0, W, 16);
+  const put = (font, colour, text, x, y, align = 'left') => { ctx.font = font; ctx.fillStyle = colour; ctx.textAlign = align; ctx.fillText(text, x, y); ctx.textAlign = 'left'; };
   ctx.textBaseline = 'alphabetic';
-  ctx.textAlign = 'left';
-  put(bold(36), INK_2, spec.brand, margin, 96);
-  put(bold(fitFontSize(measureAt(bold), spec.eyebrow, inner, 44, 26)), ACCENT, spec.eyebrow, margin, 166);
 
-  const heroPx = fitFontSize(measureAt(display), spec.hero, inner, 190, 48);
-  put(display(heroPx), ACCENT, spec.hero, margin, 180 + heroPx);
-  let y = 180 + heroPx + 84;
-  const sentencePx = fitFontSize(measureAt(display), spec.sentence, inner, 56, 34);
-  put(display(sentencePx), INK, spec.sentence, margin, y);
-  y += 52;
+  // The ticket on a dark table, with a deep green top and a cream stub.
+  const tx = 44, ty = 44, tw = W - 88, th = H - 88, tear = 884, radius = 36, notch = 30;
+  ctx.fillStyle = DEEP_2;
+  ctx.fillRect(0, 0, W, H);
+  roundedRect(ctx, tx, ty, tw, th, radius);
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = DEEP;
+  ctx.fillRect(tx, ty, tw, tear - ty);
+  ctx.fillStyle = CREAM;
+  ctx.fillRect(tx, tear, tw, ty + th - tear);
+  ctx.restore();
+  ctx.fillStyle = DEEP_2;
+  for (const cx of [tx, tx + tw]) { ctx.beginPath(); ctx.arc(cx, tear, notch, 0, Math.PI * 2); ctx.fill(); }
+  ctx.strokeStyle = CREAM_DIM;
+  ctx.lineWidth = 3;
+  ctx.setLineDash([14, 14]);
+  ctx.beginPath(); ctx.moveTo(tx + notch + 16, tear); ctx.lineTo(tx + tw - notch - 16, tear); ctx.stroke();
+  ctx.setLineDash([]);
 
-  // Life bar: the conclusion, drawn.
-  const { work, holiday, startAge, endAge } = spec.lifeBar;
-  const barH = 44, workW = inner * work / (work + holiday);
-  ctx.fillStyle = WORK_GREY;
-  ctx.fillRect(margin, y, workW, barH);
-  ctx.fillStyle = HOLIDAY_GREEN;
-  ctx.fillRect(margin + workW, y, inner - workW, barH);
-  y += barH + 40;
-  put(plain(30), INK_2, `${startAge} 岁`, margin, y);
-  const label = holiday ? (work ? `上班 ${work} 年，放假 ${holiday} 年` : `放假 ${holiday} 年`) : `上班 ${work} 年`;
+  const left = tx + 60, right = tx + tw - 60, inner = right - left;
+
+  // Top: the pass itself.
+  put(bold(30), CREAM_DIM, '放假通行证  HOLIDAY PASS', left, ty + 74);
+  put(bold(46), CREAM, spec.code.split('').join(' '), right, ty + 76, 'right');
+
+  // The age is the picture.
+  const match = spec.hero.match(/^(\d+) 岁$/);
+  const heroY = ty + 400;
+  if (match) {
+    put(display(330), SUN, match[1], left - 8, heroY);
+    const numberW = measureAt(display)(match[1], 330);
+    put(display(84), CREAM, '岁', left + numberW + 14, heroY);
+  } else {
+    put(display(fitFontSize(measureAt(display), spec.hero, inner - 240, 190, 80)), SUN, spec.hero, left, heroY - 40);
+  }
+
+  // The type, like a stamp in the corner.
+  const stampX = right - 110, stampY = ty + 240;
+  ctx.strokeStyle = CREAM_DIM;
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(stampX, stampY, 104, 0, Math.PI * 2); ctx.stroke();
+  ctx.font = '96px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
   ctx.textAlign = 'center';
-  put(bold(34), INK, label, W / 2, y);
-  ctx.textAlign = 'right';
-  put(plain(30), INK_2, `${endAge} 岁`, W - margin, y);
+  ctx.fillStyle = CREAM;
+  ctx.fillText(spec.emoji, stampX, stampY + 34);
   ctx.textAlign = 'left';
-  y += 34;
+  put(display(fitFontSize(measureAt(display), spec.typeName, 280, 46, 28)), CREAM, spec.typeName, stampX, stampY + 150, 'center');
+  put(plain(28), CREAM_DIM, spec.group, stampX, stampY + 190, 'center');
 
-  if (spec.people !== null) {
-    const size = 60, gap = 16;
-    for (let i = 0; i < 10; i++) drawPerson(ctx, margin + i * (size * 20 / 28 + gap), y, size, i < spec.people);
-    y += size + 44;
-    put(bold(fitFontSize(measureAt(bold), spec.peopleText, inner, 34, 24)), INK, spec.peopleText, margin, y);
-    y += 20;
+  const sentencePx = fitFontSize(measureAt(display), spec.sentence, inner, 58, 34);
+  put(display(sentencePx), CREAM, spec.sentence, left, heroY + 96);
+
+  // The route: today, through work, to the holiday.
+  const { startAge, holidayAge, endAge, work, holiday } = spec.route;
+  const routeY = tear - 116, total = work + holiday;
+  const stopX = left + inner * work / total;
+  ctx.lineCap = 'round';
+  if (work) {
+    ctx.strokeStyle = CREAM_DIM;
+    ctx.lineWidth = 8;
+    ctx.setLineDash([2, 18]);
+    ctx.beginPath(); ctx.moveTo(left, routeY); ctx.lineTo(stopX, routeY); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  if (holiday) {
+    ctx.strokeStyle = SUN;
+    ctx.lineWidth = 14;
+    ctx.beginPath(); ctx.moveTo(stopX, routeY); ctx.lineTo(right, routeY); ctx.stroke();
+  }
+  ctx.lineCap = 'butt';
+  const stop = (x, colour) => { ctx.fillStyle = colour; ctx.beginPath(); ctx.arc(x, routeY, 15, 0, Math.PI * 2); ctx.fill(); };
+  stop(left, CREAM);
+  if (holiday && work) stop(stopX, SUN);
+  stop(right, holiday ? SUN : CREAM_DIM);
+  const labelY = routeY + 58;
+  put(bold(32), CREAM, `${startAge} 岁`, left, labelY);
+  put(bold(32), CREAM, `${endAge} 岁`, right, labelY, 'right');
+  if (holiday && work) {
+    const midX = Math.min(Math.max(stopX, left + 170), right - 190);
+    put(bold(32), SUN, `${holidayAge} 岁`, midX, labelY, 'center');
+  }
+  const legX = work ? left : stopX;
+  if (work && stopX - left > 150) put(plain(28), CREAM_DIM, `上班 ${work} 年`, left + (stopX - left) / 2, routeY - 28, 'center');
+  if (holiday) put(bold(30), SUN, `放假 ${holiday} 年`, (stopX + right) / 2, routeY - 30, 'center');
+  void legX;
+
+  // The stub: three stamps.
+  const stubTop = tear + 44, colW = inner / 3;
+  const label = (text, i) => put(plain(26), STUB_MUTED, text, left + colW * i, stubTop + 24);
+  label('平行的你', 0);
+  label('还有周一', 1);
+  label('点亮参数', 2);
+  const stampBase = stubTop + 92;
+  if (spec.people === null) {
+    put(bold(40), STUB_INK, '还在攒', left, stampBase);
+  } else {
+    put(display(64), STUB_INK, `${spec.people}/10`, left, stampBase);
+    for (let i = 0; i < 10; i++) drawPerson(ctx, left + i * 25, stampBase + 16, 34, i < spec.people ? DEEP : STUB_RULE);
+  }
+  if (spec.mondays) {
+    put(display(64), STUB_INK, spec.mondays.toLocaleString('zh-CN'), left + colW, stampBase);
+    put(plain(26), STUB_MUTED, '个', left + colW + measureAt(display)(spec.mondays.toLocaleString('zh-CN'), 64) + 10, stampBase);
+  } else {
+    put(bold(40), STUB_INK, '不用再等', left + colW, stampBase);
+  }
+  put(display(64), STUB_INK, `${spec.lit.done}/${spec.lit.total}`, left + colW * 2, stampBase);
+  const dots = Math.max(spec.lit.total, 1), dotGap = Math.min((colW - 14) / dots, 26);
+  for (let i = 0; i < spec.lit.total; i++) {
+    ctx.fillStyle = i < spec.lit.done ? SUN : STUB_RULE;
+    ctx.beginPath();
+    ctx.arc(left + colW * 2 + 8 + i * dotGap, stampBase + 32, Math.min(dotGap / 2 - 1, 8), 0, Math.PI * 2);
+    ctx.fill();
   }
 
-  const ribbonTop = H - 96 - 44 - spec.ribbons.length * 46;
-  const linePx = fitLines(measureAt(plain), spec.lines, inner, ribbonTop - y - 16, 36, 24);
-  for (const paragraph of spec.lines) {
-    y += LINE_GAP;
-    for (const line of wrapText(t => measureAt(plain)(t, linePx), paragraph, inner)) {
-      y += linePx;
-      put(plain(linePx), INK_2, line, margin, y);
-      y += linePx * (LINE_HEIGHT - 1);
-    }
+  // One line at most, then the lives as a barcode.
+  const noteY = stampBase + 108;
+  if (spec.note) {
+    const notePx = fitFontSize(measureAt(bold), spec.note, inner, 34, 22);
+    put(bold(notePx), STUB_INK, spec.note, left, noteY);
   }
-
-  // Ribbons: each drawn life as a strip of years.
-  let ry = ribbonTop;
-  const nameW = 200;
+  const hintY = ty + th - 44;
+  const barsBottom = hintY - 54;
+  const rows = spec.ribbons.length;
+  const gap = 5, barH = rows ? Math.min((barsBottom - noteY - 18 - gap * (rows - 1)) / rows, 22) : 0;
   const maxCells = Math.max(1, ...spec.ribbons.map(r => r.cells.length));
-  for (const ribbon of spec.ribbons) {
-    put(plain(fitFontSize(measureAt(plain), ribbon.label, nameW - 12, 28, 18)), INK_2, ribbon.label, margin, ry + 26);
-    const cell = (inner - nameW) / maxCells;
+  const cellW = inner / maxCells;
+  spec.ribbons.forEach((ribbon, row) => {
+    const y = barsBottom - (rows - row) * (barH + gap) + gap;
     ribbon.cells.forEach((state, i) => {
       ctx.fillStyle = CELL_COLORS[state];
-      ctx.fillRect(margin + nameW + i * cell, ry, Math.max(cell - 1, 1), 32);
+      ctx.fillRect(left + i * cellW, y, Math.max(cellW - 2, 1), barH);
     });
-    ry += 46;
-  }
-  put(bold(36), ACCENT, spec.searchHint, margin, H - 60);
+  });
+  put(bold(36), DEEP, spec.searchHint, left, hintY);
+  put(plain(26), STUB_MUTED, spec.brand, right, hintY, 'right');
 }
 
 export function renderCard(spec, canvas) {

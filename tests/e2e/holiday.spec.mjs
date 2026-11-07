@@ -93,7 +93,7 @@ test('four lives are there from the start, each with a name, a ribbon and an end
   await expect(page.locator('#lives .life[aria-pressed="true"]')).toHaveCount(1);
   await expect(lives.first().locator('.life-name')).not.toBeEmpty();
   await expect(lives.first().locator('.ribbon rect').first()).toBeAttached();
-  await expect(page.locator('#life-legend')).toContainText('钱花完');
+  await expect(page.locator('#lives-chart-legend')).toContainText('钱花完');
   await expect(page.locator('#lives-chart path').first()).toBeAttached();
   await expect(page.locator('#life-story li').first()).toBeVisible();
 });
@@ -114,23 +114,6 @@ test('drawn lives follow the inputs', async ({ page }) => {
   const story = await page.locator('#life-story').innerText();
   await page.fill('#s-assets', '3000000');
   await expect(page.locator('#life-story')).not.toHaveText(story);
-});
-
-test('the fifth life waits until the lab has rewritten something', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.locator('#life-fifth-empty')).toContainText('第五条人生');
-  await expect(page.locator('#lives .life.fifth')).toHaveCount(0);
-});
-
-test('a quiz answer writes the fifth life, shown against the hardest life', async ({ page }) => {
-  await page.goto('/');
-  await page.locator('#quiz [data-quiz]').first().click();
-  await expect(page.locator('#quiz .quiz-reveal')).toContainText('第五条人生');
-  const fifth = page.locator('#lives .life.fifth');
-  await expect(fifth).toHaveCount(1);
-  await expect(fifth).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#life-story .fifth-compare')).toContainText('同样的年景');
-  await expect(page.locator('#life-changes')).toContainText('已写入');
 });
 
 test('a decision slider writes the fifth life, and clearing removes it', async ({ page }) => {
@@ -166,56 +149,144 @@ test('changing the real plan clears slider rewrites', async ({ page }) => {
   await expect(page.locator('#lives .life.fifth')).toHaveCount(0);
 });
 
-test('the quiz finishes with a score and can restart', async ({ page }) => {
-  await page.goto('/');
-  const quiz = page.locator('#quiz');
-  await expect(quiz).toContainText('第 1 /');
-  await expect(quiz.locator('.quiz-reveal')).toHaveCount(0);
-  await quiz.locator('[data-quiz]').first().click();
-  await expect(quiz.locator('.quiz-reveal')).toContainText('年');
-  while (await quiz.locator('#quiz-next').count()) {
-    await quiz.locator('#quiz-next').click();
-    if (await quiz.locator('[data-quiz]').count()) await quiz.locator('[data-quiz]').first().click();
-  }
-  await expect(quiz).toContainText('猜对');
-  await page.click('#quiz-restart');
-  await expect(quiz).toContainText('第 1 /');
-});
-
 test('moving a slider lights up that parameter, and progress survives a reload', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('#lab-progress')).toContainText('0/19');
+  await expect(page.locator('#lab-progress')).toContainText('0/20');
   const details = page.locator('#cards details[data-id="assets"]');
   await details.locator('summary').click();
   await details.locator('input[type=range]').fill('900000');
-  await expect(page.locator('#lab-progress')).toContainText('1/19');
+  await expect(page.locator('#lab-progress')).toContainText('1/20');
   await expect(details).toHaveClass(/played/);
   await page.reload();
-  await expect(page.locator('#lab-progress')).toContainText('1/19');
+  await expect(page.locator('#lab-progress')).toContainText('1/20');
   await expect(page.locator('#cards details[data-id="assets"]')).toHaveClass(/played/);
 });
 
 test('parameters are grouped under headings', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#cards h4')).toHaveCount(4);
-  await expect(page.locator('#cards details')).toHaveCount(19);
+  await expect(page.locator('#cards details')).toHaveCount(14);
 });
 
 test('the page stays within a phone screen', async ({ page }) => {
   await page.goto('/');
-  await page.locator('#quiz [data-quiz]').first().click();
+  await page.locator('#scenario [data-scn]').first().click();
   await page.click('#share-btn');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
-test('the chart names its lines, and the fifth life is drawn against the life it rewrites', async ({ page }) => {
+
+const answer = async (page, option = 0) => page.locator('#scenario [data-scn]').nth(option).click();
+
+test('the last life is called waiting to be written', async ({ page }) => {
   await page.goto('/');
+  await expect(page.locator('#life-fifth-empty')).toContainText('等你来写');
+  await expect(page.locator('#lives .life.fifth')).toHaveCount(0);
+  await expect(page.locator('main')).not.toContainText('第五条');
+});
+
+test('answering about the years ahead writes the life, against the hardest one', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#scenario')).toContainText('第 1 /');
+  await expect(page.locator('#scenario .scn-reveal')).toHaveCount(0);
+  await answer(page);
+  const fifth = page.locator('#lives .life.fifth');
+  await expect(fifth).toHaveCount(1);
+  await expect(fifth.locator('.life-name')).toHaveText('等你来写');
+  await expect(fifth).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#life-story .fifth-compare')).toContainText('同样的年景');
+  await expect(page.locator('#scenario .scn-reveal')).toContainText('同样的年景');
+  await expect(page.locator('#life-changes')).toContainText('已写入');
+});
+
+test('an answer can be changed before moving on', async ({ page }) => {
+  await page.goto('/');
+  await answer(page, 0);
+  const first = await page.locator('#lives .life.fifth .life-end').innerText();
+  await answer(page, 2);
+  await expect(page.locator('#scenario [data-scn]').nth(2)).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#lives .life.fifth .life-end')).not.toHaveText(first);
+});
+
+test('answers light up their parameters and survive a reload', async ({ page }) => {
+  await page.goto('/');
+  await answer(page);
+  await expect(page.locator('#lab-progress')).toContainText('1/20');
+  await page.reload();
+  await expect(page.locator('#lab-progress')).toContainText('1/20');
+  await expect(page.locator('#lives .life.fifth')).toHaveCount(1);
+});
+
+test('the questions finish with a summary and can be redone', async ({ page }) => {
+  await page.goto('/');
+  const box = page.locator('#scenario');
+  while (await box.locator('[data-scn]').count()) {
+    await answer(page);
+    await box.locator('#scn-next').click();
+  }
+  await expect(box.locator('#scn-restart')).toBeVisible();
+  await box.locator('#scn-restart').click();
+  await expect(box).toContainText('第 1 /');
+  await expect(page.locator('#lives .life.fifth')).toHaveCount(0);
+});
+
+test('answers can be carried into the professional view, by choice', async ({ page }) => {
+  await page.goto('/');
+  await answer(page);
+  const say = await page.locator('#headline .say').innerText();
+  await page.click('#to-pro');
+  await expect(page.locator('#p-eqReal')).toHaveValue('5');
+  await expect(page.locator('#views-banner')).toContainText('股票实际收益');
+  await page.click('#views-apply');
+  await expect(page.locator('#p-eqReal')).toHaveValue('3.5');
+  await expect(page.locator('#views-banner')).toContainText('已带入');
+  await expect(page.locator('#headline .say')).not.toHaveText(say);
+});
+
+test('the bad-year cut is a professional assumption', async ({ page }) => {
+  await page.goto('/');
+  await page.click('#to-pro');
+  await expect(page.locator('#p-flexCut')).toHaveValue('0');
+  const before = await page.locator('#tiles').innerText();
+  await page.fill('#p-flexCut', '30');
+  await expect(page.locator('#tiles')).not.toHaveText(before);
+});
+
+test('the chart shares the ribbon colours, the age axis and a line at the holiday', async ({ page }) => {
+  await page.goto('/');
+  const chart = page.locator('#lives-chart');
+  await expect(chart.locator('.seg-work').first()).toBeAttached();
+  await expect(chart.locator('.seg-holiday').first()).toBeAttached();
+  const cells = await chart.locator('.axis-cell').count();
+  expect(cells).toBe(65);
+  await expect(chart.locator('#retire-line')).toBeAttached();
+  await expect(chart).toContainText('上班');
+  await expect(chart).toContainText('放假');
   const legend = page.locator('#lives-chart-legend');
-  await expect(legend).toContainText('选中');
-  await expect(legend).not.toContainText('第五条');
-  await page.locator('#quiz [data-quiz]').first().click();
-  await expect(legend).toContainText('第五条');
-  await expect(page.locator('#lives-chart path[stroke="var(--s1)"]')).toHaveCount(1);
-  await expect(page.locator('#lives-chart path[stroke="var(--s2)"]')).toHaveCount(1);
+  for (const text of ['上班', '放假有钱花', '钱花完', '大跌']) await expect(legend).toContainText(text);
+});
+
+test('a life that runs out shows it on the line and on the axis', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#lives .life').nth(2).click();
+  const chart = page.locator('#lives-chart');
+  await expect(chart.locator('.seg-broke').first()).toBeAttached();
+  await expect(chart.locator('.axis-cell.broke').first()).toBeAttached();
+});
+
+test('the written life is drawn against the life it rewrites', async ({ page }) => {
+  await page.goto('/');
+  await answer(page);
+  await expect(page.locator('#lives-chart-legend')).toContainText('原计划');
+  await expect(page.locator('#lives-chart .line-compare')).toHaveCount(1);
+});
+
+test('someone who cannot reach the goal has no holiday line', async ({ page }) => {
+  await page.goto('/');
+  await page.fill('#s-assets', '0');
+  await page.fill('#s-income', '3000');
+  await page.fill('#s-expense', '9000');
+  await expect(page.locator('#lives-chart #retire-line')).toHaveCount(0);
+  await expect(page.locator('#lives-chart .seg-work').first()).toBeAttached();
 });

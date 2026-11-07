@@ -319,3 +319,30 @@ h3 { font-family: var(--f-display); font-weight: 900; font-size: 16px; margin: 1
 #inputs-box > summary { font-weight: 700; color: var(--accent); margin: 0 0 8px; }
 #share-img { margin-top: 4px; }
 .sens-note { display: block; font-size: 12px; color: var(--ink-3); }
+
+#lives-chart { height: 300px; }
+#lives-chart .zone-label { fill: var(--ink-2); font-family: var(--f-body); font-size: 12px; }
+#lives-chart .zone-label.on { fill: var(--good); font-weight: 700; }
+.sw.line-compare { height: 0; border-top: 2px dashed var(--ink-2); border-radius: 0; background: none; }
+.legend .sw.r-work { background: var(--ink-3); }
+.legend .sw.r-holiday { background: var(--good); }
+.legend .sw.r-broke { background: var(--bad); }
+.legend .sw.r-bad { background: var(--ink); height: 3px; }
+.ribbon .r-work { fill: var(--ink-3); }
+.lives { margin-top: 12px; }
+
+.scn-options { display: flex; flex-direction: column; gap: 6px; }
+.scn-option { font: inherit; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); cursor: pointer; }
+.scn-option[aria-pressed="true"] { border: 2px solid var(--s2); padding: 9px 11px; font-weight: 700; }
+.scn-reveal { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; align-items: flex-start; }
+.scn-reveal p { margin: 0; }
+.scn-effect { font-weight: 700; color: var(--ink); padding: 8px 12px; border-radius: 8px; background: color-mix(in oklab, var(--s2) 10%, var(--bg)); align-self: stretch; }
+.scn-insight { font-size: 14px; }
+.scn-what { font-size: 13px; color: var(--ink-2); }
+.scn-ref { font-size: 12px; color: var(--ink-3); }
+.scn-done { margin: 10px 0 6px; font-weight: 700; }
+.scn-summary { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.scn-summary li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; padding: 6px 10px; background: var(--bg); border-radius: 6px; }
+.scn-summary b { font-weight: 500; }
+.views-banner { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.views-banner:empty { display: none; }

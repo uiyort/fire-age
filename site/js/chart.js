@@ -83,11 +83,15 @@ export function drawChart(svg, tip, { age, bands, target, retireT, year0, money 
   hit.addEventListener('touchend', hide);
 }
 
-// One life highlighted against the others, with the fifth life in its own colour. Values are in the display currency.
+const STATE_COLOUR = { work: 'var(--ink-3)', holiday: 'var(--good)', broke: 'var(--bad)' };
+
+// One life drawn in the same colours as its ribbon, which sits on the age axis below it.
+// Other lives stay grey; the life being compared against is dashed. Values are in the display currency.
 export function drawLivesChart(svg, tip, { age, lives, money }) {
-  const W = svg.clientWidth || 340, H = svg.clientHeight || 240;
-  const m = { l: 48, r: 10, t: 14, b: 26 };
+  const W = svg.clientWidth || 340, H = svg.clientHeight || 300;
+  const m = { l: 48, r: 10, t: 26, b: 46 };
   const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const selected = lives.find(l => l.kind === 'selected');
   const Y = Math.max(...lives.map(l => l.values.length)) - 1;
   const shown = lives.filter(l => l.kind !== 'other');
   const ymaxRaw = Math.max(...shown.flatMap(l => l.values), ...lives.map(l => l.values[0])) * 1.1 || 1;
@@ -96,27 +100,47 @@ export function drawLivesChart(svg, tip, { age, lives, money }) {
   const x = t => m.l + iw * t / Y;
   const y = v => m.t + ih * (1 - Math.min(v, ymax) / ymax);
   const line = values => values.map((v, t) => `${t ? 'L' : 'M'}${x(t).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  const axisTop = m.t + ih + 5, axisH = 12;
 
   let g = `<defs><clipPath id="plot-lives"><rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}"/></clipPath></defs>`;
+  // Soft bands behind the plot, so the phases read before the line does.
+  selected.cells.forEach((cell, t) => {
+    if (cell.state === 'work') return;
+    const fill = cell.state === 'broke' ? 'var(--bad)' : 'var(--good)';
+    g += `<rect x="${x(t).toFixed(1)}" y="${m.t}" width="${(x(t + 1) - x(t)).toFixed(1)}" height="${ih}" fill="${fill}" fill-opacity=".07"/>`;
+  });
   for (let v = 0; v <= ymax + 1e-9; v += step) {
     g += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/>`;
     g += `<text x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end">${compact.format(v)}</text>`;
   }
+  g += '<g clip-path="url(#plot-lives)">';
+  for (const life of lives.filter(l => l.kind === 'other')) g += `<path d="${line(life.values)}" fill="none" stroke="var(--ink-3)" stroke-opacity=".35" stroke-width="1.5" stroke-linejoin="round"/>`;
+  for (const life of lives.filter(l => l.kind === 'compare')) g += `<path class="line-compare" d="${line(life.values)}" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round"/>`;
+  // The selected life, one segment per year, coloured by what that year was.
+  selected.cells.forEach((cell, t) => {
+    if (t + 1 >= selected.values.length) return;
+    g += `<line class="seg-${cell.state}" x1="${x(t).toFixed(1)}" y1="${y(selected.values[t]).toFixed(1)}" x2="${x(t + 1).toFixed(1)}" y2="${y(selected.values[t + 1]).toFixed(1)}" stroke="${STATE_COLOUR[cell.state]}" stroke-width="2.5" stroke-linecap="round"/>`;
+  });
+  g += '</g>';
+  // The ribbon is the axis: same years, same colours, ages below.
+  selected.cells.forEach((cell, t) => {
+    const width = Math.max(x(t + 1) - x(t) - 1, 1).toFixed(1);
+    g += `<rect class="axis-cell ${cell.state}" x="${x(t).toFixed(1)}" y="${axisTop}" width="${width}" height="${axisH}" fill="${STATE_COLOUR[cell.state]}"/>`;
+    if (cell.bad) g += `<rect class="axis-bad" x="${x(t).toFixed(1)}" y="${axisTop - 4}" width="${width}" height="3" fill="var(--ink)"/>`;
+  });
   const ageStep = Y > 50 ? 10 : 5;
   for (let a = Math.ceil(age / ageStep) * ageStep; a <= age + Y; a += ageStep) {
-    g += `<text x="${x(a - age)}" y="${H - 8}" text-anchor="middle">${a}岁</text>`;
+    g += `<text x="${x(a - age)}" y="${H - 10}" text-anchor="middle">${a}岁</text>`;
   }
-  const style = { other: 'stroke="var(--ink-3)" stroke-opacity=".45" stroke-width="1.5"', selected: 'stroke="var(--s1)" stroke-width="2.5"', fifth: 'stroke="var(--s2)" stroke-width="2.5"' };
-  const order = [...lives].sort((a, b) => (a.kind === 'other' ? -1 : 1) - (b.kind === 'other' ? -1 : 1));
-  g += '<g clip-path="url(#plot-lives)">';
-  for (const life of order) g += `<path d="${line(life.values)}" fill="none" ${style[life.kind]} stroke-linejoin="round" stroke-linecap="round"/>`;
-  g += '</g>';
-  for (const life of shown) {
-    if (life.retireT === null || life.retireT === undefined) continue;
-    const colour = life.kind === 'fifth' ? 'var(--s2)' : 'var(--s1)';
-    g += `<circle cx="${x(life.retireT)}" cy="${y(life.values[life.retireT])}" r="5" fill="${colour}" stroke="var(--surface)" stroke-width="2"/>`;
+  // The holiday year divides the life in two.
+  if (selected.retireT !== null && selected.retireT !== undefined) {
+    const rx = x(selected.retireT), workYears = selected.retireT, restYears = selected.values.length - 1 - selected.retireT;
+    g += `<line id="retire-line" x1="${rx}" x2="${rx}" y1="${m.t - 16}" y2="${axisTop + axisH}" stroke="var(--ink)" stroke-width="2"/>`;
+    if (rx > 72) g += `<text x="${rx - 8}" y="${m.t - 6}" text-anchor="end" class="zone-label">上班 ${workYears} 年</text>`;
+    if (W - m.r - rx > 116) g += `<text x="${rx + 8}" y="${m.t - 6}" class="zone-label on">${age + selected.retireT} 岁起放假 ${restYears} 年</text>`;
+  } else {
+    g += `<text x="${m.l}" y="${m.t - 6}" class="zone-label">一直在上班</text>`;
   }
-  g += `<line x1="${m.l}" x2="${W - m.r}" y1="${m.t + ih}" y2="${m.t + ih}" stroke="var(--ink-3)"/>`;
   g += `<line id="lives-cross" y1="${m.t}" y2="${m.t + ih}" stroke="var(--ink-2)" visibility="hidden"/>`;
   g += `<rect id="lives-hit" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/>`;
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);

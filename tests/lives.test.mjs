@@ -4,7 +4,6 @@ import DATA from '../site/js/data-latest.js';
 import { bwdSolve, fiNeed, fwdSolve, lifePath } from '../site/js/engine.js';
 import { defaultState, setField, toParams } from '../site/js/state.js';
 import { LIFE_CHOICES, labPlan } from '../site/js/levers.js';
-import { pickedSteps, quizRounds } from '../site/js/quiz.js';
 import { fifthSentence, ribbonSvg } from '../site/js/views.js';
 import { hardestIndex, heroModel, holidayYearsOf, lifeName, lifeRibbon, lifeStory, peopleOf } from '../site/js/holiday.js';
 
@@ -122,20 +121,14 @@ test('a story reports the lowest point of the holiday', () => {
   assert.equal(s.lowPoint, Math.min(...holiday));
 });
 
-test('the rewritten plan applies quiz picks and slider values, leaving the real plan alone', () => {
+test('the rewritten plan applies values, leaving the real plan alone', () => {
   const p = person();
   const before = { ...p };
-  const q = labPlan(p, { steps: ['income'], values: { retExp: 90000 } });
+  const q = labPlan(p, { values: { income: p.income * 1.1, retExp: 90000 } });
   assert.ok(Math.abs(q.income - p.income * 1.1) < 1e-6);
   assert.equal(q.retExp, 90000);
   assert.deepEqual(p, before);
   assert.ok(fwdSolve(q) < fwdSolve(p));
-});
-
-test('picking the same change twice applies it once', () => {
-  const p = person();
-  const q = labPlan(p, { steps: ['income', 'income'] });
-  assert.ok(Math.abs(q.income - p.income * 1.1) < 1e-6);
 });
 
 test('a withdrawal rate written into the plan takes effect with automatic rates on', () => {
@@ -143,21 +136,14 @@ test('a withdrawal rate written into the plan takes effect with automatic rates 
   assert.ok(fwdSolve(labPlan(p, { values: { swr: 6 } })) < fwdSolve(p));
 });
 
-test('only decisions can be written into the fifth life', () => {
-  for (const id of ['income', 'expense', 'growth', 'retExp', 'pension', 'pAge', 'life']) assert.ok(LIFE_CHOICES.includes(id), id);
-  for (const id of ['age', 'assets', 'eq', 'eqReal', 'bondY', 'infl', 'sigEq', 'sigBd', 'rho', 'fxDrift']) assert.ok(!LIFE_CHOICES.includes(id), id);
-});
-
-test('quiz answers become the steps of the rewritten plan', () => {
-  const rounds = quizRounds(person());
-  assert.deepEqual(pickedSteps(rounds, { 0: 'a' }), [rounds[0].a.id]);
-  assert.deepEqual(pickedSteps(rounds, {}), []);
-  assert.deepEqual(pickedSteps(rounds, { 0: 'b', 99: 'a' }), [rounds[0].b.id]);
+test('only decisions can be written in by slider', () => {
+  for (const id of ['income', 'expense', 'retExp', 'pension', 'pAge', 'life']) assert.ok(LIFE_CHOICES.includes(id), id);
+  for (const id of ['age', 'assets', 'sigEq', 'sigBd', 'rho', 'fxDrift']) assert.ok(!LIFE_CHOICES.includes(id), id);
 });
 
 test('the fifth life walks the same years as the life it rewrites', () => {
   const p = person();
-  const q = labPlan(p, { steps: ['income'] });
+  const q = labPlan(p, { values: { income: p.income * 1.1 } });
   const original = lifePath(p, fwdSolve(p), null, 42), rewritten = lifePath(q, fwdSolve(q), null, 42);
   assert.equal(original.years[0].ret, rewritten.years[0].ret);
   assert.equal(original.years[10].ret, rewritten.years[10].ret);

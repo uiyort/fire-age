@@ -8,47 +8,36 @@ const type = {
   axes: [{ name: '启程', letter: 'E', pole: '早', value: '43 岁' }, { name: '目的地', letter: 'H', pole: '在地', value: '中国大陆' }, { name: '行李', letter: 'T', pole: '轻装', value: '40%' }, { name: '路费', letter: 'S', pole: '靠存', value: '30%' }],
 };
 const hero = { reachable: true, startAge: 30, holidayAge: 43, endAge: 95, workYears: 13, holidayYears: 52, mondays: 678, people: 7, fund: { share: 0.14 } };
-const summary = { mode: 'fwd', type, hero, ribbons: [{ label: '顺风局', cells: ['work', 'holiday'] }] };
+const summary = { mode: 'fwd', type, hero, lit: { done: 3, total: 20 }, ribbons: [{ label: '顺风局', cells: ['work', 'holiday'] }] };
 
 test('the summary card carries the age, slogan, type, brand and search hint', () => {
   const s = summaryCardSpec(summary);
   assert.equal(s.kind, 'summary');
   assert.equal(s.hero, '43 岁');
   assert.equal(s.sentence, '从 43 岁起，余生皆假期');
-  assert.match(s.eyebrow, /EHTS/);
-  assert.match(s.eyebrow, /采菊人/);
+  assert.equal(s.code, 'EHTS');
+  assert.equal(s.typeName, '采菊人');
+  assert.equal(s.emoji, '🌼');
   assert.equal(s.brand, '放假年龄 / FIRE Age');
   assert.equal(s.searchHint, '搜：放假年龄');
   assert.deepEqual(s.size, [1080, 1440]);
 });
 
-test('the summary card draws its conclusions, not only states them', () => {
+test('the summary card is a ticket: route, people, Mondays, lit parameters and a barcode of lives', () => {
   const s = summaryCardSpec(summary);
-  assert.deepEqual(s.lifeBar, { work: 13, holiday: 52, startAge: 30, endAge: 95 });
+  assert.deepEqual(s.route, { startAge: 30, holidayAge: 43, endAge: 95, work: 13, holiday: 52 });
   assert.equal(s.people, 7);
-  assert.match(s.peopleText, /10 个平行的你.*7 个/);
+  assert.equal(s.mondays, 678);
+  assert.deepEqual(s.lit, { done: 3, total: 20 });
   assert.equal(s.ribbons.length, 1);
-  assert.ok(s.lines.some(l => l.includes('678 个周一')));
 });
 
-test('the summary card gathers the other results into one image', () => {
-  const s = summaryCardSpec({
-    ...summary,
-    place: { name: '泰国', gain: 4.3 },
-    fifth: '同样的年景，从 71 岁花完变成撑到 95 岁',
-    quiz: { score: 5, total: 6, title: '放假军师' },
-    goal: '储蓄率到 45%',
-  });
-  const text = s.lines.join(' ');
-  assert.match(text, /泰国.*4\.3 年/);
-  assert.match(text, /71 岁花完/);
-  assert.match(text, /5\/6.*放假军师/);
-  assert.match(text, /储蓄率到 45%/);
-});
-
-test('the summary card leaves out what the person has not done', () => {
-  const text = summaryCardSpec(summary).lines.join(' ');
-  assert.ok(!/第五条|猜对|小目标|同样的钱/.test(text));
+test('the summary card carries one extra line at most, the most personal one', () => {
+  const all = { ...summary, place: { name: '泰国', gain: 4.3 }, fifth: '同样的年景，从 71 岁花完变成撑到 95 岁', goal: '储蓄率到 45%' };
+  assert.equal(summaryCardSpec(all).note, '等你来写：同样的年景，从 71 岁花完变成撑到 95 岁');
+  assert.match(summaryCardSpec({ ...all, fifth: null }).note, /泰国.*4\.3 年/);
+  assert.match(summaryCardSpec({ ...all, fifth: null, place: null }).note, /储蓄率到 45%/);
+  assert.equal(summaryCardSpec(summary).note, '');
 });
 
 test('the summary card has no links or QR codes and passes the compliance lint', () => {
@@ -59,7 +48,7 @@ test('the summary card has no links or QR codes and passes the compliance lint',
 
 test('an unreachable result stays upbeat and shows no fake age', () => {
   const s = summaryCardSpec({ mode: 'fwd', type, hero: { ...hero, reachable: false, holidayAge: null, workYears: 65, holidayYears: 0, mondays: 0, people: null }, ribbons: [] });
-  assert.ok(!/null|NaN|undefined/.test(JSON.stringify({ ...s, people: undefined })));
+  assert.ok(!/null|NaN|undefined/.test(JSON.stringify([s.hero, s.sentence, s.note, s.mondays])));
   assert.equal(s.hero, '还在路上');
   assert.match(s.sentence, /一步步|杠杆/);
   assert.equal(s.people, null);
@@ -69,7 +58,7 @@ test('someone who can stop now gets the today wording', () => {
   const s = summaryCardSpec({ mode: 'fwd', type, hero: { ...hero, holidayAge: 30, workYears: 0, holidayYears: 65, mondays: 0 }, ribbons: [] });
   assert.equal(s.hero, '现在');
   assert.equal(s.sentence, '从今天起，余生皆假期');
-  assert.ok(!s.lines.some(l => l.includes('周一')));
+  assert.equal(s.mondays, 0);
 });
 
 test('a backward result uses the monthly amount', () => {

@@ -4,7 +4,7 @@ import { buildParams, longRunInflation } from './engine.js';
 const STORAGE_KEY = 'fire-age-v1';
 const MONEY_FIELDS = ['assets', 'income', 'expense', 'retExp', 'pension'];
 const ASSUMPTION_FIELDS = ['infl', 'bondY', 'drag', 'pAge'];
-const NUMERIC_FIELDS = [...MONEY_FIELDS, 'age', 'growth', 'life', 'pAge', 'tAge', 'eq', 'eqReal', 'bondY', 'infl', 'drag', 'fxDrift', 'swr', 'sigEq', 'sigBd', 'rho'];
+const NUMERIC_FIELDS = [...MONEY_FIELDS, 'age', 'growth', 'life', 'pAge', 'tAge', 'eq', 'eqReal', 'bondY', 'infl', 'drag', 'fxDrift', 'swr', 'sigEq', 'sigBd', 'rho', 'flexCut'];
 
 const fxOf = (data, cur) => (cur === 'USD' ? 1 : data.fx[cur].value);
 const curOf = (data, code) => data.countries[code].cur;
@@ -24,7 +24,7 @@ export function defaultState(data) {
     age: 30, assets: 500000, income: 300000, expense: 120000, growth: 2,
     retExp: 120000, life: 95, pension: null, tAge: 45,
     eq: 60, eqReal: 5, fxDrift: 0, swr: 3.9,
-    sigEq: 0.17, sigBd: 0.06, rho: 0.2,
+    sigEq: 0.17, sigBd: 0.06, rho: 0.2, flexCut: 0,
     ...localAssumptions(data.countries.CN),
   };
   return {

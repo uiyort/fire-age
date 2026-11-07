@@ -1,7 +1,7 @@
 // Turns model results into page text and tables. Strings only, no DOM access.
 import { coastNeed, conv, fiNeed, fwdSolve, swrFor, bwdSolve, savingsAt, savingsRate, buildParams } from './engine.js';
 import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn } from './holiday.js';
-import { quizScore, quizTitle } from './quiz.js';
+import { SCENARIOS, answerValues, scenarioOptions } from './scenario.js';
 import { LIFE_CHOICES, impactOf, tryParam } from './levers.js';
 
 const moneyFormats = {};
@@ -157,7 +157,7 @@ const tryValueText = (value, unit, p) => {
 };
 
 export function tryHtml(id, range, current = range.value) {
-  const hint = LIFE_CHOICES.includes(id) ? '拖动后写入第五条人生，不改你的计划。' : '这一项不由你决定，只是试算。';
+  const hint = LIFE_CHOICES.includes(id) ? '拖动后写进“等你来写”，不改你的计划。' : '这一项不由你决定，只是试算。';
   return `<div class="try"><label class="try-lab">拖一拖试试 <input type="range" data-try="${id}" min="${range.min}" max="${range.max}" step="${range.step}" value="${current}"></label><output>${hint}</output></div>`;
 }
 
@@ -174,28 +174,30 @@ const effectText = gain => {
   return gain > 0 ? `提前 ${yearsText(gain)}` : `推后 ${yearsText(-gain)}`;
 };
 
-export function quizHtml(rounds, index, answers) {
-  if (!rounds.length) return '<p class="fine">现在单改一项，放假年龄还看不出变化。先调一下收入和支出，再回来玩。</p>';
-  if (index >= rounds.length) {
-    const score = quizScore(rounds, answers);
-    return `<div class="quiz-done"><div class="quiz-score">${score}/${rounds.length}</div><p>猜对 ${score} 题，你的称号是<b>${quizTitle(score, rounds.length)}</b>。</p>
-      <div class="goal-row"><button type="button" class="ghost" id="quiz-restart">再玩一次</button></div></div>`;
+function teaching(param) {
+  const ref = param.range ? `${param.range.text} <a href="${param.range.sourceUrl}" target="_blank" rel="noopener">出处</a>` : param.noRangeReason;
+  return `<p class="scn-what">${param.what}</p><p class="scn-ref">参考：${ref}</p>`;
+}
+
+export function scenarioHtml({ index, answers, base, effect, params }) {
+  const total = SCENARIOS.length;
+  if (index >= total) {
+    const rows = SCENARIOS.filter(s => answers[s.id] !== undefined).map(s => `<li><span>${params[s.param].name}</span><b>${scenarioOptions(s, base)[answers[s.id]].label}</b></li>`).join('');
+    return `<p class="scn-done">这是你对未来年景的判断。</p><ul class="scn-summary">${rows}</ul><p class="fine">打开专业模式后，可以一键带入这些假设。</p><div class="goal-row"><button type="button" class="ghost" id="scn-restart">重新回答</button></div>`;
   }
-  const round = rounds[index], choice = answers[index];
-  const head = `<p class="quiz-count">第 ${index + 1} / ${rounds.length} 题</p><p class="quiz-q">对你来说，哪一个对放假年龄的影响更大？先猜再看。</p>`;
-  if (!choice) {
-    return `${head}<div class="quiz-options"><button type="button" class="quiz-option" data-quiz="a">${round.a.label}</button><button type="button" class="quiz-option" data-quiz="b">${round.b.label}</button></div>`;
-  }
-  const right = round.answer === 'either' || round.answer === choice;
-  const row = key => {
-    const side = round[key];
-    const mark = key === choice ? '<span class="quiz-mine">你选的</span>' : '';
-    return `<div class="quiz-row"><span>${side.label}${mark}</span><b>${effectText(side.gain)}</b></div>`;
-  };
-  const verdict = round.answer === 'either' ? '差不多，都算对。' : right ? '猜对了。' : '这次猜错了。';
-  const last = index === rounds.length - 1;
-  return `${head}<div class="quiz-reveal"><p class="quiz-verdict">${verdict}</p>${row('a')}${row('b')}<p class="quiz-insight">${round.insight}</p><p class="quiz-written">你选的这一项已写进第五条人生。</p>
-    <button type="button" class="primary" id="quiz-next">${last ? '看成绩' : '下一题'}</button></div>`;
+  const scenario = SCENARIOS[index];
+  const chosen = answers[scenario.id];
+  const options = scenarioOptions(scenario, base).map((o, i) => `<button type="button" class="scn-option" data-scn="${i}" aria-pressed="${chosen === i}">${o.label}</button>`).join('');
+  const reveal = chosen === undefined ? '' : `<div class="scn-reveal">${effect ? `<p class="scn-effect">${effect}</p>` : ''}<p class="scn-insight">${scenario.insight}</p>${teaching(params[scenario.param])}<button type="button" class="primary" id="scn-next">${index === total - 1 ? '看我的判断' : '下一题'}</button></div>`;
+  return `<p class="quiz-count">第 ${index + 1} / ${total} 题</p><p class="quiz-q">${scenario.question}</p><div class="scn-options">${options}</div>${reveal}`;
+}
+
+export function viewsBannerHtml(answers, base, params, applied) {
+  const values = answerValues(answers, base);
+  const items = SCENARIOS.filter(s => values[s.param] !== undefined).map(s => `<li><span>${params[s.param].name}</span><b>${scenarioOptions(s, base)[answers[s.id]].label}</b></li>`).join('');
+  if (!items) return '';
+  const action = applied ? '<span class="pill">已带入假设</span>' : '<button type="button" class="ghost" id="views-apply">带入假设</button>';
+  return `<h2>你的年景判断</h2><p class="sub">来自简单模式的回答，带入后可以继续手动调整。</p><ul class="scn-summary">${items}</ul><div class="goal-row">${action}</div>`;
 }
 
 export function cardBody(param, impact, tryBlock = '') {
@@ -318,7 +320,7 @@ const endingText = (story, D) => {
 function lifeRow(path, story, index, selected, D, { fifth = false, maxCells }) {
   const facts = story.outcome === 'working' ? [] : [`放假 ${holidayYearsOf(story)} 年有钱花`];
   if (story.worst && story.worst.ret < 0) facts.push(`最惨一年 ${signedPct(story.worst.ret)}`);
-  const name = fifth ? `第五条 · ${lifeName(story)}` : lifeName(story);
+  const name = fifth ? '等你来写' : lifeName(story);
   return `<button type="button" class="life${fifth ? ' fifth' : ''}" data-life="${index}" aria-pressed="${index === selected}"><span class="life-top"><span class="life-name">${name}</span><span class="life-end">${endingText(story, D)}</span></span>${ribbonSvg(path, maxCells)}<span class="life-sub">${facts.join(' · ')}</span></button>`;
 }
 
@@ -328,14 +330,14 @@ export function livesHtml(lives, stories, selected, { p, dispCur, fifth = null }
   const rows = lives.map((life, i) => lifeRow(life, stories[i], i, selected, D, { maxCells })).join('');
   const last = fifth
     ? lifeRow(fifth.path, fifth.story, lives.length, selected, D, { fifth: true, maxCells })
-    : '<div class="life-empty" id="life-fifth-empty"><b>第五条人生</b>等你来写。回答“写你的第五条人生”里的题，或者拖动参数滑杆，它会用四条里最难的那段年景，换上你的计划重走一遍。</div>';
+    : '<div class="life-empty" id="life-fifth-empty"><b>等你来写</b>说说你对未来年景的判断，它会用这四条里最难的那段日子，按你的判断重走一遍。</div>';
   return rows + last;
 }
 
 export function fifthCompareHtml(base, fifth, labels, { p, dispCur }) {
   const D = v => money(toDisplay(v, p, dispCur), dispCur);
   const plan = story => `${story.retireAge === null ? '还没放假' : `${story.retireAge} 岁放假`}，${endingText(story, D)}`;
-  return `<p class="fifth-compare">和「${lifeName(base)}」同样的年景。原计划：${plan(base)}。你改写后：${plan(fifth)}。</p>`;
+  return `<p class="fifth-compare">和「${lifeName(base)}」同样的年景。原计划：${plan(base)}。你写的：${plan(fifth)}。</p>`;
 }
 
 export const fifthSentence = (base, fifth) => {
@@ -351,7 +353,7 @@ export const fifthSentence = (base, fifth) => {
 
 export function labChangesHtml(labels) {
   if (!labels.length) return '';
-  return `<div class="life-changes"><span>已写入第五条人生：${labels.join('、')}</span><button type="button" class="ghost" id="lab-clear">清空重写</button></div>`;
+  return `<div class="life-changes"><span>已写入：${labels.join('、')}</span><button type="button" class="ghost" id="lab-clear">清空重写</button></div>`;
 }
 
 export function stickyHtml(h, { p, dispCur, success, pro }) {

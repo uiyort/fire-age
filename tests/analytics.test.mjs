@@ -48,8 +48,8 @@ test('drawing a life is a countable event', async () => {
   assert.ok(EVENTS.has('life_draw'));
 });
 
-test('finishing the quiz is a countable event, and copying no longer is', async () => {
+test('finishing the questions is a countable event, and copying no longer is', async () => {
   const { EVENTS } = await import('../functions/api/e.js');
-  assert.ok(EVENTS.has('quiz_done'));
+  assert.ok(EVENTS.has('views_done'));
   assert.ok(!EVENTS.has('copy_text'));
 });
