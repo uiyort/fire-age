@@ -1,0 +1,13 @@
+{
+  "name": "fire-age",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "description": "放假年龄 / FIRE Age: a learn-as-you-calculate financial independence calculator.",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "e2e": "playwright test",
+    "serve": "node scripts/serve.mjs"
+  }
+}
