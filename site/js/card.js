@@ -115,6 +115,15 @@ const LINE_GAP = 16;
 const LINE_HEIGHT = 1.45;
 
 // The largest font size at which the extra lines fit the space above the footer.
+// One short line at full size, or up to two lines, shrinking no smaller than minPx.
+export function noteLayout(measure, text, maxWidth, startPx = 34, minPx = 22) {
+  for (let px = startPx; px >= minPx; px -= 2) {
+    const lines = wrapText(t => measure(t, px), text, maxWidth);
+    if (lines.length <= 2) return { px, lines };
+  }
+  return { px: minPx, lines: wrapText(t => measure(t, minPx), text, maxWidth).slice(0, 2) };
+}
+
 export function fitLines(measure, paragraphs, maxWidth, available, startPx = 42, minPx = 26) {
   const heightAt = px => paragraphs.reduce((sum, text) => sum + LINE_GAP + wrapText(t => measure(t, px), text, maxWidth).length * px * LINE_HEIGHT, 0);
   let px = startPx;
@@ -280,10 +289,11 @@ function renderSummary(spec, canvas) {
   }
 
   // One line at most, then the lives as a barcode.
-  const noteY = stampBase + 108;
+  let noteY = stampBase + 108;
   if (spec.note) {
-    const notePx = fitFontSize(measureAt(bold), spec.note, inner, 34, 22);
-    put(bold(notePx), STUB_INK, spec.note, left, noteY);
+    const { px, lines } = noteLayout(measureAt(bold), spec.note, inner);
+    lines.forEach((line, i) => put(bold(px), STUB_INK, line, left, noteY + i * px * 1.3));
+    noteY += (lines.length - 1) * px * 1.3;
   }
   const hintY = ty + th - 44;
   const barsBottom = hintY - 54;

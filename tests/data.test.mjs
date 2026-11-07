@@ -43,6 +43,16 @@ test('the China 10-year yield comes from the OECD, a source that allows reuse, a
   assert.match(oecd.license, /CC BY 4\.0/);
 });
 
+test('the archive of the current version matches the data the site uses', async () => {
+  const { readFileSync: read } = await import('node:fs');
+  const { default: latest } = await import('../site/js/data-latest.js');
+  assert.deepEqual(JSON.parse(read(`site/data/${latest.version}.json`, 'utf8')), JSON.parse(JSON.stringify(latest)));
+});
+
+test('the OECD parser refuses a malformed date', () => {
+  assert.throws(() => parseOecd('REF_AREA,TIME_PERIOD,OBS_VALUE\nCHN,<img src=x>,1.6'));
+});
+
 test('the OECD parser ignores rows with no value', () => {
   const csv = 'REF_AREA,TIME_PERIOD,OBS_VALUE\nCHN,2026-10,\nCHN,2026-09,1.68\nCHN,2026-08,1.69';
   assert.deepEqual(parseOecd(csv), { value: 1.68, observedAt: '2026-09' });

@@ -29,7 +29,8 @@ function fakeDb() {
 }
 
 const full = Object.fromEntries(SCENARIOS.map(s => [s.id, 1]));
-const post = (body, env) => onRequestPost({ request: new Request('https://x/api/views', { method: 'POST', body: JSON.stringify(body) }), env });
+const JSON_TYPE = { 'content-type': 'application/json' };
+const post = (body, env, headers = JSON_TYPE) => onRequestPost({ request: new Request('https://x/api/views', { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) }), env });
 const get = env => onRequestGet({ request: new Request('https://x/api/views'), env });
 
 test('the server knows the same questions as the page', () => {
@@ -54,6 +55,16 @@ test('partial, unknown or out-of-range answers are rejected without writing', as
   assert.equal(env.VIEWS.rows.size, 0);
 });
 
+test('a post that is not JSON, comes from another site or is oversized is refused without writing', async () => {
+  const env = { VIEWS: fakeDb() };
+  assert.equal((await post({ a: full }, env, { 'content-type': 'text/plain' })).status, 415);
+  assert.equal((await post({ a: full }, env, { ...JSON_TYPE, origin: 'https://evil.example' })).status, 403);
+  assert.equal((await post({ a: full }, env, { ...JSON_TYPE, 'sec-fetch-site': 'cross-site' })).status, 403);
+  assert.equal((await post(JSON.stringify({ a: full, pad: 'x'.repeat(600) }), env)).status, 413);
+  assert.equal(env.VIEWS.rows.size, 0);
+  assert.equal((await post({ a: full }, env, { ...JSON_TYPE, origin: 'https://x', 'sec-fetch-site': 'same-origin' })).status, 204);
+});
+
 test('totals come back as shares per option, and are cached briefly', async () => {
   const env = { VIEWS: fakeDb() };
   await post({ a: full }, env);
@@ -75,12 +86,15 @@ const base = baselineOf(DATA, 'CN');
 const params = Object.fromEntries(PARAMS.map(c => [c.id, c]));
 const done = crowd => scenarioHtml({ index: SCENARIOS.length, answers: full, base, effect: '', params, crowd });
 
-test('the summary says what is kept, and has no button unless counting failed', () => {
-  const html = done({ status: 'loading' });
-  assert.ok(!html.includes('crowd-join'));
-  assert.match(html, /匿名/);
-  assert.match(html, /不记录/);
-  assert.deepEqual(findBannedCopy(html), []);
+test('the summary claims the answers were counted only once they were, and has no button unless counting failed', () => {
+  const loading = done({ status: 'loading' });
+  assert.ok(!loading.includes('crowd-join'));
+  assert.ok(!loading.includes('已匿名计入'));
+  const shown = done({ status: 'shown', sent: true, total: 3, counts: {} });
+  assert.match(shown, /已匿名计入/);
+  assert.match(shown, /不记录/);
+  assert.match(shown, /之后改答案不会再计/);
+  assert.deepEqual(findBannedCopy(shown), []);
   assert.match(done({ status: 'error' }), /crowd-join/);
 });
 

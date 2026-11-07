@@ -181,13 +181,13 @@ function teaching(param) {
 
 // What other people think: finished answers are counted anonymously, once per browser, then compared with everyone's.
 function crowdHtml(crowd) {
-  const privacy = '你的回答已匿名计入：只记录这 6 个选项，不记录 IP、设备、时间或你填的其它数字。';
+  const privacy = '你的回答已匿名计入：只记录这 6 个选项，不记录 IP、设备、时间或你填的其它数字。每个浏览器只计一次，之后改答案不会再计。';
   if (crowd.status === 'error') return `<div class="crowd"><p class="fine">暂时连不上大家的统计，稍后再试。</p><button type="button" class="ghost" id="crowd-join">再试一次</button></div>`;
   if (crowd.status === 'shown') {
     const more = crowd.total < MIN_SHOWN ? `，满 ${MIN_SHOWN} 人后显示比例` : '';
-    return `<div class="crowd"><p class="fine">已有 ${crowd.total.toLocaleString('zh-CN')} 人回答${more}。${privacy}</p></div>`;
+    return `<div class="crowd"><p class="fine">已有 ${crowd.total.toLocaleString('zh-CN')} 人回答${more}。${crowd.sent ? privacy : ''}</p></div>`;
   }
-  return `<div class="crowd"><p class="fine">正在汇总大家的判断……${privacy}</p></div>`;
+  return '<div class="crowd"><p class="fine">正在汇总大家的判断……</p></div>';
 }
 
 const crowdShare = (crowd, id, chosen) => {
@@ -354,18 +354,23 @@ export function livesHtml(lives, stories, selected, { p, dispCur, fifth = null, 
   return rows + last;
 }
 
-export function fifthCompareHtml(base, fifth, baseName = lifeName(base)) {
+export function fifthCompareHtml(base, fifth, baseName = lifeName(base), D = wan) {
   const why = base.outcome === 'ruined' ? '钱最早花完' : '剩得最少';
-  return `<p class="fifth-compare">虚线是最难的「${baseName}」（${why}）。${fifthSentence(base, fifth)}。</p>`;
+  return `<p class="fifth-compare">虚线是最难的「${baseName}」（${why}）。${fifthSentence(base, fifth, D)}。</p>`;
 }
 
 // Years after the money runs out are not a holiday, so the change is counted in holiday years that still have money.
-export const fifthSentence = (base, fifth) => {
+const wan = v => `${Math.round(v / 1e4)}万`;
+
+export const fifthSentence = (base, fifth, D = wan) => {
   if (fifth.outcome === 'working') return `同样的年景，到 ${fifth.endAge} 岁也放不了假`;
   const end = fifth.outcome === 'ruined' ? `${fifth.ruinAge} 岁花完` : `钱撑到 ${fifth.endAge} 岁`;
   if (base.outcome === 'working') return `同样的年景，原来放不了假，现在 ${fifth.retireAge} 岁放假，${end}`;
   const before = holidayYearsOf(base), after = holidayYearsOf(fifth), diff = base.retireAge - fifth.retireAge;
-  if (!diff && before === after && base.outcome === fifth.outcome) return '同样的年景，结局没有变，换个选择再试试';
+  if (!diff && before === after && base.outcome === fifth.outcome) {
+    const moved = base.outcome === 'lasted' && Math.abs(fifth.endAssets - base.endAssets) > Math.max(Math.abs(base.endAssets), 1) * 0.01;
+    return moved ? `同样的年景，钱都撑到 ${fifth.endAge} 岁，最后剩下的从 ${D(base.endAssets)} 变成 ${D(fifth.endAssets)}` : '同样的年景，结局没有变，换个选择再试试';
+  }
   const years = before === after ? `有钱花的假期还是 ${after} 年` : `有钱花的假期从 ${before} 年变成 ${after} 年`;
   const when = diff ? [`${diff > 0 ? '早' : '晚'} ${Math.abs(diff)} 年放假`] : [];
   return `同样的年景，${years}：${[...when, end].join('，')}`;
@@ -450,7 +455,8 @@ export function storyHtml(story, { p, dispCur }) {
     const versus = Math.abs(gap) < 0.005 ? '和放假线差不多' : gap > 0 ? `比放假线多 ${(gap * 100).toFixed(0)}%` : `比放假线少 ${(-gap * 100).toFixed(0)}%`;
     events.push([story.retireAge, `按计划放假，手上有 ${D(story.retireAssets)}，${versus}。`]);
   }
-  if (story.outcome === 'ruined') events.push([story.ruinAge, '积蓄花完了。现实里可以减支或兼职，这里按固定支出计算。']);
+  const spending = p.flexCut > 0 ? `这里大跌后少花 ${p.flexCut}%，其余年份照常花` : '这里按固定支出计算';
+  if (story.outcome === 'ruined') events.push([story.ruinAge, `积蓄花完了。现实里可以减支或兼职，${spending}。`]);
   if (story.outcome === 'lasted') events.push([story.endAge, `走到规划终点，还剩 ${D(story.endAssets)}。`]);
   if (story.outcome === 'working') events.push([story.endAge, `一直在积累，到这时有 ${D(story.endAssets)}。`]);
   events.sort((a, b) => a[0] - b[0]);

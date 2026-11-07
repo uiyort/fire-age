@@ -130,6 +130,7 @@ export function tryParam(p, id, value) {
 export const LIFE_CHOICES = ['income', 'expense', 'growth', 'retExp', 'life', 'pension', 'pAge', 'swr', 'drag'];
 
 // The plan with the person's answers and slider values applied. The real plan is untouched.
-export function labPlan(p, { values = {} } = {}) {
-  return rebuild(p, { ...values, ...(values.swr === undefined ? {} : { autoSwr: false }) });
+export function labPlan(p, { values = {}, minLife = 0 } = {}) {
+  const life = values.life === undefined ? {} : { life: Math.max(values.life, minLife) };
+  return rebuild(p, { ...values, ...life, ...(values.swr === undefined ? {} : { autoSwr: false }) });
 }

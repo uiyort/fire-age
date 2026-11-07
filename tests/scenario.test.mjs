@@ -5,7 +5,7 @@ import { fiYears, fwdSolve, lifePath, monteCarlo } from '../site/js/engine.js';
 import { defaultState, setField, toParams } from '../site/js/state.js';
 import { labPlan } from '../site/js/levers.js';
 import { PARAMS, PARAM_GROUPS } from '../site/js/params.js';
-import { SCENARIOS, answerValues, baselineOf, scenarioOptions } from '../site/js/scenario.js';
+import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody, scenarioOptions } from '../site/js/scenario.js';
 import { scenarioHtml, viewsBannerHtml } from '../site/js/views.js';
 import { findBannedCopy } from '../scripts/lint-copy.mjs';
 
@@ -44,6 +44,18 @@ test('answers become parameter values, and are the same every time they are appl
   assert.deepEqual(values, answerValues(answers, base));
   assert.deepEqual(answerValues({}, base), {});
   assert.deepEqual(answerValues({ gone: 1 }, base), {});
+});
+
+test('stored answers keep only current questions with a valid option', () => {
+  assert.deepEqual(cleanAnswers({ market: 9, crash: 1, nerve: -1, prices: 1.5, rates: '2', wages: 0, gone: 1 }), { crash: 1, wages: 0 });
+  for (const bad of [null, 'x', 7, [1, 2]]) assert.deepEqual(cleanAnswers(bad), {});
+});
+
+test('only a full set of current answers is sent for counting', () => {
+  const full = Object.fromEntries(SCENARIOS.map(s => [s.id, 2]));
+  assert.deepEqual(countBody({ ...full, gone: 1 }), { a: full });
+  const { market: _m, ...partial } = full;
+  assert.equal(countBody(partial), null);
 });
 
 test('a darker view of the market pushes the holiday back', () => {

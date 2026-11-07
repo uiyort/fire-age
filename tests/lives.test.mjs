@@ -320,6 +320,19 @@ test('the sensitivity table never claims age has no effect, and keeps the stock 
   assert.match(row('eq'), /波动/);
 });
 
+test('when both lives last, the sentence says how the money left changed', () => {
+  const base = story({ endAssets: 5770000 });
+  const D = v => `¥${Math.round(v / 1e4)}万`;
+  assert.equal(fifthSentence(base, story({ endAssets: 1880000 }), D), '同样的年景，钱都撑到 95 岁，最后剩下的从 ¥577万 变成 ¥188万');
+  assert.equal(fifthSentence(base, story({ endAssets: 5780000 }), D), '同样的年景，结局没有变，换个选择再试试');
+});
+
+test('a written plan never ends before the holiday it keeps', () => {
+  const p = person();
+  assert.equal(labPlan(p, { values: { life: 70 }, minLife: 81 }).life, 81);
+  assert.equal(labPlan(p, { values: { life: 90 }, minLife: 81 }).life, 90);
+});
+
 test('a written life that runs dry sooner says so plainly', () => {
   const base = story({ outcome: 'ruined', ruinAge: 71 });
   assert.equal(fifthSentence(base, story({ outcome: 'ruined', ruinAge: 68 })), '同样的年景，有钱花的假期从 28 年变成 25 年：68 岁花完');

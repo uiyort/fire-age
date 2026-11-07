@@ -6,6 +6,15 @@ import { defaultState, setField, setRetireCountry, setWorkCountry, toParams } fr
 import { rankLevers } from '../site/js/levers.js';
 import { GROUPS, TYPES, drawLives, holidayType, lifeStory, mondaysIn, placeRanking, workdaysIn } from '../site/js/holiday.js';
 import { livesSummary, storyHtml } from '../site/js/views.js';
+
+test('a life that runs dry says fixed spending only when spending was fixed', () => {
+  const p = toParams(defaultState(DATA), DATA);
+  const s = { outcome: 'ruined', endAge: 95, endAssets: 0, ruinAge: 70, retireAge: 43, retireAssets: 1, retireNeed: 1, worst: null, best: null, firstFive: 0 };
+  assert.match(storyHtml(s, { p, dispCur: 'CNY' }), /固定支出/);
+  const cut = storyHtml(s, { p: { ...p, flexCut: 30 }, dispCur: 'CNY' });
+  assert.ok(!cut.includes('固定支出'));
+  assert.match(cut, /少花 30%/);
+});
 import { findBannedCopy } from '../scripts/lint-copy.mjs';
 
 function person(fields = {}, { workC = 'CN', retC = 'CN' } = {}) {

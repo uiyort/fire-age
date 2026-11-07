@@ -16,6 +16,7 @@ export function buildParams(raw, fx) {
   p.age = Math.round(raw.age);
   p.life = Math.max(Math.round(raw.life), p.age + 2);
   p.tAge = Math.min(Math.max(Math.round(raw.tAge), p.age + 1), p.life - 1);
+  p.flexCut = Math.min(Math.max(raw.flexCut ?? 0, 0), 100);
   const w = Math.min(Math.max(raw.eq, 0), 100) / 100;
   p.w = w;
   p.bondReal = (raw.bondY - raw.infl) / 100;

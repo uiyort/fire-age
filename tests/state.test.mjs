@@ -3,6 +3,13 @@ import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
 import { defaultState, setField, setWorkCountry, setRetireCountry, estimateRetireSpend, toParams, loadState, saveState } from '../site/js/state.js';
 
+test('the bad-year cut stays between 0 and 100 percent', () => {
+  const at = v => toParams(setField(defaultState(DATA), 'flexCut', String(v), DATA), DATA).flexCut;
+  assert.equal(at(150), 100);
+  assert.equal(at(-50), 0);
+  assert.equal(at(30), 30);
+});
+
 const fx = c => DATA.fx[c]?.value ?? 1;
 
 test('clearing a money field means zero, never the example default', () => {

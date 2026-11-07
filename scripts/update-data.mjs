@@ -83,6 +83,7 @@ export function parseOecd(csv) {
   const [header, ...rows] = lines(csv).map(l => l.split(','));
   const iTime = header.indexOf('TIME_PERIOD'), iValue = header.indexOf('OBS_VALUE');
   const latest = rows.filter(r => num(r[iValue]) !== null).sort((a, b) => (a[iTime] < b[iTime] ? 1 : -1))[0];
+  if (!/^\d{4}-\d{2}$/.test(latest[iTime])) throw new Error(`unexpected OECD period ${latest[iTime]}`);
   return { value: num(latest[iValue]), observedAt: latest[iTime] };
 }
 

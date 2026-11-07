@@ -18,6 +18,8 @@ export function baselineOf(data, workC) {
 }
 
 const round = v => Math.round(v * 100) / 100;
+// Every question offers three answers; a test checks this.
+const OPTION_COUNT = 3;
 
 // Shares of what other people answered are shown only once this many full sets have been counted.
 export const MIN_SHOWN = 30;
@@ -31,7 +33,7 @@ export const SCENARIOS = [
   {
     id: 'crash', param: 'flexCut', question: '碰上大跌那年，第二年你愿意少花多少？',
     options: () => [['照常花', 0], ['少花 10%', 10], ['少花 30%', 30]],
-    insight: '放假后最怕刚开始就遇到坏年份。大跌后少花一点，不会让放假提前，但常常能让钱撑得更久。',
+    insight: '放假后最怕刚开始就遇到坏年份。大跌后少花一点，不会让放假提前，有时能让钱撑得更久，但大跌本身不常见。',
   },
   {
     id: 'nerve', param: 'eq', question: '账户一年跌掉三成，你撑得住吗？',
@@ -56,6 +58,23 @@ export const SCENARIOS = [
 ];
 
 export const scenarioOptions = (scenario, base) => scenario.options(base).map(([label, value]) => ({ label, value }));
+
+// Stored answers, keeping only current questions with an option that exists.
+export function cleanAnswers(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out = {};
+  for (const s of SCENARIOS) {
+    const v = raw[s.id];
+    if (Number.isInteger(v) && v >= 0 && v < OPTION_COUNT) out[s.id] = v;
+  }
+  return out;
+}
+
+// The body sent for counting: every current question answered, nothing else, or nothing at all.
+export function countBody(answers) {
+  const clean = cleanAnswers(answers);
+  return SCENARIOS.every(s => clean[s.id] !== undefined) ? { a: Object.fromEntries(SCENARIOS.map(s => [s.id, clean[s.id]])) } : null;
+}
 
 // Answers as parameter values. Answers to questions that no longer exist are ignored.
 export function answerValues(answers, base) {

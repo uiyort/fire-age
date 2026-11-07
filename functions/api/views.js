@@ -10,11 +10,29 @@ const valid = a => a && typeof a === 'object' && !Array.isArray(a)
   && Object.keys(a).length === QUESTIONS.length
   && QUESTIONS.every(id => Number.isInteger(a[id]) && a[id] >= 0 && a[id] < OPTIONS);
 
+const MAX_BODY = 512;
+
+// Only this site's page may post: a JSON content type forces a browser preflight that this function never answers,
+// and an Origin or Sec-Fetch-Site header from elsewhere is refused outright.
+function refusal(request) {
+  if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) return 415;
+  const origin = request.headers.get('origin');
+  if (origin && origin !== new URL(request.url).origin) return 403;
+  const site = request.headers.get('sec-fetch-site');
+  if (site && site !== 'same-origin') return 403;
+  if (Number(request.headers.get('content-length') ?? 0) > MAX_BODY) return 413;
+  return 0;
+}
+
 export async function onRequestPost({ request, env }) {
+  const status = refusal(request);
+  if (status) return new Response(null, { status });
   if (!env.VIEWS) return new Response(null, { status: 503 });
   let body;
   try {
-    body = JSON.parse(await request.text());
+    const text = await request.text();
+    if (text.length > MAX_BODY) return new Response(null, { status: 413 });
+    body = JSON.parse(text);
   } catch {
     return new Response(null, { status: 400 });
   }

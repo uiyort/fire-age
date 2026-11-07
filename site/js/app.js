@@ -4,7 +4,7 @@ import { DEFAULT_SEED, bwdSolve, dualAges, fiNeed, fiYears, fwdSolve, lifePath, 
 import { drawLives, hardestIndex, heroModel, holidayType, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking } from './holiday.js';
 import { commitField, isProUnlocked, loadState, saveState, safeStorage, setField, unlockPro, setRetireCountry, setWorkCountry, toParams } from './state.js';
 import { LIFE_CHOICES, labPlan, rankLevers, impactOf, tryRange } from './levers.js';
-import { SCENARIOS, answerValues, baselineOf } from './scenario.js';
+import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody } from './scenario.js';
 import { PARAMS, PARAM_GROUPS } from './params.js';
 import { makeGoal, compareVisit, goalApplies, loadGoal, saveGoal, clearGoal } from './goals.js';
 import { initAnalytics, track } from './analytics.js';
@@ -53,12 +53,16 @@ function crowdSent() {
 }
 
 // Counts the answers once per browser, only on request, then shows what everyone answered.
+let crowdBusy = false;
 async function joinCrowd() {
+  if (crowdBusy) return;
+  crowdBusy = true;
   crowd = { ...crowd, status: 'loading' };
   renderScenario();
   try {
-    if (!crowd.sent) {
-      const sent = await fetch('/api/views', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ a: scnAnswers }) });
+    const body = countBody(scnAnswers);
+    if (!crowd.sent && body) {
+      const sent = await fetch('/api/views', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
       if (!sent.ok) throw new Error(String(sent.status));
       try { storage.setItem(CROWD_SENT_KEY, '1'); } catch { /* counted once per visit at worst */ }
       crowd = { ...crowd, sent: true };
@@ -70,6 +74,7 @@ async function joinCrowd() {
   } catch {
     crowd = { ...crowd, status: 'error' };
   }
+  crowdBusy = false;
   renderScenario();
 }
 const PLAYED_KEY = 'fire-age-played-v1';
@@ -77,8 +82,7 @@ const played = new Set(loadPlayed());
 
 function loadAnswers() {
   try {
-    const saved = JSON.parse(storage.getItem(VIEWS_KEY));
-    return saved && typeof saved === 'object' ? saved : {};
+    return cleanAnswers(JSON.parse(storage.getItem(VIEWS_KEY)));
   } catch {
     return {};
   }
@@ -342,7 +346,7 @@ function fifthLife(p, lives, stories, { mode, retireT, s0 }) {
   const values = { ...answerValues(scnAnswers, baseline()), ...labValues };
   if (!Object.keys(values).length) return null;
   const base = hardestIndex(stories);
-  const q = labPlan(p, { values });
+  const q = labPlan(p, { values, minLife: mode === 'bwd' ? p.age + retireT + 1 : 0 });
   const path = mode === 'bwd' ? lifePath(q, retireT, s0, lives[base].seed) : lifePath(q, fwdSolve(q), null, lives[base].seed);
   return { path, story: lifeStory(path, q), base: stories[base], baseIndex: base, plan: q };
 }
@@ -366,7 +370,7 @@ function renderLives() {
   $('life-changes').innerHTML = labChangesHtml(labLabels());
   $('life-summary').textContent = livesSummary(stories, mc);
   const story = selectedFifth ? fifth.story : stories[lifeIndex];
-  const compare = fifth ? fifthCompareHtml(fifth.base, fifth.story, names[fifth.baseIndex]) : '';
+  const compare = fifth ? fifthCompareHtml(fifth.base, fifth.story, names[fifth.baseIndex], latestMoney()) : '';
   $('life-story').innerHTML = `${selectedFifth ? compare : ''}${storyHtml(story, { p: selectedFifth ? fifth.plan : p, dispCur: cur })}`;
   $('life-seed').textContent = `随机种子 ${lifeSeed} 到 ${lifeSeed + lives.length - 1}，同样的输入可以复现这几条人生。收益是模型抽样，不是历史重演。`;
   const scale = v => toDisplay(v, p, cur);
@@ -387,9 +391,12 @@ function renderLives() {
   renderScenario();
 }
 
+// Amounts in the display currency, for sentences about the written life.
+const latestMoney = () => v => money(toDisplay(v, latest.p, latest.dispCur), latest.dispCur);
+
 function renderScenario() {
   const fifth = latest.fifth;
-  const effect = fifth ? fifthSentence(fifth.base, fifth.story) : '';
+  const effect = fifth ? fifthSentence(fifth.base, fifth.story, latestMoney()) : '';
   $('scenario').innerHTML = scenarioHtml({ index: scnIndex, answers: scnAnswers, base: baseline(), effect, params: paramById, crowd });
   renderViewsBanner();
 }
@@ -541,7 +548,7 @@ function summaryInput() {
     enough: bwd.s0 <= 0,
     monthlyText: wholeMoney(toDisplay(Math.max(bwd.s0, 0) / 12, p, cur), cur),
     place: gain >= 0.05 ? { name: best.name, gain } : null,
-    fifth: fifth ? fifthSentence(fifth.base, fifth.story) : null,
+    fifth: fifth ? fifthSentence(fifth.base, fifth.story, latestMoney()) : null,
     lit: { done: played.size, total: PARAMS.length },
     goal: achieved ? goal.label : null,
   };
@@ -631,7 +638,7 @@ function onClick(ev) {
   if (ev.target.id === 'scn-next') {
     scnIndex += 1;
     if (scnIndex === SCENARIOS.length) {
-      track('views_done');
+      if (!crowd.sent) track('views_done');
       joinCrowd();
       return;
     }

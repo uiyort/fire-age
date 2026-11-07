@@ -135,13 +135,12 @@
         "note": "投资税费对年收益的拖累，是本工具的粗略估计，不是税务计算，可修改。"
       },
       "y10": {
-        "value": 1.6,
-        "sourceId": "assumption",
-        "url": "method.html",
-        "observedAt": "2026-11",
+        "sourceId": "oecd",
+        "url": "https://data-explorer.oecd.org/",
+        "value": 1.68,
+        "observedAt": "2026-09",
         "fetchedAt": "2026-11-07",
-        "status": "assumed",
-        "note": "中国货币网的条款不允许未经授权转载其数据，所以本工具不抓取、不转载。1.6% 是本工具按 2026 年 11 月公开市场水平设定的假设，不会自动更新，可在专业模式修改。"
+        "status": "official"
       }
     },
     "US": {
@@ -625,6 +624,13 @@
       "url": "https://data.bis.org/topics/CPI",
       "license": "可在不向用户额外收费的产品中使用，须注明 BIS 为来源。",
       "termsUrl": "https://data.bis.org/help/legal"
+    },
+    {
+      "id": "oecd",
+      "name": "经合组织（OECD）Financial market statistics: Long-term interest rates (IRLT), China, monthly",
+      "url": "https://data-explorer.oecd.org/",
+      "license": "CC BY 4.0，须注明 OECD 为来源。OECD 未对本工具背书。月度数据，通常晚 1 到 2 个月。",
+      "termsUrl": "https://www.oecd.org/en/about/oecd-open-by-default-policy.html"
     },
     {
       "id": "ustreasury",

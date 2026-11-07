@@ -23,7 +23,8 @@ This guide is for the project's author. The first section is a one-off that only
    npx wrangler d1 create fire-age-views
    npx wrangler d1 execute fire-age-views --remote --file db/views.sql
    ```
-   Then bind it in the project's settings: variable `VIEWS`, database `fire-age-views` (or uncomment the block in `wrangler.toml` and paste the id). Without the binding the page still works and the button reports that it cannot connect. The free plan allows 100,000 writes a day; one counted set of answers is 7 writes. Optionally add one rate-limiting rule on `/api/views` (POST), which the free plan includes.
+   Then uncomment the `[[d1_databases]]` block in `wrangler.toml` and paste the database id. This is the only way to bind it: once a Pages project uses `wrangler.toml`, bindings come from that file, not from the dashboard. Without the binding the page still works, but every visitor who finishes the questions sees that the count cannot be reached.
+   Then add one rate-limiting rule (Security, WAF, Rate limiting rules; the free plan includes one): path equals `/api/views`, method POST, 5 requests per 10 seconds per IP, action Block. This is required. The function already refuses posts from other sites, non-JSON bodies and bodies over 512 bytes, but a script can still post directly. The free plan allows 100,000 writes a day, and one counted set of answers is 7 writes.
 5. Add the custom domain in the project's Custom domains tab.
 6. Add the live address to `README.md` and `README.en.md`.
 
@@ -47,7 +48,7 @@ Known limits of this check:
 | Market data update (`.github/workflows/update-data.yml`) | 16th of each month | One source failing keeps its last value, flagged on the sources page. If more than half fail, or one field stays on an old value for over 92 days, the job stops, nothing is published, and GitHub emails you |
 | Site deployment | On every push to `main` | Cloudflare keeps the previous version live |
 
-The China and Hong Kong 10-year yields are fixed assumptions that do not update. See [data-sources.md](data-sources.md).
+The Hong Kong 10-year yield is a fixed assumption that does not update. The China yield comes from the OECD's monthly series, one to two months behind. See [data-sources.md](data-sources.md).
 
 ## Traffic numbers
 

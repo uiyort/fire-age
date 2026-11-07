@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { summaryCardSpec, placeCardSpec, lifeCardSpec, typeCardSpec, fitFontSize, fitLines, wrapText } from '../site/js/card.js';
+import { summaryCardSpec, placeCardSpec, lifeCardSpec, typeCardSpec, fitFontSize, fitLines, noteLayout, wrapText } from '../site/js/card.js';
 import { findBannedCopy } from '../scripts/lint-copy.mjs';
 
 const type = {
@@ -74,6 +74,17 @@ test('long amounts shrink to fit and respect the minimum', () => {
   const px = fitFontSize(measure, 'THB 1,234,567,890,123', 400, 96, 24);
   assert.ok(measure('THB 1,234,567,890,123', px) <= 400 || px === 24);
   assert.equal(fitFontSize(measure, '41 岁', 900, 96, 24), 96);
+});
+
+test('a long note on the card wraps onto two lines inside the margin', () => {
+  const measure = (t, px) => [...t].length * px;
+  const note = '等你来写：同样的年景，钱都撑到 95 岁，最后剩下的从 ¥577万 变成 ¥188万';
+  const { px, lines } = noteLayout(measure, note, 872);
+  assert.ok(lines.length <= 2);
+  assert.ok(px >= 22);
+  assert.equal(lines.join(''), note);
+  for (const line of lines) assert.ok(measure(line, px) <= 872, line);
+  assert.deepEqual(noteLayout(measure, '短句', 872), { px: 34, lines: ['短句'] });
 });
 
 test('long sentences wrap without losing characters', () => {

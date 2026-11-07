@@ -305,6 +305,46 @@ test('when the count cannot be reached, it can be tried again', async ({ page })
   await expect(box).toContainText('3 人');
 });
 
+test('working backward, a shorter plan in the written life does not break the section', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/');
+  await page.click('#to-bwd');
+  await page.fill('#s-tage', '80');
+  await page.waitForTimeout(400);
+  const details = page.locator('#cards details[data-id="life"]');
+  await details.locator('summary').click();
+  await details.locator('input[type=range]').fill('79');
+  await expect(page.locator('#lives .life.fifth')).toHaveCount(1);
+  await expect(page.locator('#scenario [data-scn]')).toHaveCount(3);
+  expect(errors).toEqual([]);
+});
+
+test('broken stored answers are dropped instead of breaking the section', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fire-age-views-v1', JSON.stringify({ market: 9, crash: 1, gone: 1, nerve: 'x' })));
+  await page.goto('/');
+  await expect(page.locator('#scenario [data-scn]')).toHaveCount(3);
+  await expect(page.locator('#lives .life.fifth')).toHaveCount(1);
+});
+
+test('finishing twice while the first count is still on its way counts once', async ({ page }) => {
+  const posted = [];
+  await page.route('**/api/views', async route => {
+    if (route.request().method() === 'POST') {
+      posted.push(1);
+      await new Promise(r => setTimeout(r, 800));
+      return route.fulfill({ status: 204 });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ total: 1, counts: {} }) });
+  });
+  await page.goto('/');
+  const box = await finishViews(page);
+  await box.locator('[data-scn-goto]').last().click();
+  await box.locator('#scn-next').click();
+  await expect(box).toContainText('1 人');
+  expect(posted).toHaveLength(1);
+});
+
 test('every life row names its holiday luck', async ({ page }) => {
   await page.goto('/');
   for (const row of await page.locator('#lives .life').all()) {

@@ -39,5 +39,5 @@ Open with what the number did to you ("算出来还有 574 个周一就放假"),
 ## Honesty about the numbers
 
 - Results rest on assumptions. Say so when a number is the headline.
-- The China and Hong Kong 10-year yields are fixed assumptions, not live data. Mention this if the yield is central to the point.
+- The Hong Kong 10-year yield is a fixed assumption, and the China yield is a monthly OECD figure one to two months behind. Mention this if the yield is central to the point.
 - The success rate is a simulation, not a forecast.
