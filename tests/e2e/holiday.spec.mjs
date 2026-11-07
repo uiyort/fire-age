@@ -248,6 +248,54 @@ test('no two drawn lives share a name, and the hardest is marked', async ({ page
   await expect(page.locator('#lives .life', { hasText: '最难' })).toHaveCount(1);
 });
 
+async function crowdServer(page) {
+  const posted = [];
+  await page.route('**/api/views', async route => {
+    if (route.request().method() === 'POST') {
+      posted.push(route.request().postDataJSON());
+      return route.fulfill({ status: 204 });
+    }
+    const counts = Object.fromEntries(['market', 'crash', 'nerve', 'prices', 'rates', 'wages'].map(id => [id, [20, 50, 30]]));
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ total: 100, counts }) });
+  });
+  return posted;
+}
+
+async function finishViews(page) {
+  const box = page.locator('#scenario');
+  while (await box.locator('[data-scn]').count()) {
+    if (!(await box.locator('#scn-next').count())) await answer(page);
+    await box.locator('#scn-next').click();
+  }
+  return box;
+}
+
+test('nothing about the answers is sent until the person asks', async ({ page }) => {
+  const posted = await crowdServer(page);
+  await page.goto('/');
+  const box = await finishViews(page);
+  await expect(box.locator('#crowd-join')).toContainText('匿名');
+  await expect(box).toContainText('不记录');
+  expect(posted).toHaveLength(0);
+});
+
+test('answers counted on request show how many people see each one the same way, and are counted once', async ({ page }) => {
+  const posted = await crowdServer(page);
+  await page.goto('/');
+  let box = await finishViews(page);
+  await box.locator('#crowd-join').click();
+  await expect(box.locator('.crowd-share').first()).toContainText('20% 也这么看');
+  await expect(box).toContainText('100 人');
+  expect(posted).toHaveLength(1);
+  expect(Object.keys(posted[0])).toEqual(['a']);
+  await page.reload();
+  box = await finishViews(page);
+  await expect(box.locator('#crowd-join')).toHaveText('看看大家怎么判断');
+  await box.locator('#crowd-join').click();
+  await expect(box.locator('.crowd-share').first()).toBeVisible();
+  expect(posted).toHaveLength(1);
+});
+
 test('every life row names its holiday luck', async ({ page }) => {
   await page.goto('/');
   for (const row of await page.locator('#lives .life').all()) {

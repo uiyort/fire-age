@@ -19,6 +19,9 @@ export function baselineOf(data, workC) {
 
 const round = v => Math.round(v * 100) / 100;
 
+// Shares of what other people answered are shown only once this many full sets have been counted.
+export const MIN_SHOWN = 30;
+
 export const SCENARIOS = [
   {
     id: 'market', param: 'eqReal', question: '未来几十年，股市的年景你怎么看？',

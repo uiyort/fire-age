@@ -7,7 +7,7 @@ This guide is for the project's author. The first section is a one-off that only
 1. **Create a GitHub account**, if you do not have one.
 2. **Create a Cloudflare account** at dash.cloudflare.com.
 3. **Buy the domain.** In Cloudflare, open Domain Registration, then Register Domains. Search for a name and check the price at checkout. The estimate for a `.com` is ¥70–80 per year. Add a payment method and enable auto-renew, because links already posted will break if the domain lapses.
-4. **Create a Cloudflare API token** with these permissions: Account, Cloudflare Pages, Edit; Account, Workers Scripts, Edit; Account, Account Analytics, Read. Keep the token secret and pass it through an environment variable, never in chat logs or the repository.
+4. **Create a Cloudflare API token** with these permissions: Account, Cloudflare Pages, Edit; Account, Workers Scripts, Edit; Account, D1, Edit; Account, Account Analytics, Read. Keep the token secret and pass it through an environment variable, never in chat logs or the repository.
 5. **Note your Cloudflare account ID**, shown on the account overview page.
 
 ## Deploy
@@ -18,8 +18,14 @@ This guide is for the project's author. The first section is a one-off that only
    ```
 2. Create the Pages project and connect it to the repository in the Cloudflare dashboard: Workers & Pages, Create, Pages, Connect to Git. Leave the build command empty and set the output directory to `site`.
 3. In the project's settings, bind the Analytics Engine dataset: variable `EVENTS`, dataset `fire_age_events`. `wrangler.toml` already declares this.
-4. Add the custom domain in the project's Custom domains tab.
-5. Add the live address to `README.md` and `README.en.md`.
+4. Create the D1 database for the anonymous answer totals, bind it, and create the table:
+   ```bash
+   npx wrangler d1 create fire-age-views
+   npx wrangler d1 execute fire-age-views --remote --file db/views.sql
+   ```
+   Then bind it in the project's settings: variable `VIEWS`, database `fire-age-views` (or uncomment the block in `wrangler.toml` and paste the id). Without the binding the page still works and the button reports that it cannot connect. The free plan allows 100,000 writes a day; one counted set of answers is 7 writes. Optionally add one rate-limiting rule on `/api/views` (POST), which the free plan includes.
+5. Add the custom domain in the project's Custom domains tab.
+6. Add the live address to `README.md` and `README.en.md`.
 
 ## Check access from mainland China (before posting anything)
 

@@ -36,6 +36,7 @@ npm run e2e             # browser tests
 | `site/js/engine.js` | Financial model (pure functions) |
 | `site/data/` | Archive of each market data version |
 | `functions/api/e.js` | Anonymous event counter |
+| `functions/api/views.js`, `db/views.sql` | Anonymous totals of the views on the years ahead, counted only when a visitor chooses to |
 | `scripts/update-data.mjs` | Fetches and generates market data, automatically each month |
 | `scripts/check-cn.mjs` | Tests access speed from mainland China |
 | `data/assumptions.json` | This tool's fixed assumptions and source list |

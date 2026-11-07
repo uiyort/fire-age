@@ -36,6 +36,7 @@ npm run e2e             # 浏览器测试
 | `site/js/engine.js` | 金融模型（纯函数） |
 | `site/data/` | 每一期市场数据的归档 |
 | `functions/api/e.js` | 匿名访问统计接口 |
+| `functions/api/views.js`、`db/views.sql` | 年景判断的匿名人数（访客主动选择后才计入） |
 | `scripts/update-data.mjs` | 抓取并生成市场数据，每月自动运行 |
 | `scripts/check-cn.mjs` | 测试大陆访问速度 |
 | `data/assumptions.json` | 本工具的固定假设和来源清单 |

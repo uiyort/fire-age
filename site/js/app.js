@@ -41,6 +41,37 @@ let labValues = {};
 const VIEWS_KEY = 'fire-age-views-v1';
 let scnIndex = 0;
 let scnAnswers = loadAnswers();
+const CROWD_SENT_KEY = 'fire-age-crowd-sent-v1';
+let crowd = { status: 'idle', sent: crowdSent() };
+
+function crowdSent() {
+  try {
+    return storage.getItem(CROWD_SENT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+// Counts the answers once per browser, only on request, then shows what everyone answered.
+async function joinCrowd() {
+  crowd = { ...crowd, status: 'loading' };
+  renderScenario();
+  try {
+    if (!crowd.sent) {
+      const sent = await fetch('/api/views', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ a: scnAnswers }) });
+      if (!sent.ok) throw new Error(String(sent.status));
+      try { storage.setItem(CROWD_SENT_KEY, '1'); } catch { /* counted once per visit at worst */ }
+      crowd = { ...crowd, sent: true };
+    }
+    const got = await fetch('/api/views');
+    if (!got.ok) throw new Error(String(got.status));
+    const { total, counts } = await got.json();
+    crowd = { ...crowd, status: 'shown', total, counts };
+  } catch {
+    crowd = { ...crowd, status: 'error' };
+  }
+  renderScenario();
+}
 const PLAYED_KEY = 'fire-age-played-v1';
 const played = new Set(loadPlayed());
 
@@ -359,7 +390,7 @@ function renderLives() {
 function renderScenario() {
   const fifth = latest.fifth;
   const effect = fifth ? fifthSentence(fifth.base, fifth.story) : '';
-  $('scenario').innerHTML = scenarioHtml({ index: scnIndex, answers: scnAnswers, base: baseline(), effect, params: paramById });
+  $('scenario').innerHTML = scenarioHtml({ index: scnIndex, answers: scnAnswers, base: baseline(), effect, params: paramById, crowd });
   renderViewsBanner();
 }
 
@@ -585,6 +616,10 @@ function onClick(ev) {
   }
   if (ev.target.id === 'share-close') {
     hideCard();
+    return;
+  }
+  if (ev.target.id === 'crowd-join') {
+    joinCrowd();
     return;
   }
   const scnGoto = ev.target.closest('[data-scn-goto]');

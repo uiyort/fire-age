@@ -1,7 +1,7 @@
 // Turns model results into page text and tables. Strings only, no DOM access.
 import { coastNeed, conv, fiNeed, fwdSolve, swrFor, bwdSolve, savingsAt, savingsRate, buildParams } from './engine.js';
 import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn } from './holiday.js';
-import { SCENARIOS, answerValues, scenarioOptions } from './scenario.js';
+import { MIN_SHOWN, SCENARIOS, answerValues, scenarioOptions } from './scenario.js';
 import { LIFE_CHOICES, impactOf, tryParam } from './levers.js';
 
 const moneyFormats = {};
@@ -179,12 +179,30 @@ function teaching(param) {
   return `<p class="scn-what">${param.what}</p><p class="scn-ref">参考：${ref}</p>`;
 }
 
-export function scenarioHtml({ index, answers, base, effect, params }) {
+// What other people think: offered after the last question, counted only when the person chooses to.
+function crowdHtml(crowd) {
+  const privacy = '<p class="fine">只记录这 6 个选项，不记录 IP、设备、时间或你填的其它数字。</p>';
+  const join = label => `<button type="button" class="ghost" id="crowd-join">${label}</button>`;
+  if (crowd.status === 'loading') return '<div class="crowd"><p class="fine">正在汇总……</p></div>';
+  if (crowd.status === 'error') return `<div class="crowd"><p class="fine">暂时连不上，稍后再试。</p>${join('再试一次')}</div>`;
+  if (crowd.status === 'shown') {
+    const more = crowd.total < MIN_SHOWN ? `，满 ${MIN_SHOWN} 人后显示比例` : '';
+    return `<div class="crowd"><p class="fine">已有 ${crowd.total.toLocaleString('zh-CN')} 人回答${more}。</p></div>`;
+  }
+  return `<div class="crowd">${join(crowd.sent ? '看看大家怎么判断' : '匿名计入，看看大家怎么判断')}${privacy}</div>`;
+}
+
+const crowdShare = (crowd, id, chosen) => {
+  if (crowd.status !== 'shown' || crowd.total < MIN_SHOWN || !crowd.counts?.[id]) return '';
+  return `<span class="crowd-share">${Math.round(crowd.counts[id][chosen] / crowd.total * 100)}% 也这么看</span>`;
+};
+
+export function scenarioHtml({ index, answers, base, effect, params, crowd = { status: 'idle' } }) {
   const total = SCENARIOS.length;
   if (index >= total) {
     const rows = SCENARIOS.map((s, i) => (answers[s.id] === undefined ? ''
-      : `<li><button type="button" class="scn-goto" data-scn-goto="${i}"><span>${params[s.param].name}</span><b>${scenarioOptions(s, base)[answers[s.id]].label}</b></button></li>`)).join('');
-    return `<p class="scn-done">这是你对未来年景的判断，点一项可以改。</p><ul class="scn-summary">${rows}</ul><p class="fine">打开专业模式后，可以一键带入这些假设。</p>`;
+      : `<li><button type="button" class="scn-goto" data-scn-goto="${i}"><span>${params[s.param].name}</span><b>${scenarioOptions(s, base)[answers[s.id]].label}</b>${crowdShare(crowd, s.id, answers[s.id])}</button></li>`)).join('');
+    return `<p class="scn-done">这是你对未来年景的判断，点一项可以改。</p><ul class="scn-summary">${rows}</ul>${crowdHtml(crowd)}<p class="fine">打开专业模式后，可以一键带入这些假设。</p>`;
   }
   const scenario = SCENARIOS[index];
   const chosen = answers[scenario.id];
