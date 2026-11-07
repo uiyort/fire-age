@@ -157,3 +157,9 @@ footer p { margin: 0 0 4px; }
 .doc .tbl { margin-bottom: 4px; }
 .formula { font-family: var(--f-mono); font-size: 13px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; overflow-x: auto; }
 .notes { margin: 0; padding-left: 20px; color: var(--ink-2); font-size: 13px; }
+
+textarea { font-family: var(--f-mono); font-size: 13px; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); margin-top: 8px; }
+.deck-row { display: flex; gap: 10px; overflow-x: auto; margin-top: 8px; }
+.deck-row img { width: 180px; flex: none; border-radius: 6px; border: 1px solid var(--line); display: block; }
+.bundle { font-family: var(--f-mono); font-size: 12px; background: var(--bg); padding: 10px; border-radius: 6px; overflow: auto; max-height: 320px; margin: 8px 0 0; }
+.doc-wide .results { margin-top: 16px; }

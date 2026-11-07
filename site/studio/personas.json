@@ -1,0 +1,8 @@
+[
+  { "label": "上海 · 30 岁 · 月入 2 万", "workC": "CN", "retC": "CN", "age": 30, "assets": 300000, "income": 240000, "expense": 120000 },
+  { "label": "深圳工作 → 吉隆坡退休", "workC": "CN", "retC": "MY", "age": 32, "assets": 600000, "income": 360000, "expense": 144000 },
+  { "label": "北京 · 35 岁 · 月入 4 万", "workC": "CN", "retC": "CN", "age": 35, "assets": 1000000, "income": 480000, "expense": 216000 },
+  { "label": "杭州工作 → 清迈退休", "workC": "CN", "retC": "TH", "age": 30, "assets": 400000, "income": 300000, "expense": 120000 },
+  { "label": "刚工作 · 25 岁 · 月入 1 万", "workC": "CN", "retC": "CN", "age": 25, "assets": 50000, "income": 120000, "expense": 72000 },
+  { "label": "香港工作 → 回内地退休", "workC": "HK", "retC": "CN", "age": 33, "assets": 800000, "income": 600000, "expense": 300000 }
+]

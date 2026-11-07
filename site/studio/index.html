@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>内容工坊 · 放假年龄</title>
+  <link rel="stylesheet" href="../css/app.css">
+</head>
+<body>
+  <div class="wrap doc-wide">
+    <header class="top">
+      <div class="brand">
+        <h1>内容工坊</h1>
+        <p class="sub">生成小红书图卡，并导出计算结果。文字让 Claude 按 docs/content-brief.md 来写，发布由你亲手完成。</p>
+      </div>
+    </header>
+    <main class="results">
+      <section class="card">
+        <h2>人物参数</h2>
+        <p class="sub">金额按工作地货币、按年填写。城市只是文字标签，计算按国家。</p>
+        <textarea id="personas" rows="10" spellcheck="false" aria-label="人物参数 JSON"></textarea>
+        <div class="goal-row">
+          <button type="button" class="primary" id="generate">生成</button>
+          <span class="notice" id="studio-error" role="alert"></span>
+        </div>
+      </section>
+      <div id="decks" class="results"></div>
+      <section class="card">
+        <h2>给 Claude 的数据</h2>
+        <div class="goal-row">
+          <button type="button" class="ghost" id="copy-bundle">复制</button>
+          <span class="fine" id="copy-status" role="status"></span>
+        </div>
+        <pre id="bundle" class="bundle"></pre>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="../js/studio-page.js"></script>
+</body>
+</html>
