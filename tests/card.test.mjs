@@ -151,5 +151,5 @@ test('a long place name keeps the place card sentence on one line', () => {
 
 test('closing punctuation never starts a wrapped line', () => {
   const lines = wrapText(t => [...t].length, '一二三四。五六', 4);
-  assert.deepEqual(lines, ['一二三四。', '五六']);
+  assert.deepEqual(lines, ['一二三', '四。五六']);
 });

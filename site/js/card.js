@@ -131,9 +131,12 @@ export function wrapText(measure, text, maxWidth) {
   const out = [];
   let line = '';
   for (const ch of text) {
-    if (line && measure(line + ch) > maxWidth && !NO_LINE_START.includes(ch)) {
-      out.push(line);
-      line = ch;
+    if (line && measure(line + ch) > maxWidth) {
+      // Closing punctuation may not start a line, so it takes the previous character down with it.
+      const chars = [...line];
+      const carry = NO_LINE_START.includes(ch) && chars.length > 1 ? chars.pop() : '';
+      out.push(chars.join(''));
+      line = carry + ch;
     } else {
       line += ch;
     }
