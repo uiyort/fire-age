@@ -1,0 +1,793 @@
+<title>财富自由罗盘</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@600;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky input rail on the left (the ledger), results column on the right (the reading); stacks to one column on phones. */
+:root {
+  --bg: #eef2ef;
+  --surface: #fafcfa;
+  --surface-2: #e4ebe6;
+  --ink: #14201b;
+  --ink-2: #48564f;
+  --ink-3: #75837c;
+  --line: #d3ddd7;
+  --accent: #136f52;
+  --accent-ink: #ffffff;
+  --accent-soft: #d7ece2;
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --good: #1d7a3a;
+  --warn: #a86200;
+  --bad: #c0352f;
+  --f-display: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --f-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1311; --surface: #141c19; --surface-2: #1b2622; --ink: #e5ede9; --ink-2: #a9b8b0; --ink-3: #7b8a83;
+    --line: #283430; --accent: #3db487; --accent-ink: #06130d; --accent-soft: #17352a; --s1: #3987e5; --s2: #d95926;
+    --good: #4cc070; --warn: #e3a23b; --bad: #ef6b63; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1311; --surface: #141c19; --surface-2: #1b2622; --ink: #e5ede9; --ink-2: #a9b8b0; --ink-3: #7b8a83;
+  --line: #283430; --accent: #3db487; --accent-ink: #06130d; --accent-soft: #17352a; --s1: #3987e5; --s2: #d95926;
+  --good: #4cc070; --warn: #e3a23b; --bad: #ef6b63; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.6; }
+.wrap { max-width: 1280px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 64px; }
+header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 32px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+h1 { font-family: var(--f-display); font-weight: 900; font-size: clamp(28px, 4vw, 40px); line-height: 1.15; margin: 0; letter-spacing: .02em; text-wrap: balance; }
+.sub { color: var(--ink-2); margin: 6px 0 0; max-width: 60ch; }
+.stamp { font-family: var(--f-mono); font-size: 12px; color: var(--ink-2); border: 1px solid var(--line); padding: 6px 10px; border-radius: 4px; background: var(--surface); }
+.stamp b { color: var(--accent); font-weight: 500; }
+
+.modes { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--surface); gap: 2px; }
+.modes button { font: inherit; border: 0; background: transparent; color: var(--ink-2); padding: 8px 18px; border-radius: 999px; cursor: pointer; font-weight: 500; }
+.modes button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.modes button:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.grid { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 28px; margin-top: 24px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+aside.rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 18px 18px; }
+@media (max-width: 900px) { aside.rail { position: static; max-height: none; } }
+fieldset { border: 0; padding: 0; margin: 0; padding-top: 14px; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+fieldset:first-of-type { border-top: 0; }
+fieldset + fieldset { margin-top: 16px; }
+legend { font-size: 11px; letter-spacing: .12em; color: var(--ink-3); font-weight: 700; padding: 0; float: left; width: 100%; grid-column: 1 / -1; margin-bottom: 2px; }
+.f { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.f.full { grid-column: 1 / -1; }
+.f label { font-size: 12px; color: var(--ink-2); display: flex; justify-content: space-between; gap: 6px; }
+.f label .u { color: var(--ink-3); font-family: var(--f-mono); font-size: 11px; }
+input[type=number], select { font: inherit; font-family: var(--f-mono); font-size: 14px; width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--ink); min-width: 0; }
+select { font-family: var(--f-body); }
+input[type=number]:hover, select:hover { border-color: var(--ink-3); }
+.chk { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); grid-column: 1 / -1; }
+.hint { grid-column: 1 / -1; font-size: 12px; color: var(--ink-3); margin: 0; }
+.derived { grid-column: 1 / -1; background: var(--accent-soft); border-radius: 6px; padding: 10px 12px; font-size: 12px; color: var(--ink-2); }
+.derived b { font-family: var(--f-mono); color: var(--ink); font-weight: 500; font-size: 15px; }
+.derived .row { display: flex; justify-content: space-between; gap: 8px; }
+.only-bwd { display: none; }
+body.bwd .only-bwd { display: flex; }
+body.bwd .only-fwd { display: none; }
+
+main { min-width: 0; display: flex; flex-direction: column; gap: 28px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tile.lead { border-color: var(--accent); }
+.tile .k { font-size: 12px; color: var(--ink-2); }
+.tile .v { font-family: var(--f-mono); font-size: 26px; font-weight: 500; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tile .n { font-size: 12px; color: var(--ink-3); }
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; width: fit-content; }
+.pill.good { color: var(--good); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); }
+
+section.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; min-width: 0; }
+h2 { font-family: var(--f-display); font-weight: 600; font-size: 20px; margin: 0 0 4px; text-wrap: balance; }
+h2 + .sub { margin-top: 0; font-size: 13px; }
+h3 { font-size: 14px; margin: 18px 0 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--ink-2); margin: 12px 0 4px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 18px; height: 10px; border-radius: 2px; display: inline-block; }
+.chart-box { position: relative; width: 100%; }
+#chart { width: 100%; height: 340px; display: block; }
+#chart text { fill: var(--ink-3); font-family: var(--f-mono); font-size: 11px; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgb(0 0 0 / .12); min-width: 170px; font-variant-numeric: tabular-nums; }
+.tip .r { display: flex; justify-content: space-between; gap: 14px; }
+.tip .r b { font-family: var(--f-mono); font-weight: 500; }
+.tip .h { font-weight: 700; margin-bottom: 4px; }
+
+.solves { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.solve { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: var(--bg); display: flex; flex-direction: column; gap: 4px; }
+.solve .q { font-size: 12px; color: var(--ink-2); }
+.solve .v { font-family: var(--f-mono); font-size: 22px; font-weight: 500; overflow-wrap: anywhere; }
+.solve .n { font-size: 12px; color: var(--ink-3); }
+
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; color: var(--ink-2); font-weight: 500; white-space: nowrap; }
+td.num, th.num { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td input[type=number] { width: 96px; padding: 3px 6px; text-align: right; font-size: 13px; }
+.heat td { text-align: center; font-family: var(--f-mono); }
+.heat th.rowh { text-align: right; }
+.heat td.base { outline: 2px solid var(--ink); outline-offset: -2px; }
+a { color: var(--accent); }
+.src a { font-size: 12px; margin-right: 8px; white-space: nowrap; }
+.notes { color: var(--ink-2); font-size: 13px; max-width: 75ch; }
+.notes li { margin-bottom: 6px; }
+details summary { cursor: pointer; color: var(--accent); font-size: 13px; margin-top: 10px; }
+.warnbox { border-left: 3px solid var(--warn); padding: 8px 12px; background: var(--surface-2); font-size: 13px; color: var(--ink-2); border-radius: 0 6px 6px 0; }
+.warnbox[hidden] { display: none !important; }
+.tag { font-size: 11px; color: var(--ink-3); border: 1px solid var(--line); border-radius: 3px; padding: 0 5px; margin-left: 4px; white-space: nowrap; }
+footer { margin-top: 32px; font-size: 12px; color: var(--ink-3); }
+@media (prefers-reduced-motion: no-preference) { .tile .v, .solve .v { transition: color .2s; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>财富自由罗盘</h1>
+      <p class="sub">正推：按现在的节奏，几岁能财务自由。倒推：想在某个年龄自由，需要存多少、赚多少收益、能花多少。支持在一国攒钱、另一国退休。</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end">
+      <div class="modes" role="group" aria-label="计算方向">
+        <button type="button" id="mFwd" aria-pressed="true">正推 · 何时自由</button>
+        <button type="button" id="mBwd" aria-pressed="false">倒推 · 需要多少</button>
+      </div>
+      <div class="stamp">市场数据快照 <b id="dataDate"></b> · 金额均为今日购买力</div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <aside class="rail" aria-label="输入">
+      <fieldset>
+        <legend>地区与币种</legend>
+        <div class="f"><label for="workC">工作 / 储蓄地</label><select id="workC"></select></div>
+        <div class="f"><label for="retC">退休居住地</label><select id="retC"></select></div>
+        <div class="f full"><label for="dispCur">显示币种</label><select id="dispCur"></select></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>现在</legend>
+        <div class="f"><label for="age">年龄 <span class="u">岁</span></label><input type="number" id="age" min="16" max="80" step="1"></div>
+        <div class="f"><label for="assets">可投资资产 <span class="u cw"></span></label><input type="number" id="assets" min="0" step="10000"></div>
+        <div class="f"><label for="income">税后年收入 <span class="u cw"></span></label><input type="number" id="income" min="0" step="10000"></div>
+        <div class="f"><label for="expense">当前年支出 <span class="u cw"></span></label><input type="number" id="expense" min="0" step="5000"></div>
+        <div class="f full"><label for="growth">收入实际年增长 <span class="u">%，已扣通胀</span></label><input type="number" id="growth" step="0.5"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>退休后</legend>
+        <div class="f"><label for="retExp">年支出 <span class="u cr"></span></label><input type="number" id="retExp" min="0" step="5000"></div>
+        <div class="f"><label for="life">规划到 <span class="u">岁</span></label><input type="number" id="life" min="60" max="110" step="1"></div>
+        <div class="f"><label for="pension">养老金/社保 <span class="u cr">/年</span></label><input type="number" id="pension" min="0" step="1000"></div>
+        <div class="f"><label for="pAge">领取年龄 <span class="u">岁</span></label><input type="number" id="pAge" min="50" max="80" step="1"></div>
+        <div class="f full only-bwd"><label for="tAge">目标自由年龄 <span class="u">岁</span></label><input type="number" id="tAge" min="20" max="90" step="1"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>收益与风险假设</legend>
+        <div class="f"><label for="eq">股票占比 <span class="u">%</span></label><input type="number" id="eq" min="0" max="100" step="5"></div>
+        <div class="f"><label for="eqReal">股票实际收益 <span class="u">%</span></label><input type="number" id="eqReal" step="0.1"></div>
+        <div class="f"><label for="bondY">10年国债收益率 <span class="u">%</span></label><input type="number" id="bondY" step="0.05"></div>
+        <div class="f"><label for="infl">长期通胀 <span class="u">%</span></label><input type="number" id="infl" step="0.1"></div>
+        <div class="f"><label for="drag">税费拖累 <span class="u">%/年</span></label><input type="number" id="drag" step="0.05" min="0"></div>
+        <div class="f"><label for="fxDrift">退休币实际升值 <span class="u">%/年</span></label><input type="number" id="fxDrift" step="0.1"></div>
+        <div class="f"><label for="swr">安全提取率 <span class="u">%</span></label><input type="number" id="swr" step="0.1" min="1" max="10"></div>
+        <label class="chk f"><input type="checkbox" id="autoSwr"> 按退休年限自动</label>
+        <div class="derived" id="derived"></div>
+        <p class="hint" id="fillNote"></p>
+      </fieldset>
+    </aside>
+
+    <main>
+      <div class="tiles" id="tiles"></div>
+
+      <section class="card only-bwd" style="flex-direction:column" id="solveCard">
+        <h2>倒推：想在 <span id="tAgeLbl"></span> 岁自由，四条路任选其一</h2>
+        <p class="sub">每张卡片只改一个变量，其余保持你填写的数值。</p>
+        <div class="solves" id="solves"></div>
+      </section>
+
+      <section class="card">
+        <h2>资产路径（蒙特卡洛 2,000 次）</h2>
+        <p class="sub" id="chartSub"></p>
+        <div class="legend">
+          <span><i class="sw" style="background:color-mix(in oklab, var(--s1) 18%, transparent)"></i>10–90 分位</span>
+          <span><i class="sw" style="background:color-mix(in oklab, var(--s1) 36%, transparent)"></i>25–75 分位</span>
+          <span><i class="sw" style="background:var(--s1);height:3px"></i>中位数</span>
+          <span><i class="sw" style="height:0;border-top:2px dashed var(--s2)"></i>所需资产（财富自由线）</span>
+        </div>
+        <div class="chart-box" id="chartBox">
+          <svg id="chart" role="img" aria-label="资产随年龄变化的分位数区间图"></svg>
+          <div class="tip" id="tip" hidden></div>
+        </div>
+        <div class="warnbox" id="warn" hidden></div>
+        <details><summary>查看数据表</summary><div class="tbl"><table id="pctTable"></table></div></details>
+      </section>
+
+      <section class="card">
+        <h2>FIRE 变体</h2>
+        <p class="sub">同一份收入，不同的退休生活标准。</p>
+        <div class="tbl"><table id="variants"></table></div>
+      </section>
+
+      <section class="card">
+        <h2>敏感度：自由年龄</h2>
+        <p class="sub">行是实际年化收益，列是每年储蓄额。颜色越深越早自由；黑框是当前输入。</p>
+        <div class="tbl"><table class="heat" id="heat"></table></div>
+      </section>
+
+      <section class="card">
+        <h2>市场数据与出处</h2>
+        <p class="sub">切换国家时自动填入下列数据。汇率可直接改，其它假设在左侧改。数据为 <span id="dataDate2"></span> 手动核对的公开快照，非实时行情。</p>
+        <div class="tbl"><table id="dataTbl"></table></div>
+        <h3>其它参考</h3>
+        <ul class="notes">
+          <li>安全提取率默认 3.9%：Morningstar 2026 年度研究，30 年、90% 成功率、通胀调整的固定支出（<a href="https://www.morningstar.com/retirement/whats-safe-retirement-withdrawal-rate-2026" target="_blank" rel="noopener">Morningstar</a>）。英国版为 4.1%（<a href="https://global.morningstar.com/en-gb/personal-finance/is-4-still-safe-withdrawal-rate-uk-retirees-2026" target="_blank" rel="noopener">Morningstar UK</a>）。超过 30 年的退休期按 40 年 3.5%、50 年 3.3%、60 年 3.1% 线性下调，这是本工具的经验假设，不是 Morningstar 数据。</li>
+          <li>股票实际收益默认 5.0%：美国股市 1900–2025 年实际年化 6.6%（<a href="https://www.ubs.com/global/en/media/display-page-ndp/en-20260303-global-investment-returns-yearbook-2026.html" target="_blank" rel="noopener">UBS 全球投资回报年鉴 2026</a>），但美国是幸存者，多数国家更低，所以取保守值。</li>
+          <li>债券实际收益 = 当地 10 年国债收益率 − 长期通胀假设。长期通胀 = (最新 CPI + 央行目标) ÷ 2，取中间值避免把一时的高通胀或低通胀外推 40 年。</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>同类工具对比</h2>
+        <p class="sub">市面上主流 FIRE 计算器的长处，以及本工具补上的缺口。</p>
+        <div class="tbl"><table>
+          <thead><tr><th>工具</th><th>亮点</th><th>不足</th><th>本工具借鉴/补足</th></tr></thead>
+          <tbody>
+            <tr><td><a href="https://firecalc.com" target="_blank" rel="noopener">FIRECalc</a></td><td>用 1871 年以来美国历史序列回测，最早普及“成功率”概念</td><td>只有美国数据；不建模税；单一美元；界面陈旧</td><td>保留成功率，改用蒙特卡洛并标注假设</td></tr>
+            <tr><td><a href="https://www.cfiresim.com" target="_blank" rel="noopener">cFIREsim</a></td><td>历史 + 蒙特卡洛；多种支出策略；可加社保等收入流</td><td>参数多、上手难；美国中心</td><td>养老金“桥接期”：领取前全额自付，领取后只补缺口</td></tr>
+            <tr><td><a href="https://ficalc.app" target="_blank" rel="noopener">FI Calc</a></td><td>现代界面，即时重算，多种提取策略</td><td>美国数据与美元；不能倒推</td><td>输入即算；分位数带代替单一曲线</td></tr>
+            <tr><td><a href="https://projectionlab.com" target="_blank" rel="noopener">ProjectionLab</a></td><td>全生命周期规划，覆盖多国税制，可视化强</td><td>订阅付费；复杂；亚洲（中/港/台/新/马/泰）覆盖弱</td><td>国家参数化：通胀、利率、退休年龄、税费拖累一键切换</td></tr>
+            <tr><td><a href="https://networthify.com/calculator/earlyretirement" target="_blank" rel="noopener">Networthify</a></td><td>只看储蓄率，揭示“储蓄率是第一杠杆”</td><td>收益固定；无风险、无通胀区分</td><td>敏感度热力图同时变动储蓄与收益</td></tr>
+            <tr><td><a href="https://walletburst.com/tools/coast-fi-calc/" target="_blank" rel="noopener">WalletBurst Coast FI</a></td><td>Coast FIRE 概念清楚</td><td>只做一个场景</td><td>Lean / 标准 / Fat / Coast / Barista 并列对比</td></tr>
+            <tr><td>中文类工具（<a href="https://miniwebtool.com/zh-cn/fire计算器-财务自由-提前退休/" target="_blank" rel="noopener">miniwebtool</a>、<a href="https://www.richify.ai/cn/tools/fire-calculator" target="_blank" rel="noopener">richify</a> 等）</td><td>中文界面；部分提到社保、医保、赡养</td><td>多为英文工具翻译；单币种；不能倒推；收益与通胀假设无出处、无日期</td><td>每个默认值附来源与日期；实际收益口径统一</td></tr>
+            <tr><td><a href="https://portfoliocharts.com" target="_blank" rel="noopener">Portfolio Charts</a></td><td>按国家、组合可视化历史提取率</td><td>研究工具，不做个人计划</td><td>提醒：4% 规则主要来自美国数据，Pfau (2010) 对 17 国回测发现它在多数国家并不安全</td></tr>
+          </tbody>
+        </table></div>
+        <h3>共性缺口</h3>
+        <ul class="notes">
+          <li><b>单国家、单币种</b>：没法算“在上海/深圳攒钱，去清迈、吉隆坡或新加坡退休”这类跨国安排。本工具分开工作地与退休地，并允许设定汇率实际升贬值。</li>
+          <li><b>只能正推</b>：大多只回答“几年能自由”。本工具同时解出所需储蓄、所需收益、可负担支出、所需本金四个反向答案。</li>
+          <li><b>名义与实际混用</b>：常见做法是 7% 名义收益配 4% 提取率。本工具全程使用今日购买力。</li>
+          <li><b>假设无出处</b>：本工具的每个市场数字都写明来源和日期，且可改。</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>计算方法</h2>
+        <ul class="notes">
+          <li>全部金额为今日购买力（实际值），以工作地货币计算，展示时按快照汇率换算。</li>
+          <li>组合实际收益 = 股票占比 × 股票实际收益 + 债券占比 × (10 年国债 − 长期通胀) − 税费拖累。这是几何（复利）收益。</li>
+          <li>积累期：每年末投入储蓄，储蓄 = 收入 × (1 + 收入增长)<sup>t</sup> − 当前支出。</li>
+          <li>所需资产：领取养老金前的年份逐年贴现全额支出；领取后只需覆盖缺口 ÷ 安全提取率。</li>
+          <li>蒙特卡洛：年收益服从对数正态，股票波动 17%、债券 6%、相关系数 0.2；固定随机种子，结果可复现。成功 = 规划年龄前资产未耗尽。</li>
+          <li>不含：房产自住价值、一次性大额支出、遗产目标、具体税法细节。税务以“税费拖累”近似。</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+  <footer>仅供教育与规划参考，不构成投资建议。市场数据为快照，请在决策前核对官方来源。</footer>
+</div>
+
+<script>
+const DATA_DATE = '2026-10-26';
+
+// Units per 1 USD. Snapshot 2026-10-22..26.
+const FX_SRC = {
+  CNY: ['6.6688', '2026-10-26', 'https://tradingeconomics.com/china/currency'],
+  EUR: ['0.8925', '2026-10-22', 'https://www.investing.com/currencies/streaming-forex-rates-majors'],
+  GBP: ['0.7476', '2026-10-22', 'https://www.investing.com/currencies/streaming-forex-rates-majors'],
+  JPY: ['157.0', '2026-10-22', 'https://www.investing.com/currencies/streaming-forex-rates-majors'],
+  HKD: ['7.84', '2026-10-22', 'https://www.investing.com/currencies/streaming-forex-rates-majors'],
+  SGD: ['1.277', '2026-10-25 推算', 'https://sg.finance.yahoo.com/quote/SGDTWD=X/'],
+  AUD: ['1.42', '2026-10-25', 'https://www.xe.com/en-us/currencyconverter/convert/?Amount=1&From=USD&To=TWD'],
+  CAD: ['1.40', '2026-10-25', 'https://www.xe.com/en-us/currencyconverter/convert/?Amount=1&From=USD&To=TWD'],
+  TWD: ['32.58', '2026-10-25', 'https://www.xe.com/en-us/currencyconverter/convert/?Amount=1&From=USD&To=TWD'],
+  MYR: ['4.08', '2026-10-20', 'https://www.businesstoday.com.my/2026/10/20/ringgit-opens-higher-as-inflation-eases-opr-in-focus/'],
+  THB: ['33.62', '2026-10 上旬', 'https://www.tmgm.com/en/analysis/market-news/article/thai-baht-inflation-rise-and-thb-downside-risks-commerzbank-202610071912'],
+};
+const FX = { USD: 1 };
+for (const k in FX_SRC) FX[k] = parseFloat(FX_SRC[k][0]);
+
+const TE = 'https://tradingeconomics.com/';
+// cpi: latest YoY %; target: central bank target (or notional 2); y10: 10y govt yield %; drag: default tax+fee drag %/yr.
+const COUNTRIES = {
+  CN: { name: '中国大陆', cur: 'CNY', cpi: 0.9, cpiP: '2026-09', target: 2.0, y10: 1.65, y10D: '10-26', policy: '1年LPR 3.00%', drag: 0.2, pAge: 63,
+        src: { cpi: TE + 'china/inflation-cpi', y10: TE + 'bonds' } },
+  US: { name: '美国', cur: 'USD', cpi: 3.7, cpiP: '2026-09', target: 2.0, y10: 4.99, y10D: '10-26', policy: '3.75–4.00%', drag: 0.3, pAge: 67,
+        src: { cpi: 'https://www.cnbc.com/2026/10/14/cpi-inflation-breakdown-september-2026.html', y10: TE + 'united-states/government-bond-yield' } },
+  DE: { name: '德国（欧元区）', cur: 'EUR', cpi: 3.8, cpiP: '2026-09 欧元区', target: 2.0, y10: 3.38, y10D: '10-26', policy: 'ECB 存款 2.50%', drag: 0.6, pAge: 67,
+        src: { cpi: TE + 'euro-area/inflation-cpi', y10: TE + 'germany/government-bond-yield' } },
+  UK: { name: '英国', cur: 'GBP', cpi: 3.5, cpiP: '2026-09', target: 2.0, y10: 5.35, y10D: '10-26', policy: '3.75%', drag: 0.2, pAge: 67,
+        src: { cpi: 'https://www.ons.gov.uk/economy/inflationandpriceindices/bulletins/consumerpriceinflation/september2026/pdf', y10: TE + 'bonds' } },
+  JP: { name: '日本', cur: 'JPY', cpi: 2.1, cpiP: '2026-09', target: 2.0, y10: 2.78, y10D: '10-23', policy: '1.25%', drag: 0.2, pAge: 65,
+        src: { cpi: TE + 'country-list/inflation-rate', y10: 'https://www.bloomberg.com/markets/rates-bonds' } },
+  HK: { name: '中国香港', cur: 'HKD', cpi: 1.9, cpiP: '2026-09', target: 2.0, y10: 4.17, y10D: '10-07', policy: '联系汇率，随美联储', drag: 0.3, pAge: 65,
+        src: { cpi: TE + 'hong-kong/inflation-cpi', y10: 'https://www.investing.com/rates-bonds/hong-kong-10-year-bond-yield-historical-data' } },
+  TW: { name: '中国台湾', cur: 'TWD', cpi: 2.73, cpiP: '2026-09', target: 2.0, y10: 1.99, y10D: '10-26', policy: '—', drag: 0.3, pAge: 65,
+        src: { cpi: TE + 'country-list/inflation-rate?continent=asia', y10: TE + 'bonds' } },
+  SG: { name: '新加坡', cur: 'SGD', cpi: 2.2, cpiP: '2026-09', target: 2.0, y10: 2.31, y10D: '10-26', policy: '汇率政策（MAS）', drag: 0.3, pAge: 65,
+        src: { cpi: 'https://www.asiaone.com/money/singapore-core-inflation-2026-september', y10: TE + 'bonds' } },
+  MY: { name: '马来西亚', cur: 'MYR', cpi: 1.8, cpiP: '2026-09', target: 2.0, y10: 3.88, y10D: '10-22', policy: 'OPR 2.75%', drag: 0.2, pAge: 60,
+        src: { cpi: TE + 'malaysia/inflation-cpi', y10: 'https://asianbondsonline.adb.org/malaysia/' } },
+  TH: { name: '泰国', cur: 'THB', cpi: 2.82, cpiP: '2026-09', target: 2.0, y10: null, y10D: '', policy: '1.00%', drag: 0.2, pAge: 60,
+        src: { cpi: TE + 'thailand/inflation-cpi/news/589731', y10: null } },
+  AU: { name: '澳大利亚', cur: 'AUD', cpi: 4.0, cpiP: '2026-08', target: 2.5, y10: 5.20, y10D: '10-26', policy: '4.60%', drag: 0.5, pAge: 67,
+        src: { cpi: TE + 'country-list/inflation-rate', y10: TE + 'australia/government-bond-yield' } },
+  CA: { name: '加拿大', cur: 'CAD', cpi: 3.1, cpiP: '2026-09', target: 2.0, y10: 3.82, y10D: '10-26', policy: '2.25%', drag: 0.3, pAge: 65,
+        src: { cpi: TE + 'country-list/inflation-rate', y10: TE + 'bonds' } },
+};
+const TH_BOND_FALLBACK = 2.5;
+const longInfl = c => Math.round((c.cpi + c.target) / 2 * 10) / 10;
+const bondOf = c => c.y10 == null ? TH_BOND_FALLBACK : c.y10;
+
+const SIG_EQ = 0.17, SIG_BD = 0.06, RHO = 0.2, N_PATHS = 2000;
+const $ = id => document.getElementById(id);
+const NUM_IDS = ['age','assets','income','expense','growth','retExp','life','pension','pAge','tAge','eq','eqReal','bondY','infl','drag','fxDrift','swr'];
+
+const DEFAULTS = {
+  mode: 'fwd', workC: 'CN', retC: 'CN', dispCur: 'CNY',
+  age: 30, assets: 500000, income: 300000, expense: 120000, growth: 2,
+  retExp: 120000, life: 95, pension: 36000, pAge: 63, tAge: 45,
+  eq: 60, eqReal: 5.0, bondY: 1.65, infl: 1.5, drag: 0.2, fxDrift: 0, swr: 3.9, autoSwr: true,
+};
+
+// ---------- formatting ----------
+const fmtCache = {};
+function money(v, cur) {
+  if (!isFinite(v)) return '—';
+  const key = cur;
+  if (!fmtCache[key]) fmtCache[key] = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: cur, notation: 'compact', maximumFractionDigits: 2 });
+  return fmtCache[key].format(v);
+}
+const compact = new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 });
+const pct = (v, d = 1) => isFinite(v) ? (v * 100).toFixed(d) + '%' : '—';
+const conv = (v, from, to) => v / FX[from] * FX[to];
+
+// ---------- model ----------
+function readInputs() {
+  const p = { mode: document.body.classList.contains('bwd') ? 'bwd' : 'fwd' };
+  p.workC = $('workC').value; p.retC = $('retC').value; p.dispCur = $('dispCur').value;
+  for (const id of NUM_IDS) { const v = parseFloat($(id).value); p[id] = isFinite(v) ? v : DEFAULTS[id]; }
+  p.autoSwr = $('autoSwr').checked;
+  p.wCur = COUNTRIES[p.workC].cur; p.rCur = COUNTRIES[p.retC].cur;
+  p.age = Math.round(p.age); p.life = Math.max(Math.round(p.life), p.age + 2);
+  p.tAge = Math.min(Math.max(Math.round(p.tAge), p.age + 1), p.life - 1);
+  const w = Math.min(Math.max(p.eq, 0), 100) / 100;
+  p.w = w;
+  p.bondReal = (p.bondY - p.infl) / 100;
+  p.r = w * p.eqReal / 100 + (1 - w) * p.bondReal - p.drag / 100;
+  p.sigma = Math.sqrt(w * w * SIG_EQ ** 2 + (1 - w) ** 2 * SIG_BD ** 2 + 2 * w * (1 - w) * RHO * SIG_EQ * SIG_BD);
+  return p;
+}
+
+function swrFor(p, H) {
+  if (!p.autoSwr) return p.swr / 100;
+  const pts = [[30, 3.9], [40, 3.5], [50, 3.3], [60, 3.1]];
+  if (H <= 30) return 0.039;
+  if (H >= 60) return 0.031;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [a, va] = pts[i], [b, vb] = pts[i + 1];
+    if (H <= b) return (va + (vb - va) * (H - a) / (b - a)) / 100;
+  }
+  return 0.031;
+}
+
+// Retirement spend & pension at year t, converted to work currency (real).
+function spendW(p, t, E) { return conv(E, p.rCur, p.wCur) * Math.pow(1 + p.fxDrift / 100, t); }
+function pensW(p, t) { return conv(p.pension, p.rCur, p.wCur) * Math.pow(1 + p.fxDrift / 100, t); }
+
+// Assets needed at the start of year t to retire then and spend E (ret currency) until p.life.
+function fiNeed(p, t, E = p.retExp, r = p.r) {
+  const a = p.age + t, H = Math.max(p.life - a, 1);
+  const Ew = spendW(p, t, E), Pw = pensW(p, t);
+  if (Pw <= 0) return Ew / swrFor(p, H);
+  if (p.pAge <= a) return Math.max(Ew - Pw, 0) / swrFor(p, H);
+  const b = Math.min(p.pAge - a, H);
+  let pv = 0;
+  for (let k = 0; k < b; k++) pv += Ew / Math.pow(1 + r, k);
+  if (b < H) pv += Math.max(Ew - Pw, 0) / swrFor(p, H - b) / Math.pow(1 + r, b);
+  return pv;
+}
+
+const savingsAt = (p, t, s0) => s0 != null ? s0 * Math.pow(1 + p.growth / 100, t) : p.income * Math.pow(1 + p.growth / 100, t) - p.expense;
+
+function assetsAt(p, n, { r = p.r, s0 = null, A0 = p.assets } = {}) {
+  let A = A0;
+  for (let t = 0; t < n; t++) A = A * (1 + r) + savingsAt(p, t, s0);
+  return A;
+}
+
+function fwdSolve(p, { r = p.r, s0 = null, E = p.retExp } = {}) {
+  let A = p.assets;
+  const maxT = p.life - p.age - 1;
+  for (let t = 0; t <= maxT; t++) {
+    if (A >= fiNeed(p, t, E, r)) return t;
+    A = A * (1 + r) + savingsAt(p, t, s0);
+  }
+  return null;
+}
+
+function bisect(f, lo, hi, it = 80) {
+  let flo = f(lo);
+  for (let i = 0; i < it; i++) {
+    const mid = (lo + hi) / 2, fm = f(mid);
+    if ((fm >= 0) === (flo >= 0)) { lo = mid; flo = fm; } else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+function bwdSolve(p) {
+  const n = p.tAge - p.age, r = p.r, g = p.growth / 100;
+  const need = fiNeed(p, n);
+  let G = 0;
+  for (let k = 0; k < n; k++) G += Math.pow(1 + g, k) * Math.pow(1 + r, n - 1 - k);
+  const s0 = (need - p.assets * Math.pow(1 + r, n)) / G;
+
+  const fr = rr => assetsAt(p, n, { r: rr }) - fiNeed(p, n, p.retExp, rr);
+  let reqR;
+  if (fr(0.30) < 0) reqR = Infinity;
+  else if (fr(-0.10) >= 0) reqR = -Infinity;
+  else reqR = bisect(fr, -0.10, 0.30);
+
+  const An = assetsAt(p, n);
+  let maxE = 0;
+  if (An > 0) maxE = bisect(E => An - fiNeed(p, n, E), 0, conv(An, p.wCur, p.rCur) + 1);
+
+  const futureSav = assetsAt(p, n, { A0: 0 });
+  const reqA0 = Math.max((need - futureSav) / Math.pow(1 + r, n), 0);
+  return { n, need, s0, reqR, maxE, reqA0, An };
+}
+
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+function monteCarlo(p, retireT, s0) {
+  const Y = p.life - p.age;
+  const rnd = mulberry32(20261026);
+  // p.r is a geometric return, so the median path compounds at exactly p.r.
+  const mu = Math.log(1 + p.r), s = p.sigma;
+  const cols = Array.from({ length: Y + 1 }, () => new Float64Array(N_PATHS));
+  let ok = 0;
+  const spend = [], sav = [];
+  for (let t = 0; t <= Y; t++) {
+    spend.push(Math.max(spendW(p, t, p.retExp) - (p.age + t >= p.pAge ? pensW(p, t) : 0), 0));
+    sav.push(savingsAt(p, t, s0));
+  }
+  for (let i = 0; i < N_PATHS; i++) {
+    let A = p.assets, alive = true;
+    for (let t = 0; t <= Y; t++) {
+      cols[t][i] = A;
+      if (t === Y) break;
+      const u1 = rnd() || 1e-12, u2 = rnd();
+      const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+      const gr = Math.exp(mu + s * z);
+      if (retireT != null && t >= retireT) {
+        A -= spend[t];
+        if (A < 0) { A = 0; alive = false; }
+        A *= gr;
+      } else {
+        A = A * gr + sav[t];
+        if (A < 0) A = 0;
+      }
+    }
+    if (alive) ok++;
+  }
+  const q = (arr, f) => arr[Math.min(arr.length - 1, Math.floor(f * arr.length))];
+  const bands = cols.map(c => { const a = Array.from(c).sort((x, y) => x - y); return [q(a, .1), q(a, .25), q(a, .5), q(a, .75), q(a, .9)]; });
+  return { bands, success: retireT == null ? null : ok / N_PATHS };
+}
+
+// ---------- rendering ----------
+function statusPill(s) {
+  if (s == null) return '';
+  const cls = s >= 0.9 ? 'good' : s >= 0.75 ? 'warn' : 'bad';
+  const txt = s >= 0.9 ? '✓ 稳健' : s >= 0.75 ? '! 偏紧' : '✕ 风险高';
+  return `<span class="pill ${cls}">${txt}</span>`;
+}
+
+function tile(k, v, n = '', lead = false) {
+  return `<div class="tile${lead ? ' lead' : ''}"><div class="k">${k}</div><div class="v">${v}</div><div class="n">${n}</div></div>`;
+}
+
+let last = null;
+function render() {
+  const p = readInputs();
+  const D = v => money(conv(v, p.wCur, p.dispCur), p.dispCur);
+  const yr = t => 2026 + t;
+  const sav0 = p.income - p.expense;
+  const sr = p.income > 0 ? sav0 / p.income : NaN;
+
+  $('derived').innerHTML = `
+    <div class="row"><span>组合实际年化收益</span><b>${pct(p.r, 2)}</b></div>
+    <div class="row"><span>组合年化波动</span><b>${pct(p.sigma, 1)}</b></div>
+    <div class="row"><span>债券实际收益</span><b>${pct(p.bondReal, 2)}</b></div>`;
+  document.querySelectorAll('.cw').forEach(e => e.textContent = p.wCur);
+  document.querySelectorAll('.cr').forEach(e => e.textContent = p.rCur);
+  $('swr').disabled = p.autoSwr;
+
+  let retireT, s0 = null, tiles = '', warn = '';
+  if (p.mode === 'fwd') {
+    retireT = fwdSolve(p);
+    const mc = monteCarlo(p, retireT, null);
+    last = { p, mc, retireT, s0 };
+    if (retireT == null) {
+      tiles += tile('预计自由年龄', '未能达成', `${p.life} 岁前资产追不上所需`, true);
+      tiles += tile('今天退休所需资产', D(fiNeed(p, 0)), `年支出 ${money(p.retExp, p.rCur)}`);
+      warn = '按当前储蓄和收益假设，规划期内达不到财富自由。试试提高储蓄、降低退休支出，或换一个生活成本更低的退休地。';
+    } else {
+      const H = p.life - (p.age + retireT);
+      tiles += tile('预计自由年龄', `${p.age + retireT} 岁`, retireT === 0 ? '现在就已达到' : `${yr(retireT)} 年，还需 ${retireT} 年`, true);
+      tiles += tile('财富自由数字', D(fiNeed(p, retireT)), `提取率 ${pct(swrFor(p, H))} · 退休 ${H} 年`);
+      tiles += tile('计划成功率', pct(mc.success, 0), statusPill(mc.success) + ` 资产撑到 ${p.life} 岁的概率`);
+    }
+    tiles += tile('当前储蓄率', pct(sr, 0), `每年存 ${D(sav0)}`);
+    $('chartSub').textContent = retireT == null
+      ? '按当前计划持续积累，不退休。'
+      : `按当前计划积累到 ${p.age + retireT} 岁，之后每年取出退休支出（扣除养老金）。`;
+  } else {
+    const b = bwdSolve(p);
+    s0 = Math.max(b.s0, 0);
+    retireT = b.n;
+    const mc = monteCarlo(p, retireT, s0);
+    last = { p, mc, retireT, s0 };
+    $('tAgeLbl').textContent = p.tAge;
+    tiles += tile(`${p.tAge} 岁所需资产`, D(b.need), `${yr(b.n)} 年，提取率 ${pct(swrFor(p, p.life - p.tAge))}`, true);
+    tiles += tile('按所需储蓄执行的成功率', pct(mc.success, 0), statusPill(mc.success) + ` 撑到 ${p.life} 岁`);
+    tiles += tile('当前计划在目标年龄', D(b.An), b.An >= b.need ? '已够，可提前或多花' : `缺口 ${D(b.need - b.An)}`);
+
+    const needSr = p.income > 0 ? b.s0 / p.income : NaN;
+    const solves = [];
+    solves.push(['多存：首年需储蓄', b.s0 <= 0 ? '无需再存' : D(b.s0) + '/年',
+      b.s0 <= 0 ? '现有资产复利即可达到' : `约 ${D(b.s0 / 12)}/月 · 储蓄率 ${pct(needSr, 0)}（现在 ${pct(sr, 0)}）`]);
+    solves.push(['多赚：所需实际年化收益', b.reqR === Infinity ? '> 30%' : b.reqR === -Infinity ? '< −10%' : pct(b.reqR, 2),
+      b.reqR === Infinity ? '靠收益无法弥补，需要其它杠杆' : `当前假设 ${pct(p.r, 2)}，储蓄保持不变`]);
+    solves.push(['少花：可负担退休年支出', money(b.maxE, p.rCur) + '/年', `约 ${money(b.maxE / 12, p.rCur)}/月，当前设定 ${money(p.retExp, p.rCur)}`]);
+    solves.push(['本金：今天需持有资产', D(b.reqA0), b.reqA0 <= p.assets ? '你已经有了' : `比现在多 ${D(b.reqA0 - p.assets)}`]);
+    $('solves').innerHTML = solves.map(([q, v, n]) => `<div class="solve"><div class="q">${q}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join('');
+    $('chartSub').textContent = `按“所需储蓄”执行到 ${p.tAge} 岁，之后每年取出退休支出（扣除养老金）。`;
+    if (b.s0 > sav0 && b.s0 > 0) warn = `所需储蓄高于你当前每年能存的 ${D(sav0)}。图中路径假设你能做到所需储蓄。`;
+  }
+  if (p.autoSwr && retireT != null) $('swr').value = (swrFor(p, p.life - p.age - retireT) * 100).toFixed(2);
+  $('tiles').innerHTML = tiles;
+  $('warn').hidden = !warn; $('warn').textContent = warn;
+
+  drawChart();
+  renderPctTable();
+  renderVariants(p, D);
+  renderHeat(p);
+  renderData(p);
+  save();
+}
+
+function niceStep(max, n = 5) {
+  const raw = max / n, pw = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / pw;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * pw;
+}
+
+function drawChart() {
+  const { p, mc, retireT } = last;
+  const svg = $('chart');
+  const W = svg.clientWidth || 700, H = 340, m = { l: 58, r: 14, t: 14, b: 30 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const k = conv(1, p.wCur, p.dispCur);
+  const Y = mc.bands.length - 1;
+  const target = mc.bands.map((_, t) => fiNeed(p, t) * k);
+  const p75max = Math.max(...mc.bands.map(b => b[3] * k));
+  let ymax = Math.max(p75max, target[Math.min(retireT ?? 0, Y)]) * 1.15 || 1;
+  const step = niceStep(ymax); ymax = Math.ceil(ymax / step) * step;
+  const x = t => m.l + iw * t / Y, y = v => m.t + ih * (1 - Math.min(v, ymax * 1.05) / ymax);
+  const area = (lo, hi) => {
+    let d = '';
+    for (let t = 0; t <= Y; t++) d += (t ? 'L' : 'M') + x(t).toFixed(1) + ',' + y(mc.bands[t][hi] * k).toFixed(1);
+    for (let t = Y; t >= 0; t--) d += 'L' + x(t).toFixed(1) + ',' + y(mc.bands[t][lo] * k).toFixed(1);
+    return d + 'Z';
+  };
+  const line = arr => arr.map((v, t) => (t ? 'L' : 'M') + x(t).toFixed(1) + ',' + y(v).toFixed(1)).join('');
+  let g = `<defs><clipPath id="clip"><rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}"/></clipPath></defs>`;
+  for (let v = 0; v <= ymax + 1e-9; v += step) {
+    g += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/>`;
+    g += `<text x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${compact.format(v)}</text>`;
+  }
+  const ageStep = Y > 50 ? 10 : 5;
+  for (let a = Math.ceil(p.age / ageStep) * ageStep; a <= p.life; a += ageStep) {
+    const t = a - p.age;
+    g += `<text x="${x(t)}" y="${H - 10}" text-anchor="middle">${a}岁</text>`;
+  }
+  g += `<g clip-path="url(#clip)">`;
+  g += `<path d="${area(0, 4)}" fill="var(--s1)" fill-opacity=".16"/>`;
+  g += `<path d="${area(1, 3)}" fill="var(--s1)" fill-opacity=".22"/>`;
+  g += `<path d="${line(target)}" fill="none" stroke="var(--s2)" stroke-width="2" stroke-dasharray="6 4"/>`;
+  g += `<path d="${line(mc.bands.map(b => b[2] * k))}" fill="none" stroke="var(--s1)" stroke-width="2"/>`;
+  g += `</g>`;
+  if (retireT != null) {
+    g += `<line x1="${x(retireT)}" x2="${x(retireT)}" y1="${m.t}" y2="${m.t + ih}" stroke="var(--ink-2)" stroke-dasharray="2 3"/>`;
+    const anchor = retireT > Y * 0.8 ? 'end' : 'start', dx = anchor === 'end' ? -6 : 6;
+    g += `<text x="${x(retireT) + dx}" y="${m.t + 12}" text-anchor="${anchor}" style="fill:var(--ink-2)">${p.age + retireT}岁 退休</text>`;
+  }
+  g += `<line x1="${m.l}" x2="${W - m.r}" y1="${m.t + ih}" y2="${m.t + ih}" stroke="var(--ink-3)"/>`;
+  g += `<line id="cross" y1="${m.t}" y2="${m.t + ih}" stroke="var(--ink-2)" stroke-width="1" visibility="hidden"/>`;
+  g += `<circle id="dot" r="4" fill="var(--s1)" stroke="var(--surface)" stroke-width="2" visibility="hidden"/>`;
+  g += `<rect id="hit" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/>`;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = g;
+
+  const tip = $('tip'), hit = $('hit'), cross = $('cross'), dot = $('dot');
+  const show = ev => {
+    const rect = svg.getBoundingClientRect();
+    const px = (ev.touches ? ev.touches[0].clientX : ev.clientX) - rect.left;
+    const t = Math.max(0, Math.min(Y, Math.round((px - m.l) / iw * Y)));
+    const b = mc.bands[t];
+    cross.setAttribute('x1', x(t)); cross.setAttribute('x2', x(t)); cross.setAttribute('visibility', 'visible');
+    dot.setAttribute('cx', x(t)); dot.setAttribute('cy', y(b[2] * k)); dot.setAttribute('visibility', 'visible');
+    const M = v => money(v * k, p.dispCur);
+    tip.innerHTML = `<div class="h">${p.age + t} 岁 · ${2026 + t} 年${retireT != null && t >= retireT ? ' · 退休中' : ''}</div>
+      <div class="r"><span>90 分位</span><b>${M(b[4])}</b></div>
+      <div class="r"><span>中位数</span><b>${M(b[2])}</b></div>
+      <div class="r"><span>10 分位</span><b>${M(b[0])}</b></div>
+      <div class="r"><span>自由线</span><b>${money(target[t], p.dispCur)}</b></div>`;
+    tip.hidden = false;
+    const tw = tip.offsetWidth, left = x(t) + 12 + tw > W ? x(t) - tw - 12 : x(t) + 12;
+    tip.style.left = left + 'px'; tip.style.top = (m.t + 6) + 'px';
+  };
+  const hide = () => { tip.hidden = true; cross.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); };
+  hit.addEventListener('mousemove', show); hit.addEventListener('touchstart', show, { passive: true }); hit.addEventListener('touchmove', show, { passive: true });
+  hit.addEventListener('mouseleave', hide); hit.addEventListener('touchend', hide);
+}
+
+function renderPctTable() {
+  const { p, mc } = last;
+  const k = conv(1, p.wCur, p.dispCur), M = v => money(v * k, p.dispCur);
+  let h = '<thead><tr><th>年龄</th><th class="num">10 分位</th><th class="num">中位数</th><th class="num">90 分位</th><th class="num">自由线</th></tr></thead><tbody>';
+  mc.bands.forEach((b, t) => {
+    if (t % 5 && t !== mc.bands.length - 1) return;
+    h += `<tr><td>${p.age + t}</td><td class="num">${M(b[0])}</td><td class="num">${M(b[2])}</td><td class="num">${M(b[4])}</td><td class="num">${M(fiNeed(p, t))}</td></tr>`;
+  });
+  $('pctTable').innerHTML = h + '</tbody>';
+}
+
+function renderVariants(p, D) {
+  const coastT = Math.max(p.pAge - p.age, 0);
+  const coastNeed = fiNeed(p, coastT) / Math.pow(1 + p.r, coastT);
+  const rows = [
+    ['Lean FIRE', '支出 × 0.7，精简生活', p.retExp * 0.7],
+    ['标准 FIRE', '按你填写的退休支出', p.retExp],
+    ['Fat FIRE', '支出 × 1.5，宽裕生活', p.retExp * 1.5],
+    ['Barista FIRE', '兼职收入覆盖 40% 支出', p.retExp * 0.6],
+  ];
+  let h = '<thead><tr><th>类型</th><th>含义</th><th class="num">年支出</th><th class="num">今天所需资产</th><th class="num">自由年龄</th></tr></thead><tbody>';
+  for (const [n, d, E] of rows) {
+    const t = fwdSolve(p, { E });
+    h += `<tr><td><b>${n}</b></td><td>${d}</td><td class="num">${money(E, p.rCur)}</td><td class="num">${D(fiNeed(p, 0, E))}</td><td class="num">${t == null ? '—' : (p.age + t) + ' 岁'}</td></tr>`;
+  }
+  const coastOk = p.assets >= coastNeed;
+  h += `<tr><td><b>Coast FIRE</b></td><td>此后不再储蓄，靠复利在 ${p.pAge} 岁达到标准 FIRE</td><td class="num">${money(p.retExp, p.rCur)}</td><td class="num">${D(coastNeed)}</td><td class="num">${coastOk ? '已达成' : '还差 ' + D(coastNeed - p.assets)}</td></tr>`;
+  $('variants').innerHTML = h + '</tbody>';
+}
+
+function renderHeat(p) {
+  const sav0 = p.income - p.expense;
+  const rOff = [-0.02, -0.01, 0, 0.01, 0.02];
+  const sMul = [0.6, 0.8, 1, 1.2, 1.4, 1.6];
+  const D = v => money(conv(v, p.wCur, p.dispCur), p.dispCur);
+  const cells = rOff.map(dr => sMul.map(mul => {
+    const s0 = sav0 * mul;
+    const pp = Object.assign({}, p, { income: s0 + p.expense });
+    const t = fwdSolve(pp, { r: p.r + dr });
+    return t == null ? null : p.age + t;
+  }));
+  const vals = cells.flat().filter(v => v != null);
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  let h = '<thead><tr><th class="num">收益 \\ 年储蓄</th>' + sMul.map(m => `<th class="num">${D(sav0 * m)}</th>`).join('') + '</tr></thead><tbody>';
+  rOff.forEach((dr, i) => {
+    h += `<tr><th class="rowh num">${pct(p.r + dr, 1)}</th>`;
+    sMul.forEach((m, j) => {
+      const v = cells[i][j];
+      const share = v == null ? 0 : hi === lo ? 30 : Math.round(8 + 44 * (hi - v) / (hi - lo));
+      const base = dr === 0 && m === 1 ? ' base' : '';
+      h += `<td class="num${base}" style="background:color-mix(in oklab, var(--s1) ${share}%, var(--surface))">${v == null ? '—' : v}</td>`;
+    });
+    h += '</tr>';
+  });
+  $('heat').innerHTML = h + '</tbody>';
+}
+
+function renderData(p) {
+  if ($('dataTbl').dataset.built) {
+    document.querySelectorAll('#dataTbl tr').forEach(tr => tr.style.fontWeight = (tr.dataset.c === p.workC || tr.dataset.c === p.retC) ? '700' : '');
+    return;
+  }
+  let h = '<thead><tr><th>国家/地区</th><th>货币</th><th class="num">汇率 /USD</th><th class="num">最新 CPI</th><th class="num">通胀目标</th><th class="num">长期通胀假设</th><th class="num">10年国债</th><th>政策利率</th><th class="num">常规退休</th><th>来源</th></tr></thead><tbody>';
+  for (const [code, c] of Object.entries(COUNTRIES)) {
+    const fx = c.cur === 'USD' ? '1' : `<input type="number" step="any" data-fx="${c.cur}" id="fx_${c.cur}" value="${FX[c.cur]}" aria-label="${c.cur} 每美元">`;
+    const fxs = FX_SRC[c.cur];
+    const links = [`<a href="${c.src.cpi}" target="_blank" rel="noopener">CPI</a>`];
+    if (c.src.y10) links.push(`<a href="${c.src.y10}" target="_blank" rel="noopener">国债</a>`);
+    if (fxs) links.push(`<a href="${fxs[2]}" target="_blank" rel="noopener">汇率 ${fxs[1]}</a>`);
+    h += `<tr data-c="${code}"><td>${c.name}</td><td>${c.cur}</td><td class="num">${fx}</td>
+      <td class="num">${c.cpi.toFixed(1)}% <span class="tag">${c.cpiP}</span></td><td class="num">${c.target}%</td><td class="num">${longInfl(c)}%</td>
+      <td class="num">${c.y10 == null ? `${TH_BOND_FALLBACK}%<span class="tag">未取得，假设</span>` : c.y10.toFixed(2) + '%<span class="tag">' + c.y10D + '</span>'}</td>
+      <td>${c.policy}</td><td class="num">${c.pAge}</td><td class="src">${links.join('')}</td></tr>`;
+  }
+  $('dataTbl').innerHTML = h + '</tbody>';
+  $('dataTbl').dataset.built = '1';
+  document.querySelectorAll('[data-fx]').forEach(inp => inp.addEventListener('input', () => {
+    const v = parseFloat(inp.value);
+    if (v > 0) { FX[inp.dataset.fx] = v; render(); }
+  }));
+  renderData(p);
+}
+
+// ---------- wiring ----------
+function fillFromCountry(which) {
+  const c = COUNTRIES[$('workC').value];
+  if (which === 'work') {
+    $('infl').value = longInfl(c);
+    $('bondY').value = bondOf(c);
+    $('drag').value = c.drag;
+    $('pAge').value = c.pAge;
+    $('fillNote').textContent = `已按 ${c.name} 数据填入通胀、国债收益、税费拖累和退休年龄，可自行修改。`;
+  }
+}
+
+function setMode(m) {
+  document.body.classList.toggle('bwd', m === 'bwd');
+  $('mFwd').setAttribute('aria-pressed', m === 'fwd');
+  $('mBwd').setAttribute('aria-pressed', m === 'bwd');
+  render();
+}
+
+function save() {
+  try {
+    const o = { mode: document.body.classList.contains('bwd') ? 'bwd' : 'fwd', workC: $('workC').value, retC: $('retC').value, dispCur: $('dispCur').value, autoSwr: $('autoSwr').checked };
+    for (const id of NUM_IDS) o[id] = $(id).value;
+    localStorage.setItem('fire-compass-v1', JSON.stringify(o));
+  } catch (e) {}
+}
+function load() {
+  try { const o = JSON.parse(localStorage.getItem('fire-compass-v1')); if (o && COUNTRIES[o.workC]) return Object.assign({}, DEFAULTS, o); } catch (e) {}
+  return DEFAULTS;
+}
+
+function init() {
+  $('dataDate').textContent = DATA_DATE; $('dataDate2').textContent = DATA_DATE;
+  const opts = Object.entries(COUNTRIES).map(([k, c]) => `<option value="${k}">${c.name} · ${c.cur}</option>`).join('');
+  $('workC').innerHTML = opts; $('retC').innerHTML = opts;
+  const curs = ['USD', ...Object.values(COUNTRIES).map(c => c.cur).filter(c => c !== 'USD')];
+  $('dispCur').innerHTML = [...new Set(curs)].map(c => `<option value="${c}">${c}</option>`).join('');
+  const s = load();
+  $('workC').value = s.workC; $('retC').value = s.retC; $('dispCur').value = s.dispCur; $('autoSwr').checked = !!s.autoSwr;
+  for (const id of NUM_IDS) $(id).value = s[id];
+  $('fillNote').textContent = s === DEFAULTS ? '示例数据：30 岁、上海工作的单人，可直接改成你的数字。' : '';
+
+  let prevRet = $('retC').value, prevWork = $('workC').value;
+  $('workC').addEventListener('change', () => {
+    const from = COUNTRIES[prevWork].cur, to = COUNTRIES[$('workC').value].cur;
+    for (const id of ['assets', 'income', 'expense']) $(id).value = Math.round(conv(parseFloat($(id).value) || 0, from, to));
+    prevWork = $('workC').value;
+    fillFromCountry('work');
+    render();
+  });
+  $('retC').addEventListener('change', () => {
+    const from = COUNTRIES[prevRet].cur, to = COUNTRIES[$('retC').value].cur;
+    for (const id of ['retExp', 'pension']) $(id).value = Math.round(conv(parseFloat($(id).value) || 0, from, to));
+    prevRet = $('retC').value;
+    $('fillNote').textContent = `退休支出已按汇率换成 ${to}。不同国家生活成本差异很大，请按当地实际花费改写。`;
+    render();
+  });
+  $('dispCur').addEventListener('change', render);
+  $('autoSwr').addEventListener('change', render);
+  for (const id of NUM_IDS) $(id).addEventListener('input', render);
+  $('mFwd').addEventListener('click', () => setMode('fwd'));
+  $('mBwd').addEventListener('click', () => setMode('bwd'));
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => last && drawChart(), 120); });
+  setMode(s.mode === 'bwd' ? 'bwd' : 'fwd');
+}
+init();
+</script>
