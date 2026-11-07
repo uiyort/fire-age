@@ -125,3 +125,21 @@ export function saveState(S, storage) {
     // Storage is a convenience; the calculator works without it.
   }
 }
+
+const PRO_KEY = 'fire-age-pro-v1';
+
+export function isProUnlocked(storage) {
+  try {
+    return storage.getItem(PRO_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function unlockPro(storage) {
+  try {
+    storage.setItem(PRO_KEY, '1');
+  } catch {
+    // Without storage the view stays open for this visit only.
+  }
+}

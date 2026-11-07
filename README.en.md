@@ -11,7 +11,7 @@ Live site: to be added at launch
 - **Forward:** at your current pace, the age you can stop working.
 - **Backward:** to stop at a chosen age, how much more to save, earn or cut, or how much capital you need today.
 - **Cross-border retirement:** save in one place and retire in another, with spending estimated from price levels.
-- **Two views:** a simple view with 7 questions, and a professional view exposing every assumption.
+- **Two views:** a simple view with 7 questions, and a professional view exposing every assumption, which opens once you have generated a card. Formulas, data sources and source code are never locked.
 - **Verifiable:** formulas, data sources and licence terms are public, the random seed is fixed so results reproduce, and you can export CSV and JSON.
 
 There is no sign-up and no personal data collection. Your numbers stay in your own browser, and share cards are generated locally.

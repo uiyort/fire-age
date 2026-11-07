@@ -2,7 +2,7 @@
 import DATA from './data-latest.js';
 import { DEFAULT_SEED, bwdSolve, dualAges, fiNeed, fiYears, fwdSolve, lifePath, monteCarlo } from './engine.js';
 import { drawLives, hardestIndex, heroModel, holidayType, lifeName, lifeRibbon, lifeStory, placeRanking } from './holiday.js';
-import { commitField, loadState, saveState, safeStorage, setField, setRetireCountry, setWorkCountry, toParams } from './state.js';
+import { commitField, isProUnlocked, loadState, saveState, safeStorage, setField, unlockPro, setRetireCountry, setWorkCountry, toParams } from './state.js';
 import { LIFE_CHOICES, labPlan, rankLevers, impactOf, tryRange } from './levers.js';
 import { pickedSteps, quizRounds, quizScore, quizTitle } from './quiz.js';
 import { PARAMS, PARAM_GROUPS } from './params.js';
@@ -12,7 +12,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { renderCard, summaryCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, quizHtml, solvesHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, tryHtml, trySentence, typeHtml, variantsHtml,
+  allTypesHtml, cardBody, fasterLead, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, quizHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, tryHtml, trySentence, typeHtml, variantsHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -21,12 +21,20 @@ const paramById = Object.fromEntries(PARAMS.map(c => [c.id, c]));
 const today = () => new Date().toISOString().slice(0, 10);
 const MC_DELAY_MS = 150;
 
+const returning = (() => {
+  try {
+    return storage?.getItem('fire-age-v1') != null;
+  } catch {
+    return false;
+  }
+})();
+let proUnlocked = isProUnlocked(storage);
 let S = loadState(DATA, storage);
+if (!proUnlocked && S.view === 'pro') S = { ...S, view: 'simple' };
 let goal = loadGoal(storage);
 let latest = null;
 let mcTimer = 0;
 let frame = 0;
-let lastCardView = null;
 let lifeSeed = DEFAULT_SEED;
 let lifeIndex = 0;
 let labValues = {};
@@ -169,6 +177,8 @@ function syncChrome(p) {
   document.querySelectorAll('[data-unit="retire"]').forEach(e => { e.textContent = p.rCur; });
   document.querySelectorAll('[data-bwd-only]').forEach(e => { e.hidden = S.mode !== 'bwd'; });
   document.querySelectorAll('.pro-only').forEach(e => { e.hidden = S.view !== 'pro'; });
+  document.querySelectorAll('.simple-only').forEach(e => { e.hidden = S.view !== 'simple'; });
+  $('to-pro').textContent = proUnlocked ? '专业' : '专业 🔒';
   $('simple-form').hidden = S.view !== 'simple';
   $('pro-form').hidden = S.view !== 'pro';
   $('solve-card').hidden = S.mode !== 'bwd';
@@ -210,21 +220,23 @@ function renderFast() {
   syncChrome(p);
   syncInputs();
   renderEstimate(p);
-  const { say, note } = headlineText({ mode: S.mode, p, t, bwd, dual, dispCur: cur });
+  const { say, note } = headlineText({ mode: S.mode, p, t, bwd, dual, dispCur: cur, view: S.view });
   $('headline').innerHTML = `<p class="say">${say}</p><p class="say-note">${note}</p>`;
   $('tiles').innerHTML = tilesHtml({ mode: S.mode, p, t, bwd, mc: latest.mc, dispCur: cur });
   renderHero();
   if (S.mode === 'bwd') $('solves').innerHTML = solvesHtml({ p, bwd, dispCur: cur });
-  $('type-now').innerHTML = typeHtml(type, levers[0]);
+  $('type-now').innerHTML = typeHtml(type);
   document.querySelectorAll('.type-cell').forEach(cell => cell.classList.toggle('mine', cell.dataset.code === type.code));
   renderQuiz(p);
-  $('levers').innerHTML = leversHtml(levers, p);
-  $('places').innerHTML = placesHtml(places);
+  $('levers').innerHTML = leversHtml(levers, p, { pro: S.view === 'pro' });
+  $('lead-faster').textContent = fasterLead(levers);
+  $('places').innerHTML = placesHtml(places, { all: S.view === 'pro' });
   renderGoal(p);
   renderCards(p);
   if (S.view === 'pro') {
     $('variants').innerHTML = variantsHtml({ p, dispCur: cur });
     $('heat-box').innerHTML = heatHtml({ p, dispCur: cur });
+    $('sensitivity').innerHTML = sensitivityHtml(p, PARAMS);
   }
   saveState(S, storage);
 }
@@ -233,6 +245,12 @@ function renderHero() {
   const { mode, p, t, bwd, mc, dispCur: cur } = latest;
   latest.hero = heroModel({ mode, p, t, bwd, success: mc?.success ?? null });
   $('hero').innerHTML = heroHtml(latest.hero, { p, dispCur: cur });
+  const success = mc?.success ?? null;
+  $('sticky-result').innerHTML = stickyHtml(latest.hero, { p, dispCur: cur, success, pro: S.view === 'pro' });
+  const riskLead = S.view === 'pro'
+    ? (success === null ? '按计划没有放假年份，不计算成功率。' : `${(mc?.paths ?? 0).toLocaleString('en-US')} 次模拟，成功率 ${pct(success, 0)}。`)
+    : (latest.hero.people === null ? '先到得了，再看撑不撑得住。' : `10 个平行的你，约 ${latest.hero.people} 个的钱够花到 ${p.life} 岁。`);
+  $('lead-risk').textContent = riskLead;
 }
 
 function renderSimulation() {
@@ -352,10 +370,7 @@ function renderCards(p) {
   for (const details of box.querySelectorAll('details')) {
     const param = paramById[details.dataset.id];
     details.querySelector('.lcard').innerHTML = fullCard(param, p);
-    if (S.view === 'pro' && S.view !== lastCardView) details.open = true;
-    if (S.view === 'simple' && S.view !== lastCardView && lastCardView !== null) details.open = false;
   }
-  lastCardView = S.view;
 }
 
 let calcCounted = false;
@@ -501,7 +516,29 @@ function download(name, type, text) {
   URL.revokeObjectURL(url);
 }
 
+// Generating the card is what opens the professional view. Posting it is never asked for or checked.
+function openPro() {
+  if (!proUnlocked) track('pro_unlock');
+  proUnlocked = true;
+  unlockPro(storage);
+  $('to-pro').textContent = '专业';
+  $('pro-enter').hidden = false;
+  $('pro-lock-note').hidden = true;
+}
+
+function askToUnlock() {
+  $('pro-lock-note').textContent = '生成一张放假卡，专业模式就打开了。';
+  $('pro-lock-note').hidden = false;
+  $('pro-lock-note').scrollIntoView({ block: 'center' });
+}
+
 function onClick(ev) {
+  if (ev.target.id === 'pro-enter') {
+    S = { ...S, view: 'pro' };
+    refresh();
+    window.scrollTo(0, 0);
+    return;
+  }
   if (ev.target.id === 'export-csv' || ev.target.id === 'export-json') {
     track('export_data');
     flushSimulation();
@@ -513,6 +550,7 @@ function onClick(ev) {
     track('card_generate');
     flushSimulation();
     showCard(summaryCardSpec(summaryInput()));
+    openPro();
     return;
   }
   if (ev.target.id === 'share-close') {
@@ -598,6 +636,9 @@ function init() {
   buildForm($('pro-form'), 'p', PRO_FIELDS);
   fillCountrySelects();
   $('data-version').textContent = DATA.version;
+  const wide = window.matchMedia('(min-width: 900px)');
+  if (returning && !wide.matches) $('inputs-box').open = false;
+  wide.addEventListener('change', ev => { if (ev.matches) $('inputs-box').open = true; });
   $('type-all').innerHTML = allTypesHtml();
   document.addEventListener('input', onInput);
   document.addEventListener('change', ev => {
@@ -620,6 +661,10 @@ function init() {
     refresh();
   };
   const setView = view => () => {
+    if (view === 'pro' && !proUnlocked) {
+      askToUnlock();
+      return;
+    }
     if (S.view !== view) track('mode_switch');
     S = { ...S, view };
     refresh();

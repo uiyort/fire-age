@@ -1,8 +1,8 @@
 // Turns model results into page text and tables. Strings only, no DOM access.
 import { coastNeed, conv, fiNeed, fwdSolve, swrFor, bwdSolve, savingsAt, savingsRate, buildParams } from './engine.js';
-import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn, workdaysIn } from './holiday.js';
+import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn } from './holiday.js';
 import { quizScore, quizTitle } from './quiz.js';
-import { LIFE_CHOICES, tryParam } from './levers.js';
+import { LIFE_CHOICES, impactOf, tryParam } from './levers.js';
 
 const moneyFormats = {};
 export function money(v, cur) {
@@ -17,9 +17,21 @@ export const pct = (v, d = 1) => (Number.isFinite(v) ? `${(v * 100).toFixed(d)}%
 
 export const toDisplay = (v, p, cur) => conv(v, p.wCur, cur, p.fx);
 
-export function headlineText({ mode, p, t, bwd, dual, dispCur }) {
-  let say;
+function proHeadline({ mode, p, t, bwd, dispCur }) {
   if (mode === 'bwd') {
+    const first = toDisplay(Math.max(bwd.s0, 0), p, dispCur);
+    return bwd.s0 <= 0 ? `目标 ${p.tAge} 岁：现有资产已足够。` : `目标 ${p.tAge} 岁：第一年需储蓄 ${wholeMoney(first, dispCur)}。`;
+  }
+  if (t === 0) return '已达到财务独立。';
+  if (t === null) return '规划期内未达到财务独立。';
+  return `财务独立年龄 ${p.age + t} 岁（第 ${t} 年）。`;
+}
+
+export function headlineText({ mode, p, t, bwd, dual, dispCur, view = 'simple' }) {
+  let say;
+  if (view === 'pro') {
+    say = proHeadline({ mode, p, t, bwd, dispCur });
+  } else if (mode === 'bwd') {
     const monthly = toDisplay(Math.max(bwd.s0, 0) / 12, p, dispCur);
     say = bwd.s0 <= 0 ? `想 ${p.tAge} 岁放假，现在的存款已经够了。` : `想 ${p.tAge} 岁放假，每月需存 ${wholeMoney(monthly, dispCur)}。`;
   } else if (t === 0) {
@@ -54,8 +66,6 @@ export function tilesHtml({ mode, p, t, bwd, mc, dispCur }) {
   const rate = savingsRate(p);
   const success = mc?.success ?? null;
   const parts = [];
-  const yearsLeft = mode === 'bwd' ? bwd.n : t;
-  if (yearsLeft) parts.push(tile('离放假还有', `${mondaysIn(yearsLeft).toLocaleString('zh-CN')} 个周一`, `约 ${workdaysIn(yearsLeft).toLocaleString('zh-CN')} 个工作日（按每年 250 天）`));
   if (mode === 'bwd') {
     parts.push(tile(`${p.tAge} 岁所需资产`, D(bwd.need), `提取率 ${pct(swrFor(p, p.life - p.tAge))}`));
     parts.push(tile('当前计划在那时有', D(bwd.An), bwd.An >= bwd.need ? '已经够了' : `还差 ${D(bwd.need - bwd.An)}`));
@@ -99,8 +109,14 @@ export function goalFor(id, p) {
   return null;
 }
 
-export function leversHtml(levers, p) {
-  const intro = '<h2>你的最大杠杆</h2><p class="sub">对你来说，下面这几件事最能让放假提前。</p>';
+export const fasterLead = levers => {
+  const top = levers[0];
+  if (!top) return '先让收入超过支出，这里才会有答案。';
+  return top.unlocks ? `最有效的一步：${top.label}，就能看到放假那天。` : `最有效的一步：${top.label}，提前 ${yearsText(top.gainYears)}。`;
+};
+
+export function leversHtml(levers, p, { pro = false } = {}) {
+  const intro = '<h2>你的最大杠杆</h2>';
   const gap = p.expense - p.income;
   if (!levers.length && gap >= 0) {
     const detail = gap > 0 ? `现在每年还差 ${money(gap, p.wCur)}。` : '现在收入刚好等于支出，多存一点就能启动。';
@@ -108,8 +124,8 @@ export function leversHtml(levers, p) {
   }
   if (!levers.length) return `${intro}<p class="fine">现在的设定下，单改一项还看不出变化。试着先调整收入和支出。</p>`;
   const items = levers.map(l => {
-    const gain = l.unlocks ? `能在 ${Math.round(p.age + l.afterYears)} 岁放假` : `提前 ${yearsText(l.gainYears)} · 少上 ${mondaysIn(l.gainYears).toLocaleString('zh-CN')} 个周一`;
-    const goal = goalFor(l.id, p);
+    const gain = l.unlocks ? `能在 ${Math.round(p.age + l.afterYears)} 岁放假` : pro ? `提前 ${yearsText(l.gainYears)}` : `提前 ${yearsText(l.gainYears)} · 少上 ${mondaysIn(l.gainYears).toLocaleString('zh-CN')} 个周一`;
+    const goal = pro ? null : goalFor(l.id, p);
     const button = goal ? `<button type="button" class="ghost" data-goal="${l.id}">定为小目标</button>` : '';
     return `<li class="lever"><span class="lab">${l.label}</span><span class="gain">${gain}</span>${button}</li>`;
   }).join('');
@@ -262,16 +278,23 @@ export function allTypesHtml() {
   return `<summary>全部 ${TYPES.length} 种类型和判定规则</summary><ul class="type-list">${rules}</ul>${groups}`;
 }
 
-export function placesHtml(rows) {
+const PLACES_SHOWN = 5;
+
+export function placesHtml(rows, { all = false } = {}) {
   const longest = Math.max(...rows.map(r => r.years ?? 0), 1);
-  return rows.map(r => {
+  const row = r => {
     const width = r.years === null ? 0 : Math.max(r.years / longest * 100, 1);
     const age = r.age === null ? '还到不了' : `${r.age} 岁`;
     const tag = r.current ? '<span class="pill">当前</span>' : '';
     const spend = `每年花 ${money(r.retExp, r.cur)}`;
     return `<div class="place${r.current ? ' current' : ''}"><div class="place-top"><span class="place-name">${r.name}${tag}</span><b class="place-age">${age}</b></div>
       <div class="place-bar" aria-hidden="true"><i style="width:${width.toFixed(1)}%"></i></div><div class="place-note">${spend}</div></div>`;
-  }).join('');
+  };
+  if (all) return rows.map(row).join('');
+  const shown = rows.filter((r, i) => i < PLACES_SHOWN || r.current);
+  const rest = rows.filter(r => !shown.includes(r));
+  const more = rest.length ? `<details class="places-more"><summary>看其余 ${rest.length} 个地方</summary>${rest.map(row).join('')}</details>` : '';
+  return shown.map(row).join('') + more;
 }
 
 export const signedPct = v => {
@@ -305,7 +328,7 @@ export function livesHtml(lives, stories, selected, { p, dispCur, fifth = null }
   const rows = lives.map((life, i) => lifeRow(life, stories[i], i, selected, D, { maxCells })).join('');
   const last = fifth
     ? lifeRow(fifth.path, fifth.story, lives.length, selected, D, { fifth: true, maxCells })
-    : '<div class="life-empty" id="life-fifth-empty"><b>第五条人生</b>等你来写。在下面的放假实验室做选择，它会用四条里最难的那段年景，换上你的计划重走一遍。</div>';
+    : '<div class="life-empty" id="life-fifth-empty"><b>第五条人生</b>等你来写。回答“写你的第五条人生”里的题，或者拖动参数滑杆，它会用四条里最难的那段年景，换上你的计划重走一遍。</div>';
   return rows + last;
 }
 
@@ -329,6 +352,37 @@ export const fifthSentence = (base, fifth) => {
 export function labChangesHtml(labels) {
   if (!labels.length) return '';
   return `<div class="life-changes"><span>已写入第五条人生：${labels.join('、')}</span><button type="button" class="ghost" id="lab-clear">清空重写</button></div>`;
+}
+
+export function stickyHtml(h, { p, dispCur, success, pro }) {
+  if (pro) {
+    const age = h.reachable ? `财务独立 ${h.holidayAge} 岁` : '规划期内未达到';
+    const odds = success === null || success === undefined ? '' : `<span>成功率 ${pct(success, 0)}</span>`;
+    return `<b class="sticky-age">${age}</b><span>所需 ${money(toDisplay(h.fund.need, p, dispCur), dispCur)}</span>${odds}<span class="sticky-more">实际收益 ${pct(p.r, 2)}</span>`;
+  }
+  if (!h.reachable) return '<b class="sticky-age">还在路上</b><span>先把杠杆用起来</span>';
+  const age = h.workYears === 0 ? '现在就能放假' : `${h.holidayAge} 岁放假`;
+  const bar = `<span class="sticky-bar-mini" aria-hidden="true"><i style="width:${(h.workYears / (h.workYears + h.holidayYears) * 100).toFixed(1)}%"></i></span>`;
+  const odds = h.people === null ? '' : `<span>${h.people}/10 撑到 ${h.endAge} 岁</span>`;
+  const work = h.workYears ? `<span class="sticky-more">再上 ${h.workYears} 年班</span>` : '';
+  return `<b class="sticky-age">${age}</b>${bar}${work}${odds}`;
+}
+
+export function sensitivityHtml(p, params) {
+  const valueOf = id => {
+    const v = p[id];
+    if (['assets', 'income', 'expense'].includes(id)) return money(v, p.wCur);
+    if (['retExp', 'pension'].includes(id)) return money(v, p.rCur);
+    return String(v);
+  };
+  const rows = params.map(param => {
+    const impact = impactOf(p, param.id);
+    const cells = impact.gainYears === null
+      ? `<td colspan="2">${impact.stepLabel}</td>`
+      : `<td>${impact.stepLabel}${impact.note ? `<span class="sens-note">${impact.note}</span>` : ''}</td><td class="num">${effectText(impact.gainYears)}</td>`;
+    return `<tr><td>${param.name}</td><td class="num">${valueOf(param.id)}</td>${cells}</tr>`;
+  }).join('');
+  return `<thead><tr><th>参数</th><th class="num">当前值</th><th>变动</th><th class="num">对放假年龄</th></tr></thead><tbody>${rows}</tbody>`;
 }
 
 export function heroHtml(h, { p, dispCur }) {

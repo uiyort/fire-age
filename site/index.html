@@ -21,123 +21,163 @@
         </div>
         <div class="seg" role="group" aria-label="界面详细程度">
           <button type="button" id="to-simple">简单</button>
-          <button type="button" id="to-pro">专业</button>
+          <button type="button" id="to-pro">专业 🔒</button>
         </div>
       </div>
     </header>
 
+    <div class="sticky" id="sticky-bar">
+      <div class="sticky-result" id="sticky-result"></div>
+      <nav class="zone-nav" aria-label="页面导航">
+        <a href="#zone-faster">怎么提前</a>
+        <a href="#zone-risk">撑得住吗</a>
+        <a href="#zone-learn">参数</a>
+        <a href="#share-section" class="simple-only">放假卡</a>
+      </nav>
+    </div>
+
     <main class="layout">
       <section class="headline" aria-live="polite">
         <div id="headline"></div>
-        <div class="hero" id="hero"></div>
+        <div class="hero-grid simple-only">
+          <div class="hero" id="hero"></div>
+          <div class="type-block" id="type-section">
+            <h2>你的放假类型</h2>
+            <div id="type-now"></div>
+          </div>
+        </div>
+        <details id="type-all" class="simple-only"></details>
         <div class="tiles pro-only" id="tiles" hidden></div>
       </section>
 
       <section class="inputs" aria-label="输入">
-        <form id="simple-form" autocomplete="off"></form>
-        <form id="pro-form" autocomplete="off" hidden></form>
-        <div class="estimate" id="estimate"></div>
+        <details id="inputs-box" open>
+          <summary>改我的数字</summary>
+          <form id="simple-form" autocomplete="off"></form>
+          <form id="pro-form" autocomplete="off" hidden></form>
+          <div class="estimate" id="estimate"></div>
+        </details>
       </section>
 
       <div class="results">
-        <section class="card" id="solve-card" hidden>
-          <h2>想按时放假，四条路任选其一</h2>
-          <p class="sub">每条路只改一个数字，其余保持你填写的数值。</p>
-          <div class="solves" id="solves"></div>
-        </section>
-
-        <section class="card" id="type-section">
-          <h2>你的放假类型</h2>
-          <div id="type-now"></div>
-          <details id="type-all"></details>
-        </section>
-
-        <section class="card" id="levers"></section>
-        <section class="card" id="goal" hidden>
-          <div id="goal-body"></div>
-        </section>
-
-        <section class="card" id="places-card">
-          <h2>同样的钱，在哪放假最早</h2>
-          <p class="sub">支出按当地物价折算，保持同样的生活水平。条越短，放假越早。没算签证、税和医疗，这些要自己查。</p>
-          <div id="places"></div>
-        </section>
-
-        <section class="card">
-          <h2>资产会怎么变</h2>
-          <p class="sub" id="chart-sub"></p>
-          <div class="legend">
-            <span><i class="sw band-wide"></i>10–90 分位</span>
-            <span><i class="sw band-mid"></i>25–75 分位</span>
-            <span><i class="sw line-mid"></i>中位数</span>
-            <span><i class="sw line-target"></i>放假所需资产</span>
+        <section class="zone" id="zone-faster">
+          <h2 class="zone-title">怎么提前</h2>
+          <p class="zone-lead" id="lead-faster"></p>
+          <div class="card" id="solve-card" hidden>
+            <h2>想按时放假，四条路任选其一</h2>
+            <p class="sub">每条路只改一个数字，其余保持你填写的数值。</p>
+            <div class="solves" id="solves"></div>
           </div>
-          <div class="chart-box">
-            <svg id="chart" role="img" aria-label="资产随年龄变化的分位数区间图"></svg>
-            <div class="tip" id="tip" hidden></div>
-          </div>
-          <p class="fine" id="mc-note"></p>
-          <details><summary>查看数据表</summary><div class="tbl"><table id="pct-table"></table></div></details>
-          <div class="goal-row pro-only" hidden>
-            <button type="button" class="ghost" id="export-csv">导出 CSV</button>
-            <button type="button" class="ghost" id="export-json">导出 JSON</button>
+          <div class="zone-grid">
+            <div class="zone-col">
+              <div class="card" id="levers"></div>
+              <div class="simple-only"><div class="card" id="goal" hidden><div id="goal-body"></div></div></div>
+            </div>
+            <div class="card" id="places-card">
+              <h2>同样的钱，在哪放假最早</h2>
+              <p class="sub">支出按当地物价折算，保持同样的生活水平。条越短，放假越早。没算签证、税和医疗，这些要自己查。</p>
+              <div id="places"></div>
+            </div>
           </div>
         </section>
 
-        <section class="card" id="life-section">
-          <h2>五条人生</h2>
-          <p class="sub">同一个计划，碰上不同的年景。前四条靠运气，第五条由你来写。</p>
-          <div class="life-legend" id="life-legend">
-            <span><i class="sw r-work"></i>上班</span>
-            <span><i class="sw r-holiday"></i>放假有钱花</span>
-            <span><i class="sw r-broke"></i>钱花完</span>
-            <span><i class="sw r-bad"></i>当年大跌 15% 以上</span>
-          </div>
-          <div class="lives" id="lives"></div>
-          <div id="life-changes"></div>
-          <div class="goal-row"><button type="button" class="ghost" id="life-draw">换一批年景</button></div>
-          <p class="fine" id="life-summary"></p>
-          <div class="legend" id="lives-chart-legend"></div>
-          <div class="chart-box">
-            <svg id="lives-chart" role="img" aria-label="选中的人生和其他人生的资产变化对比"></svg>
-            <div class="tip" id="lives-tip" hidden></div>
-          </div>
-          <div id="life-story"></div>
-          <p class="fine" id="life-seed"></p>
+        <section class="zone" id="zone-risk">
+          <h2 class="zone-title">撑得住吗</h2>
+          <p class="zone-lead" id="lead-risk"></p>
 
-          <div id="lab-section">
-            <h3>放假实验室：写你的第五条人生</h3>
-            <p class="sub">先猜再看答案。你选的每一项都会写进第五条人生，题目用你自己的数字算。</p>
-            <div id="quiz"></div>
-            <h3>拖一拖，认识每个参数</h3>
+          <div class="card simple-only" id="life-section">
+            <h2>平行人生</h2>
+            <p class="sub">同一个计划，碰上不同的年景。前四条靠运气，第五条由你来写。</p>
+            <div class="zone-grid">
+              <div>
+                <div class="life-legend" id="life-legend">
+                  <span><i class="sw r-work"></i>上班</span>
+                  <span><i class="sw r-holiday"></i>放假有钱花</span>
+                  <span><i class="sw r-broke"></i>钱花完</span>
+                  <span><i class="sw r-bad"></i>当年大跌 15% 以上</span>
+                </div>
+                <div class="lives" id="lives"></div>
+                <div id="life-changes"></div>
+                <div class="goal-row"><button type="button" class="ghost" id="life-draw">换一批年景</button></div>
+                <p class="fine" id="life-summary"></p>
+              </div>
+              <div>
+                <h3 class="lab-title">写你的第五条人生</h3>
+                <p class="sub">先猜再看答案。你选的每一项都会写进第五条，题目用你自己的数字算。</p>
+                <div id="quiz"></div>
+              </div>
+            </div>
+            <div class="legend" id="lives-chart-legend"></div>
+            <div class="chart-box">
+              <svg id="lives-chart" role="img" aria-label="选中的人生和其他人生的资产变化对比"></svg>
+              <div class="tip" id="lives-tip" hidden></div>
+            </div>
+            <div id="life-story"></div>
+            <p class="fine" id="life-seed"></p>
+          </div>
+
+          <div class="card pro-only" hidden>
+            <h2>资产分布</h2>
+            <p class="sub" id="chart-sub"></p>
+            <div class="legend">
+              <span><i class="sw band-wide"></i>10–90 分位</span>
+              <span><i class="sw band-mid"></i>25–75 分位</span>
+              <span><i class="sw line-mid"></i>中位数</span>
+              <span><i class="sw line-target"></i>放假所需资产</span>
+            </div>
+            <div class="chart-box">
+              <svg id="chart" role="img" aria-label="资产随年龄变化的分位数区间图"></svg>
+              <div class="tip" id="tip" hidden></div>
+            </div>
+            <p class="fine" id="mc-note"></p>
+            <div class="tbl"><table id="pct-table"></table></div>
+            <div class="goal-row">
+              <button type="button" class="ghost" id="export-csv">导出 CSV</button>
+              <button type="button" class="ghost" id="export-json">导出 JSON</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="zone" id="zone-learn">
+          <h2 class="zone-title"><span class="simple-only">认识每个参数</span><span class="pro-only" hidden>敏感度</span></h2>
+
+          <div class="card simple-only">
             <p class="sub">点开任意一项，拖动滑杆看放假年龄怎么变。不会改你的计划。</p>
             <p class="lab-progress" id="lab-progress" role="status"></p>
             <div id="cards"></div>
           </div>
+
+          <div class="card pro-only" hidden>
+            <h2>单参数敏感度</h2>
+            <p class="sub">每行只改一个参数，其余不变。</p>
+            <div class="tbl"><table id="sensitivity"></table></div>
+          </div>
+
+          <div class="card pro-only" hidden>
+            <h2>收益和储蓄的组合</h2>
+            <p class="sub">行是实际年化收益，列是每年储蓄额。颜色越深放假越早，黑框是当前输入。</p>
+            <div class="tbl" id="heat-box"></div>
+          </div>
+
+          <div class="card pro-only" hidden>
+            <h2>FIRE 变体</h2>
+            <p class="sub">同一份收入，不同的放假生活标准。</p>
+            <div class="tbl"><table id="variants"></table></div>
+          </div>
         </section>
 
-        <section class="card pro-only" hidden>
-          <h2>FIRE 变体</h2>
-          <p class="sub">同一份收入，不同的放假生活标准。</p>
-          <div class="tbl"><table id="variants"></table></div>
-        </section>
-
-        <section class="card pro-only" hidden>
-          <h2>敏感度：放假年龄</h2>
-          <p class="sub">行是实际年化收益，列是每年储蓄额。颜色越深放假越早，黑框是当前输入。</p>
-          <div class="tbl" id="heat-box"></div>
-        </section>
-
-        <section class="card" id="share-section">
+        <section class="card simple-only" id="share-section">
           <h2>生成我的放假卡</h2>
-          <p class="sub">把上面的结论收进一张图：放假年龄、类型、人生条、五条人生，还有你在实验室的成绩。</p>
+          <p class="sub">把这一页的结论收进一张图。生成后，专业模式也会打开：全部假设、敏感度表、分位数和 CSV / JSON 导出。公式和数据来源不用解锁，随时在页脚查看。</p>
+          <p class="pro-lock-note" id="pro-lock-note" role="status" hidden></p>
           <div class="goal-row"><button type="button" class="primary" id="share-btn">生成放假卡</button></div>
           <div class="share" id="share-panel" hidden>
             <img id="share-img" alt="">
-            <p class="fine" id="share-hint">长按图片保存，发到评论区晒一晒。</p>
+            <p class="fine" id="share-hint">长按图片保存。</p>
             <div class="goal-row">
               <a class="ghost save" id="share-download" download="fire-age.png">下载图片</a>
               <button type="button" class="ghost" id="share-close">收起</button>
+              <button type="button" class="ghost" id="pro-enter" hidden>进入专业模式</button>
             </div>
           </div>
         </section>

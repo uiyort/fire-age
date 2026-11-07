@@ -179,3 +179,72 @@ test('ribbons share one age scale even when a plan runs longer', () => {
   assert.match(svg, /viewBox="0 0 60 20"/);
   assert.equal((svg.match(/r-(work|holiday|broke)/g) ?? []).length, 4);
 });
+
+test('unlocking the professional view persists, and blocked storage does not break it', async () => {
+  const { isProUnlocked, unlockPro } = await import('../site/js/state.js');
+  const box = new Map();
+  const storage = { getItem: k => box.get(k) ?? null, setItem: (k, v) => box.set(k, v) };
+  assert.equal(isProUnlocked(storage), false);
+  unlockPro(storage);
+  assert.equal(isProUnlocked(storage), true);
+  const blocked = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
+  assert.equal(isProUnlocked(blocked), false);
+  assert.doesNotThrow(() => unlockPro(blocked));
+  assert.equal(isProUnlocked(null), false);
+});
+
+test('the professional headline states the result without the slogan', async () => {
+  const { headlineText } = await import('../site/js/views.js');
+  const { dualAges } = await import('../site/js/engine.js');
+  const p = person();
+  const base = { mode: 'fwd', p, bwd: bwdSolve(p), dual: dualAges(p), dispCur: 'CNY', view: 'pro' };
+  const t = fwdSolve(p);
+  assert.match(headlineText({ ...base, t }).say, new RegExp(`财务独立年龄 ${p.age + t} 岁`));
+  assert.ok(!headlineText({ ...base, t }).say.includes('余生'));
+  assert.match(headlineText({ ...base, t: 0 }).say, /已达到财务独立/);
+  assert.match(headlineText({ ...base, t: null }).say, /规划期内未达到/);
+  assert.match(headlineText({ ...base, mode: 'bwd', t }).say, new RegExp(`目标 ${p.tAge} 岁`));
+});
+
+test('the sensitivity table has one row per parameter and honest empty cells', async () => {
+  const { sensitivityHtml } = await import('../site/js/views.js');
+  const { PARAMS } = await import('../site/js/params.js');
+  const html = sensitivityHtml(person(), PARAMS);
+  assert.equal((html.match(/<tr>/g) ?? []).length, PARAMS.length + 1);
+  assert.ok(!/NaN|undefined|null/.test(html));
+  assert.match(html, /年/);
+});
+
+test('the sticky summary suits each view and each outcome', async () => {
+  const { stickyHtml } = await import('../site/js/views.js');
+  const p = person();
+  const t = fwdSolve(p);
+  const hero = heroModel({ mode: 'fwd', p, t, bwd: bwdSolve(p), success: 0.7 });
+  const simple = stickyHtml(hero, { p, dispCur: 'CNY', success: 0.7, pro: false });
+  assert.match(simple, new RegExp(`${p.age + t} 岁放假`));
+  assert.match(simple, /7\/10/);
+  const pro = stickyHtml(hero, { p, dispCur: 'CNY', success: 0.7, pro: true });
+  assert.match(pro, /成功率 70%/);
+  const none = heroModel({ mode: 'fwd', p, t: null, bwd: bwdSolve(p), success: null });
+  assert.ok(!/null|NaN|undefined/.test(stickyHtml(none, { p, dispCur: 'CNY', success: null, pro: false })));
+  assert.ok(!/null|NaN|undefined/.test(stickyHtml(none, { p, dispCur: 'CNY', success: null, pro: true })));
+});
+
+test('the place list folds all but the top five, keeping the current place in view', async () => {
+  const { placesHtml } = await import('../site/js/views.js');
+  const rows = Array.from({ length: 11 }, (_, i) => ({ code: String(i), name: 'x' + i, cur: 'CNY', retExp: 1, age: 40 + i, years: 10 + i, current: i === 9 }));
+  const html = placesHtml(rows);
+  const open = html.slice(0, html.indexOf('<details'));
+  assert.equal((open.match(/class="place( current)?"/g) ?? []).length, 6, 'top five plus the current place');
+  assert.match(open, /x9/);
+  assert.ok(!placesHtml(rows, { all: true }).includes('<details'));
+});
+
+test('the sensitivity table never claims age has no effect, and keeps the stock share risk note', async () => {
+  const { sensitivityHtml } = await import('../site/js/views.js');
+  const { PARAMS } = await import('../site/js/params.js');
+  const row = id => sensitivityHtml(person(), PARAMS.filter(c => c.id === id));
+  assert.ok(!row('age').includes('不影响放假年龄'));
+  assert.match(row('sigEq'), /成功率/);
+  assert.match(row('eq'), /波动/);
+});
