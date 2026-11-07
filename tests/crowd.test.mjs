@@ -75,12 +75,13 @@ const base = baselineOf(DATA, 'CN');
 const params = Object.fromEntries(PARAMS.map(c => [c.id, c]));
 const done = crowd => scenarioHtml({ index: SCENARIOS.length, answers: full, base, effect: '', params, crowd });
 
-test('the summary offers to count the answers anonymously, and says what is kept', () => {
-  const html = done({ status: 'idle' });
-  assert.match(html, /crowd-join/);
+test('the summary says what is kept, and has no button unless counting failed', () => {
+  const html = done({ status: 'loading' });
+  assert.ok(!html.includes('crowd-join'));
   assert.match(html, /匿名/);
   assert.match(html, /不记录/);
   assert.deepEqual(findBannedCopy(html), []);
+  assert.match(done({ status: 'error' }), /crowd-join/);
 });
 
 test('with enough answers, each row shows how many people see it the same way', () => {

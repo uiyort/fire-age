@@ -270,30 +270,39 @@ async function finishViews(page) {
   return box;
 }
 
-test('nothing about the answers is sent until the person asks', async ({ page }) => {
+test('the questions say up front that finished answers are counted anonymously', async ({ page }) => {
   const posted = await crowdServer(page);
   await page.goto('/');
-  const box = await finishViews(page);
-  await expect(box.locator('#crowd-join')).toContainText('匿名');
-  await expect(box).toContainText('不记录');
+  await expect(page.locator('#scenario-sub')).toContainText('匿名计入');
+  await answer(page);
   expect(posted).toHaveLength(0);
 });
 
-test('answers counted on request show how many people see each one the same way, and are counted once', async ({ page }) => {
+test('finished answers are counted at once, compared with everyone, and counted only once', async ({ page }) => {
   const posted = await crowdServer(page);
   await page.goto('/');
   let box = await finishViews(page);
-  await box.locator('#crowd-join').click();
   await expect(box.locator('.crowd-share').first()).toContainText('20% 也这么看');
   await expect(box).toContainText('100 人');
+  await expect(box).toContainText('不记录');
+  await expect(box.locator('#crowd-join')).toHaveCount(0);
   expect(posted).toHaveLength(1);
   expect(Object.keys(posted[0])).toEqual(['a']);
   await page.reload();
   box = await finishViews(page);
-  await expect(box.locator('#crowd-join')).toHaveText('看看大家怎么判断');
-  await box.locator('#crowd-join').click();
   await expect(box.locator('.crowd-share').first()).toBeVisible();
   expect(posted).toHaveLength(1);
+});
+
+test('when the count cannot be reached, it can be tried again', async ({ page }) => {
+  let fail = true;
+  await page.route('**/api/views', route => (fail ? route.fulfill({ status: 503 }) : route.fulfill({ status: route.request().method() === 'POST' ? 204 : 200, contentType: 'application/json', body: JSON.stringify({ total: 3, counts: {} }) })));
+  await page.goto('/');
+  const box = await finishViews(page);
+  await expect(box).toContainText('稍后');
+  fail = false;
+  await box.locator('#crowd-join').click();
+  await expect(box).toContainText('3 人');
 });
 
 test('every life row names its holiday luck', async ({ page }) => {

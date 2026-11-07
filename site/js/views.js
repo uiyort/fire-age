@@ -179,17 +179,15 @@ function teaching(param) {
   return `<p class="scn-what">${param.what}</p><p class="scn-ref">参考：${ref}</p>`;
 }
 
-// What other people think: offered after the last question, counted only when the person chooses to.
+// What other people think: finished answers are counted anonymously, once per browser, then compared with everyone's.
 function crowdHtml(crowd) {
-  const privacy = '<p class="fine">只记录这 6 个选项，不记录 IP、设备、时间或你填的其它数字。</p>';
-  const join = label => `<button type="button" class="ghost" id="crowd-join">${label}</button>`;
-  if (crowd.status === 'loading') return '<div class="crowd"><p class="fine">正在汇总……</p></div>';
-  if (crowd.status === 'error') return `<div class="crowd"><p class="fine">暂时连不上，稍后再试。</p>${join('再试一次')}</div>`;
+  const privacy = '你的回答已匿名计入：只记录这 6 个选项，不记录 IP、设备、时间或你填的其它数字。';
+  if (crowd.status === 'error') return `<div class="crowd"><p class="fine">暂时连不上大家的统计，稍后再试。</p><button type="button" class="ghost" id="crowd-join">再试一次</button></div>`;
   if (crowd.status === 'shown') {
     const more = crowd.total < MIN_SHOWN ? `，满 ${MIN_SHOWN} 人后显示比例` : '';
-    return `<div class="crowd"><p class="fine">已有 ${crowd.total.toLocaleString('zh-CN')} 人回答${more}。</p></div>`;
+    return `<div class="crowd"><p class="fine">已有 ${crowd.total.toLocaleString('zh-CN')} 人回答${more}。${privacy}</p></div>`;
   }
-  return `<div class="crowd">${join(crowd.sent ? '看看大家怎么判断' : '匿名计入，看看大家怎么判断')}${privacy}</div>`;
+  return `<div class="crowd"><p class="fine">正在汇总大家的判断……${privacy}</p></div>`;
 }
 
 const crowdShare = (crowd, id, chosen) => {

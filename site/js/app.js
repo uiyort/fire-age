@@ -630,7 +630,11 @@ function onClick(ev) {
   }
   if (ev.target.id === 'scn-next') {
     scnIndex += 1;
-    if (scnIndex === SCENARIOS.length) track('views_done');
+    if (scnIndex === SCENARIOS.length) {
+      track('views_done');
+      joinCrowd();
+      return;
+    }
     renderScenario();
     return;
   }
