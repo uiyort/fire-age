@@ -230,6 +230,24 @@ test('the questions finish with a summary, and one answer can be changed from it
   await expect(page.locator('#lab-clear')).toHaveCount(0);
 });
 
+test('working backward, the written life takes the holiday at the age asked for', async ({ page }) => {
+  await page.goto('/');
+  await page.click('#to-bwd');
+  await page.fill('#s-tage', '45');
+  await page.waitForTimeout(400);
+  await answer(page);
+  const work = await page.locator('#lives .life').first().locator('.r-work').count();
+  expect(work).toBe(15);
+  await expect(page.locator('#lives .life.fifth .r-work')).toHaveCount(work);
+});
+
+test('no two drawn lives share a name, and the hardest is marked', async ({ page }) => {
+  await page.goto('/');
+  const names = await page.locator('#lives .life .life-name').allInnerTexts();
+  expect(new Set(names).size).toBe(names.length);
+  await expect(page.locator('#lives .life', { hasText: '最难' })).toHaveCount(1);
+});
+
 test('every life row names its holiday luck', async ({ page }) => {
   await page.goto('/');
   for (const row of await page.locator('#lives .life').all()) {

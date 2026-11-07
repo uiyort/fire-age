@@ -1,7 +1,7 @@
 // Page wiring: reads inputs into state, recomputes, renders.
 import DATA from './data-latest.js';
 import { DEFAULT_SEED, bwdSolve, dualAges, fiNeed, fiYears, fwdSolve, lifePath, monteCarlo } from './engine.js';
-import { drawLives, hardestIndex, heroModel, holidayType, lifeName, lifeRibbon, lifeStory, placeRanking } from './holiday.js';
+import { drawLives, hardestIndex, heroModel, holidayType, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking } from './holiday.js';
 import { commitField, isProUnlocked, loadState, saveState, safeStorage, setField, unlockPro, setRetireCountry, setWorkCountry, toParams } from './state.js';
 import { LIFE_CHOICES, labPlan, rankLevers, impactOf, tryRange } from './levers.js';
 import { SCENARIOS, answerValues, baselineOf } from './scenario.js';
@@ -306,12 +306,13 @@ function labLabels() {
 }
 
 // The life waiting to be written: the hardest of the four years of luck, walked with the person's own view of the future.
-function fifthLife(p, lives, stories) {
+// Working backward, it keeps the holiday age and the saving plan that were asked for.
+function fifthLife(p, lives, stories, { mode, retireT, s0 }) {
   const values = { ...answerValues(scnAnswers, baseline()), ...labValues };
   if (!Object.keys(values).length) return null;
   const base = hardestIndex(stories);
   const q = labPlan(p, { values });
-  const path = lifePath(q, fwdSolve(q), null, lives[base].seed);
+  const path = mode === 'bwd' ? lifePath(q, retireT, s0, lives[base].seed) : lifePath(q, fwdSolve(q), null, lives[base].seed);
   return { path, story: lifeStory(path, q), base: stories[base], baseIndex: base, plan: q };
 }
 
@@ -321,23 +322,26 @@ function renderLives() {
   const s0 = mode === 'bwd' ? Math.max(bwd.s0, 0) : null;
   const lives = drawLives(p, retireT, s0, lifeSeed);
   const stories = lives.map(life => lifeStory(life, p));
-  const fifth = fifthLife(p, lives, stories);
+  const fifth = fifthLife(p, lives, stories, { mode, retireT, s0 });
+  const names = lifeNames(stories);
+  const hardest = hardestIndex(stories);
   if (!fifth && lifeIndex === lives.length) lifeIndex = 0;
   latest.lives = lives;
   latest.stories = stories;
   latest.fifth = fifth;
+  latest.names = names;
   const selectedFifth = fifth && lifeIndex === lives.length;
-  $('lives').innerHTML = livesHtml(lives, stories, lifeIndex, { p, dispCur: cur, fifth });
+  $('lives').innerHTML = livesHtml(lives, stories, lifeIndex, { p, dispCur: cur, fifth, names, hardest });
   $('life-changes').innerHTML = labChangesHtml(labLabels());
   $('life-summary').textContent = livesSummary(stories, mc);
   const story = selectedFifth ? fifth.story : stories[lifeIndex];
-  const compare = fifth ? fifthCompareHtml(fifth.base, fifth.story) : '';
+  const compare = fifth ? fifthCompareHtml(fifth.base, fifth.story, names[fifth.baseIndex]) : '';
   $('life-story').innerHTML = `${selectedFifth ? compare : ''}${storyHtml(story, { p: selectedFifth ? fifth.plan : p, dispCur: cur })}`;
   $('life-seed').textContent = `随机种子 ${lifeSeed} 到 ${lifeSeed + lives.length - 1}，同样的输入可以复现这几条人生。收益是模型抽样，不是历史重演。`;
   const scale = v => toDisplay(v, p, cur);
   const series = lives.map((life, i) => {
     const kind = selectedFifth ? (i === fifth.baseIndex ? 'compare' : 'other') : (i === lifeIndex ? 'selected' : 'other');
-    return { label: lifeName(stories[i]), kind, retireT: life.retireT, cells: lifeRibbon(life), values: life.years.map(y => scale(y.assets)) };
+    return { label: names[i], kind, retireT: life.retireT, cells: lifeRibbon(life), values: life.years.map(y => scale(y.assets)) };
   });
   if (selectedFifth) series.push({ label: '等你来写', kind: 'selected', retireT: fifth.path.retireT, cells: lifeRibbon(fifth.path), values: fifth.path.years.map(y => scale(y.assets)) });
   $('lives-chart-legend').innerHTML = [
@@ -345,7 +349,7 @@ function renderLives() {
     '<span><i class="sw r-holiday"></i>放假有钱花</span>',
     '<span><i class="sw r-broke"></i>钱花完</span>',
     '<span><i class="sw r-bad"></i>当年大跌 15% 以上</span>',
-    ...(selectedFifth ? [`<span><i class="sw line-compare"></i>原计划：${lifeName(fifth.base)}</span>`] : []),
+    ...(selectedFifth ? [`<span><i class="sw line-compare"></i>原计划：${names[fifth.baseIndex]}</span>`] : []),
     '<span><i class="sw line-other"></i>其他几条</span>',
   ].join('');
   drawLivesChart($('lives-chart'), $('lives-tip'), { age: p.age, lives: series, money: v => money(v, cur) });
@@ -499,7 +503,7 @@ function summaryInput() {
   const best = places[0], here = places.find(r => r.current);
   const gain = best.years !== null && here?.years != null ? here.years - best.years : 0;
   const achieved = goal && goalApplies(goal, p) && compareVisit(goal, p, today()).achieved;
-  const ribbons = lives.map((life, i) => ({ label: lifeName(stories[i]), cells: lifeRibbon(life).map(c => c.state) }));
+  const ribbons = lives.map((life, i) => ({ label: (latest.names ?? lifeNames(stories))[i], cells: lifeRibbon(life).map(c => c.state) }));
   if (fifth) ribbons.push({ label: '等你来写', cells: lifeRibbon(fifth.path).map(c => c.state) });
   return {
     mode, type, hero, ribbons,

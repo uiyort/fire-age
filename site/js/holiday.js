@@ -162,6 +162,37 @@ export function lifeName(story) {
   return story.endAssets >= story.retireAssets * 0.5 ? '平稳局' : '细水长流';
 }
 
+// Other true names for a life, tried in order when its first name is already taken in the same draw.
+function otherNames(s) {
+  if (s.outcome === 'working') return ['还在攒'];
+  const start = s.firstFive ?? 0, bad = s.badYears ?? 0;
+  if (s.outcome === 'ruined') {
+    return [[start >= 0.04, '后劲不足'], [start < 0, '起步就难'], [bad >= 3, '风浪不断'], [true, '入不敷出']].filter(([ok]) => ok).map(([, name]) => name);
+  }
+  const ratio = s.retireAssets > 0 ? s.endAssets / s.retireAssets : 1;
+  return [
+    [bad >= 3, '风浪不断'], [start < 0, '先苦后甜'], [start >= 0.06 && ratio >= 1, '一路高歌'],
+    [s.retireAssets > 0 && s.lowPoint < s.retireAssets * 0.25, '虎口脱险'],
+    [s.worst && s.best && s.worst.ret <= -0.2 && s.best.ret >= 0.3, '过山车'],
+    [ratio >= 1, '顺风局'], [ratio >= 0.5, '平稳局'], [ratio < 0.5, '细水长流'],
+  ].filter(([ok]) => ok).map(([, name]) => name);
+}
+
+const ORDINALS = ['二', '三', '四', '五', '六'];
+
+// Names for lives drawn together: each stays true to its own life, and no two are the same.
+export function lifeNames(stories) {
+  const taken = [];
+  for (const s of stories) {
+    const first = lifeName(s);
+    const free = [first, ...otherNames(s)].find(name => !taken.includes(name));
+    if (free) { taken.push(free); continue; }
+    const k = taken.filter(name => name === first || name.startsWith(`${first}·`)).length;
+    taken.push(`${first}·${ORDINALS[k - 1] ?? k + 1}`);
+  }
+  return taken;
+}
+
 // The life that went worst: the earliest to run out, otherwise the one with least left.
 export function hardestIndex(stories) {
   const rank = s => (s.outcome === 'ruined' ? s.ruinAge - 1e6 : s.endAssets);

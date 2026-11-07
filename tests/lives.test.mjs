@@ -5,7 +5,7 @@ import { bwdSolve, fiNeed, fwdSolve, lifePath } from '../site/js/engine.js';
 import { defaultState, setField, toParams } from '../site/js/state.js';
 import { LIFE_CHOICES, labPlan } from '../site/js/levers.js';
 import { fifthCompareHtml, fifthSentence, labChangesHtml, livesHtml, ribbonSvg } from '../site/js/views.js';
-import { hardestIndex, heroModel, holidayYearsOf, lifeName, lifeRibbon, lifeStory, peopleOf } from '../site/js/holiday.js';
+import { hardestIndex, heroModel, holidayYearsOf, lifeName, lifeNames, lifeRibbon, lifeStory, peopleOf } from '../site/js/holiday.js';
 
 const person = (fields = {}) => {
   let S = defaultState(DATA);
@@ -158,6 +158,38 @@ test('a return that rounds to zero is not painted as a loss', () => {
   assert.match(html, /<b class="bad">−3%\/年<\/b>/);
 });
 
+test('lives drawn together never share a name, and each name stays true', () => {
+  const early = story({ outcome: 'ruined', ruinAge: 63, firstFive: 0, badYears: 3 });
+  const later = story({ outcome: 'ruined', ruinAge: 65, firstFive: 0.04, badYears: 2 });
+  assert.deepEqual(lifeNames([early, later]), ['中途断粮', '后劲不足']);
+  const wild = story({ worst: { ret: -0.25 }, best: { ret: 0.35 }, badYears: 2, firstFive: 0.13, endAssets: 300 });
+  const bumpy = story({ worst: { ret: -0.25 }, best: { ret: 0.35 }, badYears: 6, firstFive: 0.02, endAssets: 60 });
+  assert.deepEqual(lifeNames([wild, bumpy]), ['过山车', '风浪不断']);
+});
+
+test('identical lives still get different names', () => {
+  const s = story({ outcome: 'ruined', ruinAge: 70 });
+  assert.deepEqual(lifeNames([s, s, s]), ['中途断粮', '入不敷出', '中途断粮·二']);
+});
+
+test('the hardest life is marked, so the written one has a visible starting point', () => {
+  const p = person();
+  const t = fwdSolve(p);
+  const lives = [5, 6, 7].map(seed => lifePath(p, t, null, seed));
+  const stories = lives.map(l => lifeStory(l, p));
+  const html = livesHtml(lives, stories, 0, { p, dispCur: p.wCur, names: lifeNames(stories), hardest: 1 });
+  assert.equal((html.match(/life-tag/g) ?? []).length, 1);
+  const rows = html.split('data-life=');
+  assert.ok(rows[2].includes('最难'));
+});
+
+test('the comparison names the hardest life and says what hardest means', () => {
+  const html = fifthCompareHtml(story({ outcome: 'ruined', ruinAge: 71 }), story({ outcome: 'lasted' }), '后劲不足');
+  assert.match(html, /最难/);
+  assert.match(html, /后劲不足/);
+  assert.match(html, /最早花完/);
+});
+
 test('what wrote the last life is listed, with no clear-all button', () => {
   const html = labChangesHtml(['股票实际收益']);
   assert.match(html, /股票实际收益/);
@@ -294,8 +326,8 @@ test('a written life that runs dry sooner says so plainly', () => {
 });
 
 test('the written life is compared against the dashed life it rewrites', () => {
-  const html = fifthCompareHtml(story({ outcome: 'ruined', ruinAge: 71 }), story({ outcome: 'lasted' }));
+  const html = fifthCompareHtml(story({ outcome: 'ruined', ruinAge: 71 }), story({ outcome: 'lasted' }), '中途断粮');
   assert.match(html, /虚线/);
-  assert.ok(html.includes(lifeName(story({ outcome: 'ruined', ruinAge: 71 }))));
+  assert.ok(html.includes('中途断粮'));
   assert.ok(html.includes('有钱花的假期从 28 年变成 52 年'));
 });

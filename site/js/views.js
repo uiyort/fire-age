@@ -319,26 +319,28 @@ const endingText = (story, D) => {
 };
 
 // What sets one draw of years apart from another: the first holiday years, the whole holiday, and the hard falls.
-function lifeRow(path, story, index, selected, D, { fifth = false, maxCells, p }) {
+function lifeRow(path, story, index, selected, D, { fifth = false, maxCells, p, name: given, hardest = false }) {
   const rate = r => `<b class="${Math.round(r * 100) < 0 ? 'bad' : r >= p.r ? 'good' : ''}">${signedPct(r)}/年</b>`;
   const luck = story.holidayReturn === null ? ['一直在上班'] : [`放假头 5 年 ${rate(story.firstFive)}`, `整个假期 ${rate(story.holidayReturn)}`];
   const facts = [...luck, `大跌 ${story.badYears} 次`];
-  const name = fifth ? '等你来写' : lifeName(story);
-  return `<button type="button" class="life${fifth ? ' fifth' : ''}" data-life="${index}" aria-pressed="${index === selected}"><span class="life-top"><span class="life-name">${name}</span><span class="life-end">${endingText(story, D)}</span></span>${ribbonSvg(path, maxCells)}<span class="life-sub">${facts.join(' · ')}</span></button>`;
+  const name = fifth ? '等你来写' : given ?? lifeName(story);
+  const tag = hardest ? '<span class="pill bad life-tag">最难</span>' : '';
+  return `<button type="button" class="life${fifth ? ' fifth' : ''}" data-life="${index}" aria-pressed="${index === selected}"><span class="life-top"><span><span class="life-name">${name}</span>${tag}</span><span class="life-end">${endingText(story, D)}</span></span>${ribbonSvg(path, maxCells)}<span class="life-sub">${facts.join(' · ')}</span></button>`;
 }
 
-export function livesHtml(lives, stories, selected, { p, dispCur, fifth = null }) {
+export function livesHtml(lives, stories, selected, { p, dispCur, fifth = null, names = [], hardest = null }) {
   const D = v => money(toDisplay(v, p, dispCur), dispCur);
   const maxCells = Math.max(...[...lives, ...(fifth ? [fifth.path] : [])].map(l => l.years.length - 1));
-  const rows = lives.map((life, i) => lifeRow(life, stories[i], i, selected, D, { maxCells, p })).join('');
+  const rows = lives.map((life, i) => lifeRow(life, stories[i], i, selected, D, { maxCells, p, name: names[i], hardest: i === hardest })).join('');
   const last = fifth
     ? lifeRow(fifth.path, fifth.story, lives.length, selected, D, { fifth: true, maxCells, p })
     : '<div class="life-empty" id="life-fifth-empty"><b>等你来写</b>说说你对未来年景的判断，它会用这四条里最难的那段日子，按你的判断重走一遍。</div>';
   return rows + last;
 }
 
-export function fifthCompareHtml(base, fifth) {
-  return `<p class="fifth-compare">虚线是原来的「${lifeName(base)}」。${fifthSentence(base, fifth)}。</p>`;
+export function fifthCompareHtml(base, fifth, baseName = lifeName(base)) {
+  const why = base.outcome === 'ruined' ? '钱最早花完' : '剩得最少';
+  return `<p class="fifth-compare">虚线是最难的「${baseName}」（${why}）。${fifthSentence(base, fifth)}。</p>`;
 }
 
 // Years after the money runs out are not a holiday, so the change is counted in holiday years that still have money.
