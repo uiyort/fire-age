@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resultCardSpec, goalCardSpec, placeCardSpec, lifeCardSpec, fitFontSize, fitLines, wrapText } from '../site/js/card.js';
+import { resultCardSpec, goalCardSpec, placeCardSpec, lifeCardSpec, typeCardSpec, quizCardSpec, fitFontSize, fitLines, wrapText } from '../site/js/card.js';
 import { findBannedCopy } from '../scripts/lint-copy.mjs';
 
 const fwd = { mode: 'fwd', age: 30, retireAge: 41, years: 11, success: 0.59, needText: '¥317.75万' };
@@ -12,8 +12,6 @@ test('result card carries the age, slogan, brand and search hint', () => {
   assert.equal(s.brand, '放假年龄 / FIRE Age');
   assert.equal(s.searchHint, '搜：放假年龄');
   assert.deepEqual(s.size, [1080, 1080]);
-  assert.match(s.comment, /放假年龄是 41 岁/);
-  assert.match(s.comment, /你的呢/);
 });
 
 test('cards contain no links or QR codes', () => {
@@ -68,11 +66,9 @@ test('card copy passes the compliance lint', () => {
 });
 
 test('the result card carries the holiday type and the Mondays left', () => {
-  const s = resultCardSpec({ ...fwd, typeName: '松鼠型', mondays: 574 });
-  assert.equal(s.eyebrow, '松鼠型');
+  const s = resultCardSpec({ ...fwd, typeName: 'EHTS 采菊人', mondays: 574 });
+  assert.equal(s.eyebrow, 'EHTS 采菊人');
   assert.deepEqual(s.lines, ['还有 574 个周一就放假']);
-  assert.match(s.comment, /574 个周一/);
-  assert.match(s.comment, /松鼠型/);
 });
 
 test('the result card does not mention Mondays when there are none left', () => {
@@ -91,7 +87,6 @@ test('the place card names the gain against the current place', () => {
   const s = placeCardSpec(rows);
   assert.equal(s.hero, '早 3.2 年');
   assert.match(s.sentence, /泰国/);
-  assert.match(s.comment, /泰国.*38 岁.*中国大陆.*41 岁/);
   assert.ok(s.lines.some(l => l.includes('美国') && l.includes('还到不了')));
   assert.deepEqual(findBannedCopy(JSON.stringify(s)), []);
 });
@@ -114,8 +109,6 @@ test('the life card tells the worst year and the ending', () => {
   const s = lifeCardSpec(life);
   assert.equal(s.hero, '撑到 95 岁');
   assert.match(s.sentence, /46 岁.*23%/);
-  assert.match(s.comment, /86%.*2,?000/);
-  assert.match(s.comment, /你抽到/);
 });
 
 test('the life card says plainly when the money runs out', () => {
@@ -152,4 +145,31 @@ test('a long place name keeps the place card sentence on one line', () => {
 test('closing punctuation never starts a wrapped line', () => {
   const lines = wrapText(t => [...t].length, '一二三四。五六', 4);
   assert.deepEqual(lines, ['一二三', '四。五六']);
+});
+
+test('cards no longer carry a sentence to copy', () => {
+  for (const spec of [resultCardSpec(fwd), placeCardSpec(rows), lifeCardSpec(life), goalCardSpec({ label: '目标' }, { yearsDelta: 1 })]) {
+    assert.equal(spec.comment, undefined);
+  }
+});
+
+const sampleType = {
+  code: 'EHTS', name: '采菊人', emoji: '🌼', group: '归园派', blurb: '早早收工，回家种花。',
+  axes: [{ name: '启程', letter: 'E', pole: '早', value: '43 岁' }, { name: '目的地', letter: 'H', pole: '在地', value: '中国大陆' }, { name: '行李', letter: 'T', pole: '轻装', value: '40%' }, { name: '路费', letter: 'S', pole: '靠存', value: '30%' }],
+};
+
+test('the type card shows the code, name, group and all four axes', () => {
+  const s = typeCardSpec(sampleType);
+  assert.match(s.eyebrow, /EHTS/);
+  assert.match(s.eyebrow, /归园派/);
+  assert.match(s.hero, /采菊人/);
+  assert.equal(s.sentence, sampleType.blurb);
+  assert.equal(s.stats.length, 4);
+  assert.deepEqual(findBannedCopy(JSON.stringify(s)), []);
+});
+
+test('the quiz card shows the score and the title earned', () => {
+  const s = quizCardSpec({ score: 5, total: 6, title: '放假军师' });
+  assert.equal(s.hero, '5/6');
+  assert.match(s.sentence, /放假军师/);
 });

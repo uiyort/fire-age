@@ -49,3 +49,10 @@ export const PARAMS = [
   { id: 'rho', name: '股债相关性', what: '股票和债券是否同涨同跌。相关性越低，组合整体波动越小。',
     improve: '这是一个很难预测的假设。试几个不同的值，看结果是否敏感。', noRangeReason: TOOL_ASSUMPTION },
 ];
+
+export const PARAM_GROUPS = [
+  { name: '攒钱这一段', ids: ['assets', 'income', 'expense', 'growth'] },
+  { name: '放假这一段', ids: ['age', 'retExp', 'life', 'pension', 'pAge', 'swr'] },
+  { name: '市场假设', ids: ['eq', 'eqReal', 'bondY', 'infl', 'drag', 'fxDrift'] },
+  { name: '风险假设', ids: ['sigEq', 'sigBd', 'rho'] },
+];

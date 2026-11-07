@@ -1,6 +1,8 @@
 // Turns model results into page text and tables. Strings only, no DOM access.
 import { coastNeed, conv, fiNeed, fwdSolve, swrFor, bwdSolve, savingsAt, savingsRate, buildParams } from './engine.js';
-import { mondaysIn, workdaysIn } from './holiday.js';
+import { AXES, GROUPS, TYPES, mondaysIn, workdaysIn } from './holiday.js';
+import { quizScore, quizTitle } from './quiz.js';
+import { tryParam } from './levers.js';
 
 const moneyFormats = {};
 export function money(v, cur) {
@@ -132,11 +134,58 @@ export function impactSentence({ stepLabel, gainYears, note = '' }) {
   return `${stepLabel}，${change}。${note}`;
 }
 
-export function cardBody(param, impact) {
+const tryValueText = (value, unit, p) => {
+  if (unit === 'work') return money(value, p.wCur);
+  if (unit === 'retire') return money(value, p.rCur);
+  return unit ? `${value} ${unit}` : String(value);
+};
+
+export function tryHtml(id, range) {
+  return `<div class="try"><label class="try-lab">拖一拖试试 <input type="range" data-try="${id}" min="${range.min}" max="${range.max}" step="${range.step}" value="${range.value}"></label><output>拖动滑杆，只是试算，不改你的计划。</output></div>`;
+}
+
+export function trySentence(p, id, value, range) {
+  const before = tryParam(p, id, range.value), after = tryParam(p, id, value);
+  const age = a => (a === null ? '还到不了' : `${a} 岁`);
+  const odds = after.success === null || before.success === null ? '' : `，成功率 ${pct(before.success, 0)} → ${pct(after.success, 0)}`;
+  const held = id === 'expense' ? '（退休支出不变）' : '';
+  return `${tryValueText(value, range.unit, p)}${held}：放假年龄 ${age(before.age)} → ${age(after.age)}${odds}`;
+}
+
+const effectText = gain => {
+  if (Math.abs(gain) < 0.05) return '放假年龄基本不变';
+  return gain > 0 ? `提前 ${yearsText(gain)}` : `推后 ${yearsText(-gain)}`;
+};
+
+export function quizHtml(rounds, index, answers) {
+  if (!rounds.length) return '<p class="fine">现在单改一项，放假年龄还看不出变化。先调一下收入和支出，再回来玩。</p>';
+  if (index >= rounds.length) {
+    const score = quizScore(rounds, answers);
+    return `<div class="quiz-done"><div class="quiz-score">${score}/${rounds.length}</div><p>猜对 ${score} 题，你的称号是<b>${quizTitle(score, rounds.length)}</b>。</p>
+      <div class="goal-row"><button type="button" class="ghost" id="quiz-card">生成成绩卡片</button><button type="button" class="ghost" id="quiz-restart">再玩一次</button></div></div>`;
+  }
+  const round = rounds[index], choice = answers[index];
+  const head = `<p class="quiz-count">第 ${index + 1} / ${rounds.length} 题</p><p class="quiz-q">对你来说，哪一个对放假年龄的影响更大？先猜再看。</p>`;
+  if (!choice) {
+    return `${head}<div class="quiz-options"><button type="button" class="quiz-option" data-quiz="a">${round.a.label}</button><button type="button" class="quiz-option" data-quiz="b">${round.b.label}</button></div>`;
+  }
+  const right = round.answer === 'either' || round.answer === choice;
+  const row = key => {
+    const side = round[key];
+    const mark = key === choice ? '<span class="quiz-mine">你选的</span>' : '';
+    return `<div class="quiz-row"><span>${side.label}${mark}</span><b>${effectText(side.gain)}</b></div>`;
+  };
+  const verdict = round.answer === 'either' ? '差不多，都算对。' : right ? '猜对了。' : '这次猜错了。';
+  const last = index === rounds.length - 1;
+  return `${head}<div class="quiz-reveal"><p class="quiz-verdict">${verdict}</p>${row('a')}${row('b')}<p class="quiz-insight">${round.insight}</p>
+    <button type="button" class="primary" id="quiz-next">${last ? '看成绩' : '下一题'}</button></div>`;
+}
+
+export function cardBody(param, impact, tryBlock = '') {
   const ref = param.range
     ? `${param.range.text} <a href="${param.range.sourceUrl}" target="_blank" rel="noopener">出处</a>`
     : param.noRangeReason;
-  return `<p>${param.what}</p><p class="imp">${impactSentence(impact)}</p><p>${param.improve}</p><p class="ref">参考：${ref}</p>`;
+  return `<p>${param.what}</p><p class="imp">${impactSentence(impact)}</p>${tryBlock}<p>${param.improve}</p><p class="ref">参考：${ref}</p>`;
 }
 
 export function pctTableHtml({ p, mc, target, dispCur }) {
@@ -195,12 +244,22 @@ export function heatHtml({ p, dispCur }) {
 
 export function typeHtml(type, lever) {
   const next = lever ? `<p class="next">下一步：${lever.label}，${lever.unlocks ? '就能看到放假那天' : `提前 ${yearsText(lever.gainYears)}`}。</p>` : '';
-  return `<div class="type-head"><span class="type-name">${type.name}</span><span class="type-en">${type.en}</span><span class="pill">${type.group}</span></div>
-    <p class="type-blurb">${type.blurb}</p><p class="why">依据：${type.why}</p>${next}`;
+  const axes = type.axes.map(axis => {
+    const poles = Object.entries(axis.poles).map(([letter, label]) => `<span class="pole${letter === axis.letter ? ' on' : ''}">${letter} ${label}</span>`).join('');
+    return `<div class="axis"><span class="axis-name">${axis.name}</span><span class="poles">${poles}</span><span class="axis-value">${axis.value}</span></div>`;
+  }).join('');
+  return `<div class="type-head"><span class="type-emoji" aria-hidden="true">${type.emoji}</span><div class="type-title"><div class="type-code">${type.code}</div><div class="type-name">${type.name}</div></div><div class="type-tags"><span class="pill">${type.group}</span><span class="pill">${type.status.name}</span></div></div>
+    <p class="type-blurb">${type.blurb}</p><div class="axes">${axes}</div><p class="why">${type.status.why}</p>${next}`;
 }
 
-export const allTypesHtml = types => `<summary>全部 ${types.length} 种类型和判定规则</summary><ul class="type-list">${types
-  .map(t => `<li><b>${t.name}</b> <span class="type-en">${t.en}</span>：${t.rule}</li>`).join('')}</ul><p class="fine">从上到下依次判定：假期中、破土、滑行、候鸟、松鼠、极简、海景、雪球、长跑，先符合哪一条就是哪一型。</p>`;
+export function allTypesHtml() {
+  const rules = AXES.map(a => `<li><b>${a.name}</b>：${a.rule}</li>`).join('');
+  const groups = GROUPS.map(g => {
+    const cells = TYPES.filter(t => t.group === g.name).map(t => `<div class="type-cell" data-code="${t.code}"><span class="type-emoji" aria-hidden="true">${t.emoji}</span><div><b>${t.name}</b> <span class="type-en">${t.code}</span><p>${t.blurb}</p></div></div>`).join('');
+    return `<h3>${g.name} <span class="type-en">${g.blurb}</span></h3><div class="type-grid">${cells}</div>`;
+  }).join('');
+  return `<summary>全部 ${TYPES.length} 种类型和判定规则</summary><ul class="type-list">${rules}</ul>${groups}`;
+}
 
 export function placesHtml(rows) {
   const longest = Math.max(...rows.map(r => r.years ?? 0), 1);

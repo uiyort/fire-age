@@ -1,17 +1,18 @@
 // Page wiring: reads inputs into state, recomputes, renders.
 import DATA from './data-latest.js';
 import { DEFAULT_SEED, bwdSolve, dualAges, fiNeed, fiYears, fwdSolve, monteCarlo } from './engine.js';
-import { TYPES, drawLives, holidayType, lifeStory, placeRanking } from './holiday.js';
+import { drawLives, holidayType, lifeStory, placeRanking } from './holiday.js';
 import { commitField, loadState, saveState, safeStorage, setField, setRetireCountry, setWorkCountry, toParams } from './state.js';
-import { rankLevers, impactOf } from './levers.js';
-import { PARAMS } from './params.js';
+import { rankLevers, impactOf, tryRange } from './levers.js';
+import { quizRounds, quizScore, quizTitle } from './quiz.js';
+import { PARAMS, PARAM_GROUPS } from './params.js';
 import { makeGoal, compareVisit, goalApplies, loadGoal, saveGoal, clearGoal } from './goals.js';
 import { initAnalytics, track } from './analytics.js';
 import { drawChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
-import { copyText, goalCardSpec, lifeCardSpec, placeCardSpec, renderCard, resultCardSpec, toCardInput, toLifeCardInput } from './card.js';
+import { goalCardSpec, lifeCardSpec, placeCardSpec, quizCardSpec, renderCard, resultCardSpec, toCardInput, toLifeCardInput, typeCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, goalFor, goalHtml, headlineText, heatHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, solvesHtml, storyHtml, tilesHtml, toDisplay, typeHtml, variantsHtml,
+  allTypesHtml, cardBody, goalFor, goalHtml, headlineText, heatHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, quizHtml, solvesHtml, storyHtml, tilesHtml, toDisplay, tryHtml, trySentence, typeHtml, variantsHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -28,6 +29,36 @@ let frame = 0;
 let lastCardView = null;
 let lifeSeed = null;
 let lifeIndex = 0;
+let quizIndex = 0;
+let quizAnswers = {};
+const PLAYED_KEY = 'fire-age-played-v1';
+const played = new Set(loadPlayed());
+
+function loadPlayed() {
+  try {
+    const saved = JSON.parse(storage.getItem(PLAYED_KEY));
+    return Array.isArray(saved) ? saved.filter(id => paramById[id]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function renderPlayed() {
+  const done = played.size === PARAMS.length;
+  $('lab-progress').textContent = done ? `${played.size}/${PARAMS.length}，全部点亮。这些参数你都亲手试过了。` : `已点亮 ${played.size}/${PARAMS.length} 个参数`;
+  for (const details of $('cards').querySelectorAll('details')) details.classList.toggle('played', played.has(details.dataset.id));
+}
+
+function markPlayed(id) {
+  if (played.has(id)) return;
+  played.add(id);
+  try {
+    storage.setItem(PLAYED_KEY, JSON.stringify([...played]));
+  } catch {
+    // Progress is a convenience; the lab works without it.
+  }
+  renderPlayed();
+}
 
 const SIMPLE_FIELDS = [
   { legend: '现在', fields: [
@@ -183,6 +214,8 @@ function renderFast() {
   $('tiles').innerHTML = tilesHtml({ mode: S.mode, p, t, bwd, mc: latest.mc, dispCur: cur });
   if (S.mode === 'bwd') $('solves').innerHTML = solvesHtml({ p, bwd, dispCur: cur });
   $('type-now').innerHTML = typeHtml(type, levers[0]);
+  document.querySelectorAll('.type-cell').forEach(cell => cell.classList.toggle('mine', cell.dataset.code === type.code));
+  renderQuiz(p);
   $('levers').innerHTML = leversHtml(levers, p);
   $('places').innerHTML = placesHtml(places);
   renderGoal(p);
@@ -235,6 +268,11 @@ function renderLives() {
   $('life-card').hidden = false;
 }
 
+function renderQuiz(p) {
+  latest.quiz = quizRounds(p);
+  $('quiz').innerHTML = quizHtml(latest.quiz, quizIndex, quizAnswers);
+}
+
 function renderGoal(p) {
   const box = $('goal');
   if (goal && !goalApplies(goal, p)) {
@@ -246,22 +284,25 @@ function renderGoal(p) {
     return;
   }
   box.hidden = false;
-  box.innerHTML = goalHtml(goal, compareVisit(goal, p, today()));
+  $('goal-body').innerHTML = goalHtml(goal, compareVisit(goal, p, today()));
 }
+
+const fullCard = (param, p) => cardBody(param, impactOf(p, param.id), tryHtml(param.id, tryRange(p, param.id)));
 
 function renderCards(p) {
   for (const param of PARAMS) {
     const inline = $(`card-${param.id}`);
-    if (inline && !inline.hidden) inline.innerHTML = cardBody(param, impactOf(p, param.id));
+    if (inline && !inline.hidden) inline.innerHTML = fullCard(param, p);
   }
   const box = $('cards');
   if (!box.childElementCount) {
-    box.innerHTML = PARAMS.map(param => `<details data-id="${param.id}"><summary>${param.name}</summary><div class="lcard"></div></details>`).join('');
+    box.innerHTML = PARAM_GROUPS.map(group => `<h4>${group.name}</h4>${group.ids.map(id => `<details data-id="${id}"><summary>${paramById[id].name}</summary><div class="lcard"></div></details>`).join('')}`).join('');
+    renderPlayed();
   }
   // Update in place so an open card stays open, keeps focus, and is not counted again.
-  for (const details of box.children) {
+  for (const details of box.querySelectorAll('details')) {
     const param = paramById[details.dataset.id];
-    details.querySelector('.lcard').innerHTML = cardBody(param, impactOf(p, param.id));
+    details.querySelector('.lcard').innerHTML = fullCard(param, p);
     if (S.view === 'pro' && S.view !== lastCardView) details.open = true;
     if (S.view === 'simple' && S.view !== lastCardView && lastCardView !== null) details.open = false;
   }
@@ -276,6 +317,7 @@ function countCalculation() {
 }
 
 function refresh() {
+  hideCard();
   cancelAnimationFrame(frame);
   frame = requestAnimationFrame(() => {
     renderFast();
@@ -296,6 +338,12 @@ function fieldFromElement(id) {
 
 function onInput(ev) {
   const el = ev.target;
+  if (el.dataset.try) {
+    const p = toParams(S, DATA);
+    el.closest('.try').querySelector('output').textContent = trySentence(p, el.dataset.try, Number(el.value), tryRange(p, el.dataset.try));
+    markPlayed(el.dataset.try);
+    return;
+  }
   if (el.id === 's-retexp') {
     S = setField(S, 'retExp', el.value === '' ? '' : Number(el.value) * 12, DATA, { commit: false });
     countCalculation();
@@ -333,16 +381,21 @@ function onSelect(ev) {
   }
 }
 
-function showCard(spec) {
+function hideCard() {
+  $('share-panel').hidden = true;
+}
+
+// The card opens inside the section it came from, next to what it shows.
+function showCard(spec, slotId) {
   const canvas = document.createElement('canvas');
   renderCard(spec, canvas);
   const png = canvas.toDataURL('image/png');
   $('share-img').src = png;
   $('share-download').href = png;
-  $('share-comment').textContent = spec.comment;
-  $('share-copy-status').textContent = '';
+  $('share-img').alt = [spec.eyebrow, spec.hero, spec.sentence].filter(Boolean).join('，');
+  $(slotId).append($('share-panel'));
   $('share-panel').hidden = false;
-  $('share-panel').scrollIntoView({ block: 'center' });
+  $('share-panel').scrollIntoView({ block: 'nearest' });
 }
 
 // A pending simulation would put a stale success rate on the card, so finish it first.
@@ -375,43 +428,72 @@ function onClick(ev) {
   if (ev.target.id === 'share-btn') {
     track('card_generate');
     flushSimulation();
-    showCard(resultCardSpec(toCardInput(latest)));
+    showCard(resultCardSpec(toCardInput(latest)), 'slot-result');
+    return;
+  }
+  if (ev.target.id === 'share-close') {
+    hideCard();
+    return;
+  }
+  if (ev.target.id === 'type-card-btn') {
+    track('card_generate');
+    showCard(typeCardSpec(latest.type), 'slot-type');
+    return;
+  }
+  if (ev.target.id === 'quiz-card') {
+    track('card_generate');
+    const score = quizScore(latest.quiz, quizAnswers), total = latest.quiz.length;
+    showCard(quizCardSpec({ score, total, title: quizTitle(score, total) }), 'slot-quiz');
+    return;
+  }
+  if (ev.target.id === 'quiz-restart') {
+    quizIndex = 0;
+    quizAnswers = {};
+    hideCard();
+    renderQuiz(latest.p);
+    return;
+  }
+  if (ev.target.id === 'quiz-next') {
+    quizIndex += 1;
+    if (quizIndex === latest.quiz.length) track('quiz_done');
+    renderQuiz(latest.p);
+    return;
+  }
+  const quizOption = ev.target.closest('[data-quiz]');
+  if (quizOption) {
+    quizAnswers[quizIndex] = quizOption.dataset.quiz;
+    renderQuiz(latest.p);
     return;
   }
   if (ev.target.id === 'place-card') {
     track('card_generate');
-    showCard(placeCardSpec(latest.places));
+    showCard(placeCardSpec(latest.places), 'slot-place');
     return;
   }
   if (ev.target.id === 'life-draw') {
     track('life_draw');
     lifeSeed = lifeSeed === null ? DEFAULT_SEED : Math.floor(Math.random() * 2 ** 31);
     lifeIndex = 0;
+    hideCard();
     flushSimulation();
     return;
   }
   if (ev.target.id === 'life-card') {
     track('card_generate');
     flushSimulation();
-    showCard(lifeCardSpec(toLifeCardInput(latest.lifeStory, latest)));
+    showCard(lifeCardSpec(toLifeCardInput(latest.lifeStory, latest)), 'slot-life');
     return;
   }
   const lifeButton = ev.target.closest('[data-life]');
   if (lifeButton) {
     lifeIndex = Number(lifeButton.dataset.life);
+    hideCard();
     renderLives();
     return;
   }
   if (ev.target.id === 'goal-card') {
     track('card_generate');
-    showCard(goalCardSpec(goal, compareVisit(goal, toParams(S, DATA), today())));
-    return;
-  }
-  if (ev.target.id === 'share-copy') {
-    track('copy_text');
-    copyText($('share-comment').textContent, $('share-comment')).then(result => {
-      $('share-copy-status').textContent = result === 'copied' ? '已复制' : '请长按选中文字复制';
-    });
+    showCard(goalCardSpec(goal, compareVisit(goal, toParams(S, DATA), today())), 'slot-goal');
     return;
   }
   const help = ev.target.closest('.help');
@@ -422,7 +504,7 @@ function onClick(ev) {
     help.setAttribute('aria-expanded', String(!card.hidden));
     if (!card.hidden) {
       track('card_open');
-      card.innerHTML = cardBody(paramById[id], impactOf(toParams(S, DATA), id));
+      card.innerHTML = fullCard(paramById[id], toParams(S, DATA));
     }
     return;
   }
@@ -447,7 +529,7 @@ function init() {
   buildForm($('pro-form'), 'p', PRO_FIELDS);
   fillCountrySelects();
   $('data-version').textContent = DATA.version;
-  $('type-all').innerHTML = allTypesHtml(TYPES);
+  $('type-all').innerHTML = allTypesHtml();
   document.addEventListener('input', onInput);
   document.addEventListener('change', ev => {
     if (ev.target.tagName === 'SELECT') {

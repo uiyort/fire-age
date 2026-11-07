@@ -1,7 +1,7 @@
 // Content studio logic: turns personas into card decks and a data bundle for writing copy. No DOM access.
 import { DEFAULT_SEED, fiNeed, fwdSolve, fiYears, lifePath, monteCarlo, savingsRate, swrFor } from './engine.js';
 import { holidayType, lifeStory, mondaysIn, placeRanking } from './holiday.js';
-import { lifeCardSpec, placeCardSpec, toLifeCardInput } from './card.js';
+import { lifeCardSpec, placeCardSpec, toLifeCardInput, typeCardSpec } from './card.js';
 import { defaultState, setField, setRetireCountry, setWorkCountry, toParams } from './state.js';
 import { rankLevers } from './levers.js';
 import { money, pct } from './views.js';
@@ -63,7 +63,7 @@ export function buildDeck(r) {
     reachable
       ? card('result', { eyebrow: r.label, hero: `${r.retireAge} 岁`, sentence: r.years === 0 ? '从今天起，余生皆假期' : `从 ${r.retireAge} 岁起，余生皆假期`, stats })
       : card('result', { eyebrow: r.label, hero: '还在路上', sentence: '还没到放假那天，用杠杆一步步提前', stats }),
-    card('type', { eyebrow: `${r.label}的放假类型`, hero: r.type.name, sentence: r.type.why, lines: [r.type.blurb, `判定规则：${r.type.rule}`] }),
+    tall('type', typeCardSpec(r.type)),
     leverCard,
     tall('place', placeCardSpec(r.places)),
     tall('life', lifeCardSpec(r.life)),

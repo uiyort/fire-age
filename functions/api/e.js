@@ -1,5 +1,5 @@
 // Anonymous event counter. Stores the event name, channel and data version only: no IP, user agent, cookie or input value.
-export const EVENTS = new Set(['visit', 'calc_done', 'mode_switch', 'card_open', 'card_generate', 'copy_text', 'export_data', 'life_draw']);
+export const EVENTS = new Set(['visit', 'calc_done', 'mode_switch', 'card_open', 'card_generate', 'export_data', 'life_draw', 'quiz_done']);
 
 const CHANNEL = /^[a-z0-9_-]{1,24}$/;
 const VERSION = /^\d{4}-\d{2}$/;

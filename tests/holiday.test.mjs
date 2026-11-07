@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
-import { coastNeed, fiNeed, fiYears, fwdSolve, lifePath, monteCarlo } from '../site/js/engine.js';
+import { fiNeed, fiYears, fwdSolve, lifePath, monteCarlo } from '../site/js/engine.js';
 import { defaultState, setField, setRetireCountry, setWorkCountry, toParams } from '../site/js/state.js';
 import { rankLevers } from '../site/js/levers.js';
-import { TYPES, drawLives, holidayType, lifeStory, mondaysIn, placeRanking, workdaysIn } from '../site/js/holiday.js';
+import { GROUPS, TYPES, drawLives, holidayType, lifeStory, mondaysIn, placeRanking, workdaysIn } from '../site/js/holiday.js';
 import { livesSummary, storyHtml } from '../site/js/views.js';
 import { findBannedCopy } from '../scripts/lint-copy.mjs';
 
@@ -22,61 +22,72 @@ test('years become Mondays and workdays', () => {
   assert.equal(workdaysIn(11), 2750);
 });
 
-test('someone who can already stop is on holiday', () => {
-  assert.equal(typeOf(person({ assets: 1e9 })).id, 'reached');
+const letters = t => t.code.split('');
+
+test('the code has one letter from each of the four axes', () => {
+  const t = typeOf(person());
+  assert.match(t.code, /^[EL][HA][TF][SG]$/);
+  assert.deepEqual(t.axes.map(a => a.letter), letters(t));
 });
 
-test('someone with no savings and no end in sight is just starting', () => {
-  const t = typeOf(person({ assets: 0, income: 60000, expense: 60000, growth: 0 }));
-  assert.equal(t.id, 'seedling');
-  assert.match(t.why, /存不下钱/);
+test('starting the holiday by 50 is E, later or never is L', () => {
+  assert.equal(letters(typeOf(person({ age: 30, assets: 1000000, income: 400000, expense: 100000 })))[0], 'E');
+  assert.equal(letters(typeOf(person({ age: 45, assets: 0, income: 150000, expense: 120000, growth: 0 })))[0], 'L');
+  assert.equal(letters(typeOf(person({ assets: 0, income: 60000, expense: 60000, growth: 0 })))[0], 'L');
 });
 
-test('assets that reach the line without further saving are coasting', () => {
-  const { p, workC, retC } = person({ age: 40, assets: 2000000, income: 130000, expense: 120000, growth: 0 });
-  assert.ok(p.assets >= coastNeed(p));
-  assert.ok(fwdSolve(p) > 0);
-  assert.equal(holidayType(p, DATA, { workC, retC }).id, 'coast');
+test('staying put is H, retiring in another place is A', () => {
+  assert.equal(letters(typeOf(person()))[1], 'H');
+  assert.equal(letters(typeOf(person({}, { retC: 'TH' })))[1], 'A');
 });
 
-test('retiring somewhere at most 80% of local prices is the migrant type', () => {
-  const t = typeOf(person({ assets: 100000, income: 300000, expense: 120000 }, { workC: 'CN', retC: 'TH' }));
-  assert.equal(t.id, 'migrant');
-  assert.match(t.why, /物价/);
+test('spending at most 60% of income is T, more is F, adjusted for local prices', () => {
+  assert.equal(letters(typeOf(person({ income: 300000, expense: 120000, retExp: 180000 })))[2], 'T');
+  assert.equal(letters(typeOf(person({ income: 300000, expense: 120000, retExp: 181000 })))[2], 'F');
+  const sameLife = person({ income: 300000, expense: 240000 }, { retC: 'TH' });
+  assert.equal(letters(typeOf(sameLife))[2], 'F', 'cheap places do not change how much luggage you carry');
 });
 
-test('a savings rate of at least 50% is the squirrel type', () => {
-  const t = typeOf(person({ assets: 100000, income: 300000, expense: 150000 }));
-  assert.equal(t.id, 'saver');
-  assert.match(t.why, /50%/);
+test('capital doing most of the work is G, savings doing it is S', () => {
+  assert.equal(letters(typeOf(person({ age: 50, assets: 1300000, income: 200000, expense: 130000, retExp: 130000, growth: 0 })))[3], 'G');
+  assert.equal(letters(typeOf(person({ assets: 50000, income: 200000, expense: 150000, retExp: 150000 })))[3], 'S');
+  assert.equal(letters(typeOf(person({ assets: 1e9 })))[3], 'G');
+  assert.equal(letters(typeOf(person({ assets: 0, income: 60000, expense: 60000, growth: 0 })))[3], 'S');
 });
 
-test('planned spending at most 70% of today is lean', () => {
-  const t = typeOf(person({ assets: 100000, income: 300000, expense: 200000, retExp: 120000 }));
-  assert.equal(t.id, 'lean');
+test('there are sixteen types, one for every code, in four groups of four', () => {
+  const codes = TYPES.map(t => t.code);
+  assert.equal(new Set(codes).size, 16);
+  for (const a of 'EL') for (const b of 'HA') for (const c of 'TF') for (const d of 'SG') assert.ok(codes.includes(a + b + c + d), a + b + c + d);
+  assert.equal(GROUPS.length, 4);
+  for (const g of GROUPS) assert.equal(TYPES.filter(t => t.group === g.name).length, 4, g.name);
+  assert.equal(new Set(TYPES.map(t => t.name)).size, 16);
 });
 
-test('planned spending at least 1.5 times today is the seaview type', () => {
-  const t = typeOf(person({ assets: 100000, income: 300000, expense: 200000, retExp: 320000 }));
-  assert.equal(t.id, 'fat');
+test('the group follows from destination and luggage', () => {
+  for (const t of TYPES) assert.equal(GROUPS.find(g => g.name === t.group).letters, t.code.slice(1, 3), t.code);
 });
 
-test('existing capital doing most of the work is a snowball', () => {
-  const t = typeOf(person({ age: 50, assets: 1300000, income: 200000, expense: 130000, retExp: 130000, growth: 0 }));
-  assert.equal(t.id, 'snowball');
-});
-
-test('everyone else is a steady runner', () => {
-  const t = typeOf(person({ assets: 50000, income: 200000, expense: 150000, retExp: 150000 }));
-  assert.equal(t.id, 'steady');
-});
-
-test('every type names a public rule, and no type copy breaks the compliance rules', () => {
-  assert.equal(TYPES.length, 9);
+test('every type has an image and a blurb, and passes the compliance rules', () => {
   for (const t of TYPES) {
-    assert.ok(t.name && t.en && t.group && t.blurb && t.rule, t.id);
+    assert.ok(t.name && t.emoji && t.blurb, t.code);
     assert.deepEqual(findBannedCopy(JSON.stringify(t)), []);
   }
+});
+
+test('progress is reported separately from the type', () => {
+  assert.equal(typeOf(person({ assets: 1e9 })).status.id, 'reached');
+  assert.equal(typeOf(person({ assets: 0, income: 60000, expense: 60000, growth: 0 })).status.id, 'waiting');
+  assert.equal(typeOf(person({ age: 40, assets: 2000000, income: 130000, expense: 120000, growth: 0 })).status.id, 'coast');
+  assert.equal(typeOf(person({ assets: 50000, income: 200000, expense: 150000 })).status.id, 'onway');
+});
+
+test('realistic people land across the types rather than in one', () => {
+  const seen = new Set();
+  for (const age of [25, 35, 45, 55]) for (const assets of [50000, 500000, 3000000]) for (const income of [120000, 300000, 800000]) for (const share of [0.4, 0.8]) for (const retC of ['CN', 'TH']) {
+    seen.add(typeOf(person({ age, assets, income, expense: income * share }, { retC })).code);
+  }
+  assert.ok(seen.size >= 12, [...seen].join(' '));
 });
 
 test('place ranking covers every country, earliest first, and marks the current one', () => {

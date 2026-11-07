@@ -1,5 +1,5 @@
 // Ranks what would move this person's holiday age the most, and measures each parameter's effect.
-import { buildParams, fiYears, fwdSolve, swrFor } from './engine.js';
+import { buildParams, fiYears, fwdSolve, monteCarlo, swrFor } from './engine.js';
 
 const rebuild = (p, changes) => buildParams({ ...p, ...changes }, p.fx);
 
@@ -42,7 +42,7 @@ function currentSwrPercent(p) {
 const IMPACT_STEPS = {
   assets: { stepLabel: '现有资产多 10%', change: p => ({ assets: p.assets * 1.1 }) },
   income: { stepLabel: '收入高 10%', change: p => ({ income: p.income * 1.1 }) },
-  expense: { stepLabel: '当前支出少 10%', change: p => ({ expense: p.expense * 0.9 }) },
+  expense: { stepLabel: '当前支出少 10%（退休支出不变）', change: p => ({ expense: p.expense * 0.9 }) },
   growth: { stepLabel: '收入增速高 1 个百分点', change: p => ({ growth: p.growth + 1 }) },
   retExp: { stepLabel: '退休支出少 10%', change: p => ({ retExp: p.retExp * 0.9 }) },
   life: { stepLabel: '规划年龄多 5 岁', change: p => ({ life: p.life + 5 }) },
@@ -71,4 +71,55 @@ export function impactOf(p, paramId) {
   const step = IMPACT_STEPS[paramId];
   const before = fiYears(p), after = fiYears(rebuild(p, step.change(p)));
   return { stepLabel: step.stepLabel, note: step.note, gainYears: before === null || after === null ? null : before - after };
+}
+
+const RISK_PARAMS = ['eq', 'sigEq', 'sigBd', 'rho'];
+const TRY_PATHS = 500;
+
+function niceStep(raw) {
+  const unit = Math.pow(10, Math.floor(Math.log10(raw)));
+  return raw / unit >= 5 ? 5 * unit : raw / unit >= 2 ? 2 * unit : unit;
+}
+
+function moneyRange(value, fallback, unit) {
+  const max = Math.max(value * 2, fallback, 1000);
+  return { min: 0, max, step: niceStep(max / 100), value, unit };
+}
+
+const TRY_RANGES = {
+  age: p => ({ min: 18, max: Math.max(p.life - 2, 19), step: 1, value: p.age, unit: '岁' }),
+  assets: p => moneyRange(p.assets, p.income * 5, 'work'),
+  income: p => moneyRange(p.income, p.expense * 2, 'work'),
+  expense: p => moneyRange(p.expense, p.income, 'work'),
+  retExp: p => moneyRange(p.retExp, p.retExp, 'retire'),
+  pension: p => moneyRange(p.pension, p.retExp, 'retire'),
+  growth: p => ({ min: -2, max: 6, step: 0.5, value: p.growth, unit: '%' }),
+  life: p => ({ min: Math.max(p.age + 2, 70), max: 110, step: 1, value: p.life, unit: '岁' }),
+  pAge: p => ({ min: 50, max: 75, step: 1, value: p.pAge, unit: '岁' }),
+  eq: p => ({ min: 0, max: 100, step: 5, value: p.eq, unit: '%' }),
+  eqReal: p => ({ min: 0, max: 8, step: 0.5, value: p.eqReal, unit: '%' }),
+  bondY: p => ({ min: 0, max: 8, step: 0.25, value: p.bondY, unit: '%' }),
+  infl: p => ({ min: 0, max: 6, step: 0.25, value: p.infl, unit: '%' }),
+  drag: p => ({ min: 0, max: 3, step: 0.25, value: p.drag, unit: '%' }),
+  fxDrift: p => ({ min: -3, max: 3, step: 0.5, value: p.fxDrift, unit: '%' }),
+  swr: p => ({ min: 2, max: 6, step: 0.25, value: currentSwrPercent(p), unit: '%' }),
+  sigEq: p => ({ min: 0.05, max: 0.35, step: 0.01, value: p.sigEq, unit: '' }),
+  sigBd: p => ({ min: 0.01, max: 0.15, step: 0.01, value: p.sigBd, unit: '' }),
+  rho: p => ({ min: -1, max: 1, step: 0.1, value: p.rho, unit: '' }),
+};
+
+// The slider range for a parameter, always wide enough to include the current value.
+export function tryRange(p, id) {
+  const range = TRY_RANGES[id](p);
+  return { ...range, min: Math.min(range.min, range.value), max: Math.max(range.max, range.value) };
+}
+
+// What the plan would give with one value changed. Works on a copy, so the real plan is untouched.
+export function tryParam(p, id, value) {
+  const q = rebuild(p, { [id]: value, ...(id === 'swr' ? { autoSwr: false } : {}) });
+  const t = fwdSolve(q);
+  return {
+    age: t === null ? null : q.age + t,
+    success: RISK_PARAMS.includes(id) && t !== null ? monteCarlo(q, t, null, { paths: TRY_PATHS }).success : null,
+  };
 }

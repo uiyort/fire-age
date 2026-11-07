@@ -1,4 +1,4 @@
-// Makes a result feel personal: Mondays left, a holiday type, the same money elsewhere, one drawn life.
+// Makes a result feel personal: Mondays left, a four-letter holiday type, the same money elsewhere, one drawn life.
 // Pure functions, no DOM. Every label and number comes from the model, with its rule published on the method page.
 import { assetsAt, buildParams, coastNeed, conv, fiNeed, fiYears, fwdSolve, lifePath, savingsRate } from './engine.js';
 
@@ -8,48 +8,78 @@ const WORKDAYS_PER_YEAR = 250;
 export const mondaysIn = years => Math.round(years * DAYS_PER_YEAR / 7);
 export const workdaysIn = years => Math.round(years * WORKDAYS_PER_YEAR);
 
-const MIGRANT_PRICE_RATIO = 0.8;
-const SAVER_RATE = 0.5;
-const LEAN_RATIO = 0.7;
-const FAT_RATIO = 1.5;
-const SNOWBALL_SHARE = 0.5;
+const EARLY_AGE = 50;
+const LIGHT_SHARE = 0.6;
+const GROW_SHARE = 0.5;
+
+// Four questions about a holiday, each with two answers. One letter from each makes the type.
+export const AXES = [
+  { key: 'when', name: '启程', poles: { E: '早', L: '晚' }, rule: '放假年龄在 50 岁及以前是 E，之后或还到不了是 L。' },
+  { key: 'where', name: '目的地', poles: { H: '在地', A: '远方' }, rule: '在现在生活的地方放假是 H，换个地方是 A。' },
+  { key: 'pack', name: '行李', poles: { T: '轻装', F: '宽裕' }, rule: '放假后的开销（按当地物价折算）不超过现在收入的 60% 是 T，超过是 F。' },
+  { key: 'fare', name: '路费', poles: { S: '靠存', G: '靠滚' }, rule: '放假时一半以上的资产来自现有本金的复利是 G，否则是 S。' },
+];
+
+export const GROUPS = [
+  { name: '归园派', letters: 'HT', blurb: '不走远，也不多花，把日子过回自己手里。' },
+  { name: '主场派', letters: 'HF', blurb: '就在熟悉的地方，把假期过得舒舒服服。' },
+  { name: '漫游派', letters: 'AT', blurb: '行李不多，地图很大。' },
+  { name: '环球派', letters: 'AF', blurb: '走得远，也住得好。' },
+];
 
 export const TYPES = [
-  { id: 'reached', name: '假期中', en: 'FIRE reached', group: '已上岸', blurb: '钱已经够了，接下来的问题是怎么过。', rule: '现有资产已经达到放假线。' },
-  { id: 'coast', name: '滑行型', en: 'Coast FIRE', group: '已上岸', blurb: '就算今天起不再存钱，复利也会把你送到终点。', rule: '不再储蓄，现有资产靠复利也能在领养老金时达到放假线。' },
-  { id: 'saver', name: '松鼠型', en: 'High saver', group: '积累派', blurb: '靠高储蓄率把放假往前推，这是最可控的一条路。', rule: '储蓄率达到 50%。' },
-  { id: 'snowball', name: '雪球型', en: 'Compounder', group: '积累派', blurb: '本金已经在替你干活，时间是你最大的帮手。', rule: '放假时一半以上的资产来自现有本金的复利。' },
-  { id: 'migrant', name: '候鸟型', en: 'Geo-arbitrage', group: '设计派', blurb: '在贵的地方赚钱，去便宜的地方放假。', rule: '退休地物价不超过现居地的 80%。' },
-  { id: 'lean', name: '极简型', en: 'Lean FIRE', group: '设计派', blurb: '想要的不多，所以能早点走。', rule: '按物价折算后，退休支出不超过现在的 70%。' },
-  { id: 'fat', name: '海景型', en: 'Fat FIRE', group: '设计派', blurb: '放假也要过得宽裕，所以多攒几年。', rule: '按物价折算后，退休支出达到现在的 1.5 倍。' },
-  { id: 'steady', name: '长跑型', en: 'Steady runner', group: '路上派', blurb: '按部就班地走，节奏稳定就能到。', rule: '能到达放假线，且不属于以上任何一种。' },
-  { id: 'seedling', name: '破土型', en: 'Just starting', group: '路上派', blurb: '终点还没出现，但每一步都在把它拉近。', rule: '按现在的节奏，规划期内还到不了放假线。' },
-];
-const BY_ID = Object.fromEntries(TYPES.map(t => [t.id, t]));
+  ['EHTS', '采菊人', '🌼', '一笔一笔攒出来，早早收工，回家种花。'],
+  ['EHTG', '垂钓客', '🎣', '本金替你上班，你坐在河边等鱼咬钩。'],
+  ['LHTS', '老园丁', '🌱', '慢慢攒，慢慢种，到点回自己的园子。'],
+  ['LHTG', '晒背猫', '🐱', '不着急，让复利多晒一会儿，够了就躺下。'],
+  ['EHFS', '早午餐家', '🍳', '存够了就不赶早高峰，上午十点才开始今天。'],
+  ['EHFG', '庄园主', '🏡', '钱生钱的速度够快，早早住进自己的大院子。'],
+  ['LHFS', '茶馆东家', '🍵', '攒了一辈子，开张之后天天有人陪喝茶。'],
+  ['LHFG', '酒窖主', '🍷', '越陈越香，时间到了，开一瓶最好的。'],
+  ['EATS', '背包客', '🎒', '存够路费就出发，趁膝盖还好。'],
+  ['EATG', '冲浪客', '🏄', '本金在岸上滚，人在浪上漂。'],
+  ['LATS', '候鸟', '🐦', '攒够了就飞，哪里暖和住哪里。'],
+  ['LATG', '房车客', '🚐', '不赶路，让复利当油钱，开到哪算哪。'],
+  ['EAFS', '环球旅人', '🧭', '早早存够大钱，世界地图一格一格点亮。'],
+  ['EAFG', '帆船船长', '⛵', '资产顺风，人也顺风，早早出海。'],
+  ['LAFS', '邮轮常客', '🚢', '辛苦了大半辈子，这次换别人开船。'],
+  ['LAFG', '岛主', '🏝️', '复利送你上岛，剩下的时间归海浪。'],
+].map(([code, name, emoji, blurb]) => ({ code, name, emoji, blurb, group: GROUPS.find(g => g.letters === code.slice(1, 3)).name }));
+
+const BY_CODE = Object.fromEntries(TYPES.map(t => [t.code, t]));
 const percent = v => `${Math.round(v * 100)}%`;
 
-// The first matching rule wins, in the order written here, so the result is deterministic and checkable.
-export function holidayType(p, data, { workC, retC }) {
-  const pick = (id, why) => ({ ...BY_ID[id], why });
-  const t = fwdSolve(p);
-  const rate = savingsRate(p);
-  if (t === 0) return pick('reached', '现有资产已经够覆盖放假所需。');
-  if (t === null) return pick('seedling', rate !== null && rate > 0 ? '按现在的节奏，规划期内还到不了放假线。' : '目前存不下钱，第一步是让收入超过支出。');
-  if (p.assets >= coastNeed(p)) return pick('coast', `今天起不再存钱，靠复利到 ${Math.max(p.pAge, p.age)} 岁也能达标。`);
-
-  const priceRatio = data.countries[retC].priceLevel.value / data.countries[workC].priceLevel.value;
-  if (workC !== retC && priceRatio <= MIGRANT_PRICE_RATIO) return pick('migrant', `退休地物价约为现居地的 ${percent(priceRatio)}。`);
-  if (rate !== null && rate >= SAVER_RATE) return pick('saver', `储蓄率 ${percent(rate)}，达到 50% 门槛。`);
-
-  if (p.expense > 0) {
-    const spendRatio = conv(p.retExp, p.rCur, p.wCur, p.fx) / priceRatio / p.expense;
-    if (spendRatio <= LEAN_RATIO) return pick('lean', `退休支出约为现在的 ${percent(spendRatio)}。`);
-    if (spendRatio >= FAT_RATIO) return pick('fat', `退休支出约为现在的 ${percent(spendRatio)}。`);
+// Where this person is on the way there, separate from what kind of holiday it is.
+function progress(p, t) {
+  if (t === 0) return { id: 'reached', name: '假期中', why: '现有资产已经够覆盖放假所需。' };
+  if (t === null) {
+    const saving = (savingsRate(p) ?? 0) > 0;
+    return { id: 'waiting', name: '待发车', why: saving ? '按现在的节奏，规划期内还到不了放假线。' : '目前存不下钱，第一步是让收入超过支出。' };
   }
-  const atHoliday = assetsAt(p, t);
-  const share = atHoliday > 0 ? p.assets * Math.pow(1 + p.r, t) / atHoliday : 0;
-  if (share >= SNOWBALL_SHARE) return pick('snowball', `放假时约 ${percent(Math.min(share, 1))} 的资产来自现有本金的复利。`);
-  return pick('steady', rate !== null && rate > 0 ? `储蓄率 ${percent(rate)}，按部就班走向放假线。` : '按部就班走向放假线。');
+  if (p.assets >= coastNeed(p)) return { id: 'coast', name: '滑行中', why: `今天起不再存钱，靠复利到 ${Math.max(p.pAge, p.age)} 岁也能到站。` };
+  return { id: 'onway', name: '在路上', why: `还有 ${t} 年到站。` };
+}
+
+export function holidayType(p, data, { workC, retC }) {
+  const t = fwdSolve(p);
+  const age = t === null ? null : p.age + t;
+  const priceRatio = data.countries[retC].priceLevel.value / data.countries[workC].priceLevel.value;
+  const spendShare = p.income > 0 ? conv(p.retExp, p.rCur, p.wCur, p.fx) / priceRatio / p.income : Infinity;
+  const atHoliday = t === null ? 0 : assetsAt(p, t);
+  const capitalShare = atHoliday > 0 ? Math.min(p.assets * Math.pow(1 + p.r, t) / atHoliday, 1) : 0;
+
+  const picks = {
+    when: [age !== null && age <= EARLY_AGE ? 'E' : 'L', age === null ? '还没到' : `${age} 岁放假`],
+    where: [workC === retC ? 'H' : 'A', data.countries[retC].name],
+    pack: [spendShare <= LIGHT_SHARE ? 'T' : 'F', Number.isFinite(spendShare) ? `开销占收入 ${percent(spendShare)}` : '目前没有收入'],
+    fare: [capitalShare >= GROW_SHARE ? 'G' : 'S', t === null ? '还在攒' : `本金复利占 ${percent(capitalShare)}`],
+  };
+  const axes = AXES.map(axis => {
+    const [letter, value] = picks[axis.key];
+    return { key: axis.key, name: axis.name, poles: axis.poles, letter, pole: axis.poles[letter], value };
+  });
+  const code = axes.map(a => a.letter).join('');
+  return { ...BY_CODE[code], axes, status: progress(p, t) };
 }
 
 // The same plan in every place. Spending keeps its purchasing power; a pension moves at market exchange rates.

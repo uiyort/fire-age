@@ -31,14 +31,14 @@
         <div id="headline"></div>
         <div class="tiles" id="tiles"></div>
         <div class="share-row"><button type="button" class="primary" id="share-btn">生成结果卡片</button></div>
-        <div class="share" id="share-panel" hidden>
-          <img id="share-img" alt="放假年龄结果卡片">
-          <p class="fine" id="share-hint">长按图片保存，发到评论区晒一晒。</p>
-          <a class="ghost save" id="share-download" download="fire-age.png">下载图片</a>
-          <p class="share-comment" id="share-comment"></p>
-          <div class="goal-row">
-            <button type="button" class="ghost" id="share-copy">复制这句话</button>
-            <span class="fine" id="share-copy-status" role="status"></span>
+        <div class="share-slot" id="slot-result">
+          <div class="share" id="share-panel" hidden>
+            <img id="share-img" alt="">
+            <p class="fine" id="share-hint">长按图片保存，发到评论区晒一晒。</p>
+            <div class="goal-row">
+              <a class="ghost save" id="share-download" download="fire-age.png">下载图片</a>
+              <button type="button" class="ghost" id="share-close">收起</button>
+            </div>
           </div>
         </div>
       </section>
@@ -56,20 +56,26 @@
           <div class="solves" id="solves"></div>
         </section>
 
-        <section class="card">
+        <section class="card" id="type-section">
           <h2>你的放假类型</h2>
           <div id="type-now"></div>
+          <div class="goal-row"><button type="button" class="ghost" id="type-card-btn">生成类型卡片</button></div>
+          <div class="share-slot" id="slot-type"></div>
           <details id="type-all"></details>
         </section>
 
         <section class="card" id="levers"></section>
-        <section class="card" id="goal" hidden></section>
+        <section class="card" id="goal" hidden>
+          <div id="goal-body"></div>
+          <div class="share-slot" id="slot-goal"></div>
+        </section>
 
         <section class="card" id="places-card">
           <h2>同样的钱，在哪放假最早</h2>
           <p class="sub">支出按当地物价折算，保持同样的生活水平。条越短，放假越早。没算签证、税和医疗，这些要自己查。</p>
           <div id="places"></div>
           <div class="goal-row"><button type="button" class="ghost" id="place-card">生成排名卡片</button></div>
+          <div class="share-slot" id="slot-place"></div>
         </section>
 
         <section class="card">
@@ -93,17 +99,16 @@
           </div>
         </section>
 
-        <section class="card">
+        <section class="card" id="life-section">
           <h2>抽一条人生</h2>
           <p class="sub">成功率是几千条人生的统计。抽几条出来，看看同样的计划在不同年景下是什么样。</p>
-          <div class="goal-row">
-            <button type="button" class="primary" id="life-draw">抽一条人生</button>
-            <button type="button" class="ghost" id="life-card" hidden>生成这条人生的卡片</button>
-          </div>
+          <div class="goal-row"><button type="button" class="primary" id="life-draw">抽一条人生</button></div>
           <div class="lives" id="lives"></div>
           <p class="fine" id="life-summary"></p>
           <div id="life-story"></div>
           <p class="fine" id="life-seed"></p>
+          <div class="goal-row"><button type="button" class="ghost" id="life-card" hidden>生成这条人生的卡片</button></div>
+          <div class="share-slot" id="slot-life"></div>
         </section>
 
         <section class="card pro-only" hidden>
@@ -118,9 +123,14 @@
           <div class="tbl" id="heat-box"></div>
         </section>
 
-        <section class="card">
-          <h2>认识每个参数</h2>
-          <p class="sub">点开看它是什么、对你影响多大、怎么改善。</p>
+        <section class="card" id="lab-section">
+          <h2>放假实验室</h2>
+          <p class="sub">先猜再看答案。题目全部用你自己的数字算，所以每个人的答案都不一样。</p>
+          <div id="quiz"></div>
+          <div class="share-slot" id="slot-quiz"></div>
+          <h3>拖一拖，认识每个参数</h3>
+          <p class="sub">点开任意一项，拖动滑杆看放假年龄怎么变。只是试算，不会改你的计划。</p>
+          <p class="lab-progress" id="lab-progress" role="status"></p>
           <div id="cards"></div>
         </section>
       </div>

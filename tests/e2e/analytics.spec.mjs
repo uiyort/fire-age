@@ -35,10 +35,9 @@ test('the main interactions are each recorded', async ({ page }) => {
   await page.click('#to-bwd');
   await page.click('#help-age');
   await page.click('#share-btn');
-  await page.click('#share-copy');
   await page.click('#to-pro');
   await page.click('#export-json');
-  for (const name of ['mode_switch', 'card_open', 'card_generate', 'copy_text', 'export_data']) {
+  for (const name of ['mode_switch', 'card_open', 'card_generate', 'export_data']) {
     await expect.poll(() => events.map(e => e.e)).toContain(name);
   }
 });

@@ -24,7 +24,7 @@ For Claude when writing copy from a studio data bundle, and for the author when 
 Open with what the number did to you ("算出来还有 574 个周一就放假"), not with "我做了个工具". Do not lead with the name or a link; let people ask in the comments or search. Good hooks from the bundle:
 
 - `mondays`: the holiday age turned into Mondays left.
-- `type`: a label people can claim and argue with. The rule is public, so invite "我也是这型吗".
+- `type`: a four-letter code and a name, such as EHTS 采菊人. People can claim it and argue with it. The rules are public, so invite "你是哪一型".
 - `places`: the same money ranked by country. Always mention that visas, tax and healthcare are not counted.
 - `life`: one drawn life and its worst year. Say it is one sampled path under a stated seed, never a forecast.
 
