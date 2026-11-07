@@ -5,6 +5,7 @@ import { loadState, saveState, safeStorage, setField, setRetireCountry, setWorkC
 import { rankLevers, impactOf } from './levers.js';
 import { PARAMS } from './params.js';
 import { makeGoal, compareVisit, loadGoal, saveGoal, clearGoal } from './goals.js';
+import { initAnalytics, track } from './analytics.js';
 import { drawChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { copyText, goalCardSpec, renderCard, resultCardSpec, toCardInput } from './card.js';
@@ -23,6 +24,7 @@ let goal = loadGoal(storage);
 let latest = null;
 let mcTimer = 0;
 let frame = 0;
+let lastCardView = null;
 
 const SIMPLE_FIELDS = [
   { legend: '现在', fields: [
@@ -225,11 +227,24 @@ function renderCards(p) {
     if (inline && !inline.hidden) inline.innerHTML = cardBody(param, impactOf(p, param.id));
   }
   const box = $('cards');
-  const opened = new Set([...box.querySelectorAll('details[open]')].map(d => d.dataset.id));
-  box.innerHTML = PARAMS.map(param => {
-    const open = S.view === 'pro' || opened.has(param.id) ? ' open' : '';
-    return `<details data-id="${param.id}"${open}><summary>${param.name}</summary><div class="lcard">${cardBody(param, impactOf(p, param.id))}</div></details>`;
-  }).join('');
+  if (!box.childElementCount) {
+    box.innerHTML = PARAMS.map(param => `<details data-id="${param.id}"><summary>${param.name}</summary><div class="lcard"></div></details>`).join('');
+  }
+  // Update in place so an open card stays open, keeps focus, and is not counted again.
+  for (const details of box.children) {
+    const param = paramById[details.dataset.id];
+    details.querySelector('.lcard').innerHTML = cardBody(param, impactOf(p, param.id));
+    if (S.view === 'pro' && S.view !== lastCardView) details.open = true;
+    if (S.view === 'simple' && S.view !== lastCardView && lastCardView !== null) details.open = false;
+  }
+  lastCardView = S.view;
+}
+
+let calcCounted = false;
+function countCalculation() {
+  if (calcCounted) return;
+  calcCounted = true;
+  track('calc_done');
 }
 
 function refresh() {
@@ -255,6 +270,7 @@ function onInput(ev) {
   const el = ev.target;
   if (el.id === 's-retexp') {
     S = setField(S, 'retExp', el.value === '' ? '' : Number(el.value) * 12, DATA);
+    countCalculation();
     refresh();
     return;
   }
@@ -268,11 +284,13 @@ function onInput(ev) {
   if (!f) return;
   const value = f.monthly && el.value !== '' ? Number(el.value) * 12 : el.value;
   S = setField(S, f.id, value, DATA);
+  countCalculation();
   refresh();
 }
 
 function onSelect(ev) {
   const { id, value } = ev.target;
+  countCalculation();
   if (id === 's-work' || id === 'p-work') {
     const wasWorkCur = S.dispCur === DATA.countries[S.workC].cur;
     S = setWorkCountry(S, value, DATA);
@@ -319,21 +337,25 @@ function download(name, type, text) {
 
 function onClick(ev) {
   if (ev.target.id === 'export-csv' || ev.target.id === 'export-json') {
+    track('export_data');
     flushSimulation();
     if (ev.target.id === 'export-csv') download('fire-age.csv', 'text/csv;charset=utf-8', toCsv(latest));
     else download('fire-age.json', 'application/json', toJson(latest));
     return;
   }
   if (ev.target.id === 'share-btn') {
+    track('card_generate');
     flushSimulation();
     showCard(resultCardSpec(toCardInput(latest)));
     return;
   }
   if (ev.target.id === 'goal-card') {
+    track('card_generate');
     showCard(goalCardSpec(goal, compareVisit(goal, toParams(S, DATA), today())));
     return;
   }
   if (ev.target.id === 'share-copy') {
+    track('copy_text');
     copyText($('share-comment').textContent, $('share-comment')).then(result => {
       $('share-copy-status').textContent = result === 'copied' ? '已复制' : '请长按选中文字复制';
     });
@@ -345,7 +367,10 @@ function onClick(ev) {
     const card = $(`card-${id}`);
     card.hidden = !card.hidden;
     help.setAttribute('aria-expanded', String(!card.hidden));
-    if (!card.hidden) card.innerHTML = cardBody(paramById[id], impactOf(toParams(S, DATA), id));
+    if (!card.hidden) {
+      track('card_open');
+      card.innerHTML = cardBody(paramById[id], impactOf(toParams(S, DATA), id));
+    }
     return;
   }
   const leverGoal = ev.target.closest('[data-goal]');
@@ -373,8 +398,19 @@ function init() {
   document.addEventListener('change', ev => { if (ev.target.tagName === 'SELECT') onSelect(ev); });
   document.addEventListener('click', onClick);
   for (const form of [$('simple-form'), $('pro-form')]) form.addEventListener('submit', ev => ev.preventDefault());
-  const setMode = mode => () => { S = { ...S, mode }; refresh(); };
-  const setView = view => () => { S = { ...S, view }; refresh(); };
+  const setMode = mode => () => {
+    if (S.mode !== mode) track('mode_switch');
+    S = { ...S, mode };
+    refresh();
+  };
+  const setView = view => () => {
+    if (S.view !== view) track('mode_switch');
+    S = { ...S, view };
+    refresh();
+  };
+  $('cards').addEventListener('toggle', ev => {
+    if (ev.target.open && S.view === 'simple') track('card_open');
+  }, true);
   $('to-fwd').addEventListener('click', setMode('fwd'));
   $('to-bwd').addEventListener('click', setMode('bwd'));
   $('to-simple').addEventListener('click', setView('simple'));
@@ -386,6 +422,8 @@ function init() {
   });
   renderFast();
   renderSimulation();
+  initAnalytics(location.href, DATA.version);
+  track('visit');
 }
 
 init();

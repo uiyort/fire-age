@@ -1,0 +1,7 @@
+name = "fire-age"
+compatibility_date = "2026-10-01"
+pages_build_output_dir = "site"
+
+[[analytics_engine_datasets]]
+binding = "EVENTS"
+dataset = "fire_age_events"
