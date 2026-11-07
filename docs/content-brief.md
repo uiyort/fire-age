@@ -19,6 +19,15 @@ For Claude when writing copy from a studio data bundle, and for the author when 
 - Discuss calculation and principles only. Never name a fund, stock or other product, never suggest an allocation percentage, and never promise returns.
 - Never use 稳赚, 保本, 暴富 or similar wording.
 
+## Lead with the experience, not the tool
+
+Open with what the number did to you ("算出来还有 574 个周一就放假"), not with "我做了个工具". Do not lead with the name or a link; let people ask in the comments or search. Good hooks from the bundle:
+
+- `mondays`: the holiday age turned into Mondays left.
+- `type`: a label people can claim and argue with. The rule is public, so invite "我也是这型吗".
+- `places`: the same money ranked by country. Always mention that visas, tax and healthcare are not counted.
+- `life`: one drawn life and its worst year. Say it is one sampled path under a stated seed, never a forecast.
+
 ## By platform
 
 **Xiaohongshu.** A title of at most 20 characters built around one surprising number, then a short body of 3 to 5 lines. No links or QR codes, in the images or the text. Use the tags #FIRE #提前退休 #财务自由.

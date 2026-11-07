@@ -163,3 +163,39 @@ textarea { font-family: var(--f-mono); font-size: 13px; width: 100%; padding: 8p
 .deck-row img { width: 180px; flex: none; border-radius: 6px; border: 1px solid var(--line); display: block; }
 .bundle { font-family: var(--f-mono); font-size: 12px; background: var(--bg); padding: 10px; border-radius: 6px; overflow: auto; max-height: 320px; margin: 8px 0 0; }
 .doc-wide .results { margin-top: 16px; }
+
+.type-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-top: 8px; }
+.type-name { font-family: var(--f-display); font-weight: 900; font-size: 28px; line-height: 1.2; }
+.type-en { font-size: 12px; color: var(--ink-3); }
+.type-head .pill { color: var(--accent); align-self: center; }
+.type-blurb, .why, .next { margin: 6px 0 0; }
+.why { font-size: 13px; color: var(--ink-2); }
+.next { font-size: 13px; font-weight: 700; }
+.type-list { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: var(--ink-2); }
+.type-list li { margin-bottom: 4px; }
+.type-list b { color: var(--ink); }
+.lever .gain { white-space: normal; }
+
+#places { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.place-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.place-name { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; min-width: 0; }
+.place .pill { color: var(--accent); }
+.place-age { font-family: var(--f-mono); font-weight: 500; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.place-bar { height: 6px; margin-top: 3px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.place-bar i { display: block; height: 100%; background: color-mix(in oklab, var(--s1) 55%, var(--surface)); border-radius: 4px; }
+.place.current .place-bar i { background: var(--s1); }
+.place-note { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+
+.lives { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.lives:empty { display: none; }
+@media (min-width: 700px) { .lives { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.life { font: inherit; text-align: left; display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); cursor: pointer; }
+.life[aria-pressed="true"] { border: 2px solid var(--accent); padding: 7px 9px; }
+.spark { width: 100%; height: 44px; display: block; margin-bottom: 4px; overflow: visible; }
+.spark polyline { fill: none; stroke: var(--s1); stroke-width: 2px; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+.spark-mark { stroke: var(--ink-3); stroke-width: 1px; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.life-head { font-weight: 700; font-size: 14px; }
+.life-sub { font-size: 12px; color: var(--ink-2); overflow-wrap: anywhere; }
+.story-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.story-list li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; font-size: 14px; }
+.story-list b { font-family: var(--f-mono); font-weight: 500; color: var(--accent); white-space: nowrap; }

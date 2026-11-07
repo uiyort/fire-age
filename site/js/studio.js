@@ -1,5 +1,7 @@
 // Content studio logic: turns personas into card decks and a data bundle for writing copy. No DOM access.
-import { fiNeed, fwdSolve, fiYears, monteCarlo, savingsRate, swrFor } from './engine.js';
+import { DEFAULT_SEED, fiNeed, fwdSolve, fiYears, lifePath, monteCarlo, savingsRate, swrFor } from './engine.js';
+import { holidayType, lifeStory, mondaysIn, placeRanking } from './holiday.js';
+import { lifeCardSpec, placeCardSpec, toLifeCardInput } from './card.js';
 import { defaultState, setField, setRetireCountry, setWorkCountry, toParams } from './state.js';
 import { rankLevers } from './levers.js';
 import { money, pct } from './views.js';
@@ -19,6 +21,7 @@ export function personaResult(persona, data) {
   const t = fwdSolve(p);
   const mc = monteCarlo(p, t, null);
   const need = fiNeed(p, t ?? 0);
+  const story = lifeStory(lifePath(p, t, null, DEFAULT_SEED), p);
   return {
     label: persona.label,
     workplace: data.countries[persona.workC].name,
@@ -33,11 +36,16 @@ export function personaResult(persona, data) {
     retExpText: money(p.retExp, p.rCur),
     withdrawalRate: swrFor(p, p.life - p.age - (t ?? 0)),
     savingsRate: savingsRate(p),
+    type: holidayType(p, data, { workC: persona.workC, retC: persona.retC }),
+    mondays: t === null ? 0 : mondaysIn(t),
+    places: placeRanking(p, data, persona.retC),
+    life: { seed: DEFAULT_SEED, ...toLifeCardInput(story, { p, dispCur: p.wCur, mc }) },
     levers: rankLevers(p, data, { retC: persona.retC }).map(l => ({ label: l.label, gainYears: l.gainYears, unlocks: l.unlocks, afterYears: l.afterYears })),
   };
 }
 
 const card = (kind, fields) => ({ kind, size: [1080, 1440], brand: BRAND, searchHint: SEARCH_HINT, stats: [], lines: [], ...fields });
+const tall = (kind, spec) => card(kind, { ...spec, kind, size: [1080, 1440] });
 const leverGain = l => (l.unlocks ? '能够放假' : `提前 ${l.gainYears.toFixed(1)} 年`);
 
 export function buildDeck(r) {
@@ -55,7 +63,10 @@ export function buildDeck(r) {
     reachable
       ? card('result', { eyebrow: r.label, hero: `${r.retireAge} 岁`, sentence: r.years === 0 ? '从今天起，余生皆假期' : `从 ${r.retireAge} 岁起，余生皆假期`, stats })
       : card('result', { eyebrow: r.label, hero: '还在路上', sentence: '还没到放假那天，用杠杆一步步提前', stats }),
+    card('type', { eyebrow: `${r.label}的放假类型`, hero: r.type.name, sentence: r.type.why, lines: [r.type.blurb, `判定规则：${r.type.rule}`] }),
     leverCard,
+    tall('place', placeCardSpec(r.places)),
+    tall('life', lifeCardSpec(r.life)),
     card('learn', {
       eyebrow: '这个数字怎么来的', hero: r.needText, sentence: '放假所需资产',
       lines: [`每年花 ${r.retExpText}，按 ${pct(r.withdrawalRate, 1)} 的提取率估算。`, '放假越早，要撑的年数越长，提取率就要越低。', '全部按今天的购买力计算。'],

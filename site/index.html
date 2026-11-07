@@ -56,8 +56,21 @@
           <div class="solves" id="solves"></div>
         </section>
 
+        <section class="card">
+          <h2>你的放假类型</h2>
+          <div id="type-now"></div>
+          <details id="type-all"></details>
+        </section>
+
         <section class="card" id="levers"></section>
         <section class="card" id="goal" hidden></section>
+
+        <section class="card" id="places-card">
+          <h2>同样的钱，在哪放假最早</h2>
+          <p class="sub">支出按当地物价折算，保持同样的生活水平。条越短，放假越早。没算签证、税和医疗，这些要自己查。</p>
+          <div id="places"></div>
+          <div class="goal-row"><button type="button" class="ghost" id="place-card">生成排名卡片</button></div>
+        </section>
 
         <section class="card">
           <h2>资产会怎么变</h2>
@@ -78,6 +91,19 @@
             <button type="button" class="ghost" id="export-csv">导出 CSV</button>
             <button type="button" class="ghost" id="export-json">导出 JSON</button>
           </div>
+        </section>
+
+        <section class="card">
+          <h2>抽一条人生</h2>
+          <p class="sub">成功率是几千条人生的统计。抽几条出来，看看同样的计划在不同年景下是什么样。</p>
+          <div class="goal-row">
+            <button type="button" class="primary" id="life-draw">抽一条人生</button>
+            <button type="button" class="ghost" id="life-card" hidden>生成这条人生的卡片</button>
+          </div>
+          <div class="lives" id="lives"></div>
+          <p class="fine" id="life-summary"></p>
+          <div id="life-story"></div>
+          <p class="fine" id="life-seed"></p>
         </section>
 
         <section class="card pro-only" hidden>

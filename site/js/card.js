@@ -1,5 +1,6 @@
 // Shareable cards: what they say (pure) and how they are drawn (canvas, local only, never uploaded).
 import { money, toDisplay, wholeMoney, pct } from './views.js';
+import { mondaysIn } from './holiday.js';
 
 const BRAND = '放假年龄 / FIRE Age';
 const SEARCH_HINT = '搜：放假年龄';
@@ -11,26 +12,29 @@ const trimYears = y => String(Math.round(y * 10) / 10);
 
 export function toCardInput(result) {
   const { mode, p, t, bwd, mc, dispCur } = result;
+  const typeName = result.type?.name;
   if (mode === 'bwd') {
     return {
-      mode, targetAge: p.tAge, enough: bwd.s0 <= 0, success: mc?.success ?? null,
+      typeName, mondays: mondaysIn(bwd.n), mode, targetAge: p.tAge, enough: bwd.s0 <= 0, success: mc?.success ?? null,
       monthlyText: wholeMoney(toDisplay(Math.max(bwd.s0, 0) / 12, p, dispCur), dispCur),
     };
   }
   return {
-    mode, age: p.age, years: t, retireAge: t === null ? null : p.age + t, success: t === null ? null : mc?.success ?? null,
+    typeName, mondays: t === null ? 0 : mondaysIn(t), mode, age: p.age, years: t, retireAge: t === null ? null : p.age + t, success: t === null ? null : mc?.success ?? null,
     needText: t === null ? '' : money(toDisplay(result.target[t], p, dispCur), dispCur),
   };
 }
 
 export function resultCardSpec(input) {
-  const base = { kind: 'result', size: [1080, 1080], brand: BRAND, searchHint: SEARCH_HINT, stats: [] };
+  const base = { kind: 'result', size: [1080, 1080], brand: BRAND, searchHint: SEARCH_HINT, stats: [], ...(input.typeName ? { eyebrow: input.typeName } : {}) };
+  const mondays = input.mondays ? input.mondays.toLocaleString('zh-CN') : null;
   const successStat = input.success === null || input.success === undefined ? [] : [{ label: '计划成功率', value: pct(input.success, 0) }];
   if (input.mode === 'bwd') {
     const sentence = input.enough
       ? `想 ${input.targetAge} 岁放假，现在的存款已经够了`
       : `想 ${input.targetAge} 岁放假，每月需存 ${input.monthlyText}`;
-    return { ...base, hero: `${input.targetAge} 岁`, sentence, stats: successStat, comment: `${sentence}。你的放假年龄是多少？` };
+    const lines = mondays ? [`离放假还有 ${mondays} 个周一`] : [];
+    return { ...base, hero: `${input.targetAge} 岁`, sentence, lines, stats: successStat, comment: `${sentence}。你的放假年龄是多少？` };
   }
   if (input.years === null) {
     return {
@@ -46,7 +50,61 @@ export function resultCardSpec(input) {
   return {
     ...base, hero: `${input.retireAge} 岁`, sentence: `从 ${input.retireAge} 岁起，余生皆假期`,
     stats: [{ label: '再坚持', value: `${input.years} 年` }, ...stats],
-    comment: `我的放假年龄是 ${input.retireAge} 岁${successText}。你的呢？`,
+    ...(mondays ? { lines: [`还有 ${mondays} 个周一就放假`] } : {}),
+    comment: `我的放假年龄是 ${input.retireAge} 岁${successText}${mondays ? `，还有 ${mondays} 个周一` : ''}${input.typeName ? `，我是${input.typeName}` : ''}。你的呢？`,
+  };
+}
+
+const PLACE_LINES = 4;
+
+export function placeCardSpec(rows) {
+  const current = rows.find(r => r.current);
+  const best = rows[0];
+  const base = { kind: 'place', size: [1080, 1080], brand: BRAND, searchHint: SEARCH_HINT, stats: [], eyebrow: '同样的钱，换个地方放假' };
+  const ageText = r => (r.age === null ? '还到不了' : `${r.age} 岁`);
+  const top = rows.slice(0, PLACE_LINES);
+  const shown = current && !top.includes(current) ? [...top.slice(0, -1), current] : top;
+  const lines = [...shown.map(r => `${r.name}：${ageText(r)}`), '按物价水平估算，没算签证、税和医疗。'];
+  if (best.age === null) {
+    return { ...base, hero: '还在路上', sentence: '先把储蓄变成正数', lines, comment: '我还在攒钱，等攒够了，你想去哪？' };
+  }
+  const gain = current?.years == null ? null : current.years - best.years;
+  if (gain === null) {
+    return { ...base, hero: `${best.age} 岁`, sentence: `选${best.name}才看得到放假那天`, lines, comment: `同样的钱，在${best.name} ${best.age} 岁能放假，在${current.name}还到不了。你想去哪？` };
+  }
+  if (gain < 0.05) {
+    return { ...base, hero: `${current.age} 岁`, sentence: `你选的${current.name}已经是最早的`, lines, comment: `我算了一圈，同样的钱还是在${current.name}放假最早，${current.age} 岁。你想去哪？` };
+  }
+  return {
+    ...base, hero: `早 ${trimYears(gain)} 年`, sentence: `选${best.name}比选${current.name}早放假`, lines,
+    comment: `同样的钱，在${best.name} ${best.age} 岁能放假，在${current.name}要 ${current.age} 岁。你想去哪？`,
+  };
+}
+
+export const toLifeCardInput = (story, result) => ({
+  ...story,
+  endText: money(toDisplay(story.endAssets, result.p, result.dispCur), result.dispCur),
+  success: result.mc?.success ?? null,
+  paths: result.mc?.paths ?? 0,
+});
+
+export function lifeCardSpec(life) {
+  const base = { kind: 'life', size: [1080, 1080], brand: BRAND, searchHint: SEARCH_HINT, stats: [], eyebrow: '我抽到的一条人生' };
+  const odds = life.success === null ? '' : `成功率 ${pct(life.success, 0)} 是 ${life.paths.toLocaleString('en-US')} 条人生的统计，`;
+  const successStat = life.success === null ? [] : [{ label: '计划成功率', value: pct(life.success, 0) }];
+  if (life.outcome === 'working') {
+    return { ...base, hero: '还在攒', sentence: '这条人生里还没放假，先把杠杆用起来', stats: successStat, comment: `${odds}我抽到的这条人生还在攒钱。你抽到什么？` };
+  }
+  const stats = [{ label: '放假年龄', value: `${life.retireAge} 岁` }, ...successStat];
+  if (life.outcome === 'ruined') {
+    const sentence = '放假后钱没撑住，这个计划还要调整';
+    return { ...base, hero: `${life.ruinAge} 岁花完`, sentence, stats, comment: `${odds}我抽到的这条在 ${life.ruinAge} 岁花完了积蓄。你抽到什么？` };
+  }
+  const hit = life.worst && life.worst.ret < 0;
+  const sentence = hit ? `${life.worst.age} 岁那年亏了 ${Math.round(-life.worst.ret * 100)}%，还是撑住了` : '一路没有亏损的年份，运气不错';
+  return {
+    ...base, hero: `撑到 ${life.endAge} 岁`, sentence, stats: [...stats, { label: '最后还剩', value: life.endText }],
+    comment: `${odds}我抽到的这条：${sentence}。你抽到什么？`,
   };
 }
 
@@ -67,11 +125,13 @@ export function fitFontSize(measure, text, maxWidth, startPx, minPx) {
   return Math.max(px, minPx);
 }
 
+const NO_LINE_START = '。，、；：？！）》”’%';
+
 export function wrapText(measure, text, maxWidth) {
   const out = [];
   let line = '';
   for (const ch of text) {
-    if (line && measure(line + ch) > maxWidth) {
+    if (line && measure(line + ch) > maxWidth && !NO_LINE_START.includes(ch)) {
       out.push(line);
       line = ch;
     } else {
@@ -80,6 +140,17 @@ export function wrapText(measure, text, maxWidth) {
   }
   if (line) out.push(line);
   return out;
+}
+
+const LINE_GAP = 16;
+const LINE_HEIGHT = 1.45;
+
+// The largest font size at which the extra lines fit the space above the footer.
+export function fitLines(measure, paragraphs, maxWidth, available, startPx = 42, minPx = 26) {
+  const heightAt = px => paragraphs.reduce((sum, text) => sum + LINE_GAP + wrapText(t => measure(t, px), text, maxWidth).length * px * LINE_HEIGHT, 0);
+  let px = startPx;
+  while (px > minPx && heightAt(px) > available) px -= 2;
+  return px;
 }
 
 export function renderCard(spec, canvas) {
@@ -125,19 +196,21 @@ export function renderCard(spec, canvas) {
     y += sentencePx * 1.35;
   }
 
-  for (const paragraph of spec.lines ?? []) {
-    y += 16;
+  const footerY = H - 90;
+  const statY = footerY - 190;
+  const lines = spec.lines ?? [];
+  const linePx = fitLines(measureAt(plain), lines, inner, (spec.stats.length ? statY - 90 : footerY - 40) - y);
+  for (const paragraph of lines) {
+    y += LINE_GAP;
     ctx.fillStyle = INK_2;
-    for (const line of wrapText(t => measureAt(plain)(t, 42), paragraph, inner)) {
-      ctx.font = plain(42);
+    for (const line of wrapText(t => measureAt(plain)(t, linePx), paragraph, inner)) {
+      ctx.font = plain(linePx);
       ctx.fillText(line, margin, y);
-      y += 42 * 1.45;
+      y += linePx * LINE_HEIGHT;
     }
   }
 
-  const footerY = H - 90;
   if (spec.stats.length) {
-    const statY = footerY - 190;
     const colW = inner / spec.stats.length;
     ctx.fillStyle = RULE;
     ctx.fillRect(margin, statY - 60, inner, 2);

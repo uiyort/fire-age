@@ -129,19 +129,56 @@ function mulberry32(seed) {
   };
 }
 
+// Yearly cash flows for a simulated plan.
+function planFlows(p, retireT, s0) {
+  const spend = [], sav = [];
+  for (let t = 0; t <= p.life - p.age; t++) {
+    // Drift stops at retirement, matching fiNeed: the need is fixed in the year the holiday starts.
+    const k = retireT == null ? t : Math.min(t, retireT);
+    spend.push(Math.max(spendW(p, k, p.retExp) - (p.age + t >= p.pAge ? pensW(p, k) : 0), 0));
+    sav.push(savingsAt(p, t, s0));
+  }
+  return { spend, sav };
+}
+
+// One path of the same simulation monteCarlo runs: same draws, same order, same rules.
+export function lifePath(p, retireT, s0, seed) {
+  const Y = p.life - p.age;
+  const rnd = mulberry32(seed);
+  const mu = Math.log(1 + p.r), s = p.sigma;
+  const { spend, sav } = planFlows(p, retireT, s0);
+  const years = [];
+  let A = p.assets, ruinAge = null;
+  for (let t = 0; t <= Y; t++) {
+    if (t === Y) {
+      years.push({ t, age: p.age + t, assets: A, ret: null });
+      break;
+    }
+    const u1 = rnd() || 1e-12, u2 = rnd();
+    const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    const gr = Math.exp(mu + s * z);
+    years.push({ t, age: p.age + t, assets: A, ret: gr - 1 });
+    if (retireT != null && t >= retireT) {
+      A -= spend[t];
+      if (A < 0) {
+        A = 0;
+        ruinAge ??= p.age + t;
+      }
+      A *= gr;
+    } else {
+      A = Math.max(A * gr + sav[t], 0);
+    }
+  }
+  return { seed, retireT, years, ruinAge };
+}
+
 export function monteCarlo(p, retireT, s0 = null, { paths = DEFAULT_PATHS, seed = DEFAULT_SEED } = {}) {
   const Y = p.life - p.age;
   const rnd = mulberry32(seed);
   // p.r is a geometric return, so the median path compounds at exactly p.r.
   const mu = Math.log(1 + p.r), s = p.sigma;
   const cols = Array.from({ length: Y + 1 }, () => new Float64Array(paths));
-  const spend = [], sav = [];
-  for (let t = 0; t <= Y; t++) {
-    // Drift stops at retirement, matching fiNeed: the need is fixed in the year the holiday starts.
-    const k = retireT == null ? t : Math.min(t, retireT);
-    spend.push(Math.max(spendW(p, k, p.retExp) - (p.age + t >= p.pAge ? pensW(p, k) : 0), 0));
-    sav.push(savingsAt(p, t, s0));
-  }
+  const { spend, sav } = planFlows(p, retireT, s0);
   let ok = 0;
   for (let i = 0; i < paths; i++) {
     let A = p.assets, alive = true;
@@ -168,6 +205,12 @@ export function monteCarlo(p, retireT, s0 = null, { paths = DEFAULT_PATHS, seed 
     return [q(a, .1), q(a, .25), q(a, .5), q(a, .75), q(a, .9)];
   });
   return { bands, success: retireT == null ? null : ok / paths, paths, seed };
+}
+
+// Assets needed today so that compounding alone reaches the need when the pension starts.
+export function coastNeed(p) {
+  const t = Math.max(p.pAge - p.age, 0);
+  return fiNeed(p, t) / Math.pow(1 + p.r, t);
 }
 
 export function dualAges(p) {

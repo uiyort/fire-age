@@ -28,6 +28,13 @@ All amounts are real (today's purchasing power), computed in the work currency a
 
 Assets cannot go below zero during accumulation, in either the deterministic path or the simulation: overspending is not carried as debt. Currency drift applies only when the work and retirement currencies differ, and it stops at retirement in both the need calculation and the simulation.
 
+## Result features
+
+- **Mondays and workdays:** `years × 365.25 ÷ 7` and `years × 250`, rounded. 250 is an approximation.
+- **Holiday type:** the first rule that matches, in this order: reached (assets at the need), seedling (no holiday in the planning horizon), coast (assets ≥ need at pension age ÷ (1+r)^years), migrant (retirement price level ÷ current ≤ 80%, different places), saver (savings rate ≥ 50%), lean (price-adjusted retirement spending ≤ 70% of current), fat (≥ 150%), snowball (over half of assets at the holiday come from compounding today's capital), steady (the rest). The thresholds are this tool's own, not an academic standard.
+- **Place ranking:** other assumptions held, retirement spending is converted at FX and scaled by the ratio of price levels; a pension is converted at FX only. Visas, tax, healthcare and currency risk are not included.
+- **Drawn lives:** each is one simulated path under the same rules, with seeds shown on the page. The first draw uses four consecutive seeds from 20261026.
+
 ## Not modelled
 
 Detailed tax law (approximated by `drag`), owner-occupied housing, one-off expenses, bequests, excess medical inflation, city-level living costs, and dynamic withdrawal strategies.

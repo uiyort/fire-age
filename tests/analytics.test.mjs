@@ -42,3 +42,8 @@ test('channel comes from the ch parameter and is sanitised', () => {
   assert.equal(channelFromUrl('https://x/'), 'direct');
   assert.equal(channelFromUrl('https://x/?ch=%3Cscript%3E'), 'direct');
 });
+
+test('drawing a life is a countable event', async () => {
+  const { EVENTS } = await import('../functions/api/e.js');
+  assert.ok(EVENTS.has('life_draw'));
+});

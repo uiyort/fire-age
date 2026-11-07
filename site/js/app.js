@@ -1,6 +1,7 @@
 // Page wiring: reads inputs into state, recomputes, renders.
 import DATA from './data-latest.js';
-import { bwdSolve, dualAges, fiNeed, fiYears, fwdSolve, monteCarlo } from './engine.js';
+import { DEFAULT_SEED, bwdSolve, dualAges, fiNeed, fiYears, fwdSolve, monteCarlo } from './engine.js';
+import { TYPES, drawLives, holidayType, lifeStory, placeRanking } from './holiday.js';
 import { commitField, loadState, saveState, safeStorage, setField, setRetireCountry, setWorkCountry, toParams } from './state.js';
 import { rankLevers, impactOf } from './levers.js';
 import { PARAMS } from './params.js';
@@ -8,9 +9,9 @@ import { makeGoal, compareVisit, goalApplies, loadGoal, saveGoal, clearGoal } fr
 import { initAnalytics, track } from './analytics.js';
 import { drawChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
-import { copyText, goalCardSpec, renderCard, resultCardSpec, toCardInput } from './card.js';
+import { copyText, goalCardSpec, lifeCardSpec, placeCardSpec, renderCard, resultCardSpec, toCardInput, toLifeCardInput } from './card.js';
 import {
-  cardBody, goalFor, goalHtml, headlineText, heatHtml, leversHtml, money, pct, pctTableHtml, solvesHtml, tilesHtml, toDisplay, variantsHtml,
+  allTypesHtml, cardBody, goalFor, goalHtml, headlineText, heatHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, solvesHtml, storyHtml, tilesHtml, toDisplay, typeHtml, variantsHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -25,6 +26,8 @@ let latest = null;
 let mcTimer = 0;
 let frame = 0;
 let lastCardView = null;
+let lifeSeed = null;
+let lifeIndex = 0;
 
 const SIMPLE_FIELDS = [
   { legend: '现在', fields: [
@@ -168,7 +171,9 @@ function renderFast() {
   const levers = rankLevers(p, DATA, { retC: S.retC });
   const retireT = S.mode === 'bwd' ? bwd.n : t;
   const target = Array.from({ length: p.life - p.age + 1 }, (_, i) => fiNeed(p, i));
-  latest = { ...(latest ?? {}), view: S.view, mode: S.mode, p, t, retireT, years: fiYears(p), dual, bwd, levers, target, dataVersion: DATA.version, dispCur: cur };
+  const type = holidayType(p, DATA, { workC: S.workC, retC: S.retC });
+  const places = placeRanking(p, DATA, S.retC);
+  latest = { ...(latest ?? {}), view: S.view, mode: S.mode, p, t, retireT, years: fiYears(p), dual, bwd, levers, target, type, places, dataVersion: DATA.version, dispCur: cur };
 
   syncChrome(p);
   syncInputs();
@@ -177,7 +182,9 @@ function renderFast() {
   $('headline').innerHTML = `<p class="say">${say}</p><p class="say-note">${note}</p>`;
   $('tiles').innerHTML = tilesHtml({ mode: S.mode, p, t, bwd, mc: latest.mc, dispCur: cur });
   if (S.mode === 'bwd') $('solves').innerHTML = solvesHtml({ p, bwd, dispCur: cur });
+  $('type-now').innerHTML = typeHtml(type, levers[0]);
   $('levers').innerHTML = leversHtml(levers, p);
+  $('places').innerHTML = placesHtml(places);
   renderGoal(p);
   renderCards(p);
   if (S.view === 'pro') {
@@ -209,6 +216,23 @@ function renderSimulation() {
       : `按现在的计划存到 ${p.age + retireT} 岁，之后每年取出退休支出（扣除养老金）。`;
   $('mc-note').textContent = `蒙特卡洛模拟 ${mc.paths.toLocaleString('zh-CN')} 次，随机种子 ${mc.seed}，结果可复现。金额都按今天的购买力计算。`;
   $('pct-table').innerHTML = pctTableHtml({ p, mc, target, dispCur: cur });
+  renderLives();
+}
+
+// The drawn lives follow the current plan, so changing an input redraws them with the same seeds.
+function renderLives() {
+  if (lifeSeed === null) return;
+  const { p, retireT, mode, bwd, mc, dispCur: cur } = latest;
+  const s0 = mode === 'bwd' ? Math.max(bwd.s0, 0) : null;
+  const lives = drawLives(p, retireT, s0, lifeSeed);
+  const stories = lives.map(life => lifeStory(life, p));
+  latest.lifeStory = stories[lifeIndex];
+  $('lives').innerHTML = livesHtml(lives, stories, lifeIndex, { p, dispCur: cur });
+  $('life-summary').textContent = livesSummary(stories, mc);
+  $('life-story').innerHTML = storyHtml(stories[lifeIndex], { p, dispCur: cur });
+  $('life-seed').textContent = `随机种子 ${lifeSeed} 到 ${lifeSeed + lives.length - 1}，同样的输入可以复现这几条人生。收益是模型抽样，不是历史重演。`;
+  $('life-draw').textContent = '再抽一次';
+  $('life-card').hidden = false;
 }
 
 function renderGoal(p) {
@@ -318,6 +342,7 @@ function showCard(spec) {
   $('share-comment').textContent = spec.comment;
   $('share-copy-status').textContent = '';
   $('share-panel').hidden = false;
+  $('share-panel').scrollIntoView({ block: 'center' });
 }
 
 // A pending simulation would put a stale success rate on the card, so finish it first.
@@ -351,6 +376,30 @@ function onClick(ev) {
     track('card_generate');
     flushSimulation();
     showCard(resultCardSpec(toCardInput(latest)));
+    return;
+  }
+  if (ev.target.id === 'place-card') {
+    track('card_generate');
+    showCard(placeCardSpec(latest.places));
+    return;
+  }
+  if (ev.target.id === 'life-draw') {
+    track('life_draw');
+    lifeSeed = lifeSeed === null ? DEFAULT_SEED : Math.floor(Math.random() * 2 ** 31);
+    lifeIndex = 0;
+    flushSimulation();
+    return;
+  }
+  if (ev.target.id === 'life-card') {
+    track('card_generate');
+    flushSimulation();
+    showCard(lifeCardSpec(toLifeCardInput(latest.lifeStory, latest)));
+    return;
+  }
+  const lifeButton = ev.target.closest('[data-life]');
+  if (lifeButton) {
+    lifeIndex = Number(lifeButton.dataset.life);
+    renderLives();
     return;
   }
   if (ev.target.id === 'goal-card') {
@@ -398,6 +447,7 @@ function init() {
   buildForm($('pro-form'), 'p', PRO_FIELDS);
   fillCountrySelects();
   $('data-version').textContent = DATA.version;
+  $('type-all').innerHTML = allTypesHtml(TYPES);
   document.addEventListener('input', onInput);
   document.addEventListener('change', ev => {
     if (ev.target.tagName === 'SELECT') {
