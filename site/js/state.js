@@ -3,6 +3,7 @@ import { buildParams, longRunInflation } from './engine.js';
 
 const STORAGE_KEY = 'fire-age-v1';
 const MONEY_FIELDS = ['assets', 'income', 'expense', 'retExp', 'pension'];
+const ASSUMPTION_FIELDS = ['infl', 'bondY', 'drag', 'pAge'];
 const NUMERIC_FIELDS = [...MONEY_FIELDS, 'age', 'growth', 'life', 'pAge', 'tAge', 'eq', 'eqReal', 'bondY', 'infl', 'drag', 'fxDrift', 'swr', 'sigEq', 'sigBd', 'rho'];
 
 const fxOf = (data, cur) => (cur === 'USD' ? 1 : data.fx[cur].value);
@@ -40,11 +41,13 @@ export function estimateRetireSpend(annualExpense, workC, retC, data) {
   return convert(annualExpense, curOf(data, workC), curOf(data, retC), data) * ratio;
 }
 
-export function setField(S, id, rawText, data) {
+// commit: false is for values still being typed, which must not become the fallback for a blank field.
+export function setField(S, id, rawText, data, { commit = true } = {}) {
   const text = String(rawText).trim();
   const parsed = text === '' ? NaN : Number(text);
   const value = Number.isFinite(parsed) ? parsed : null;
-  const next = { ...S, [id]: value, lastValid: value === null ? S.lastValid : { ...S.lastValid, [id]: value } };
+  const next = { ...S, [id]: value, lastValid: value === null || !commit ? S.lastValid : { ...S.lastValid, [id]: value } };
+  if (ASSUMPTION_FIELDS.includes(id)) next.touched = { ...S.touched, [id]: true };
   if (id === 'retExp') return { ...next, touched: { ...S.touched, retExp: true }, notice: '' };
   if (id === 'expense' && !S.touched.retExp) {
     const spent = value ?? 0;
@@ -52,6 +55,8 @@ export function setField(S, id, rawText, data) {
   }
   return next;
 }
+
+export const commitField = (S, id) => (S[id] === null || S[id] === undefined ? S : { ...S, lastValid: { ...S.lastValid, [id]: S[id] } });
 
 export function setWorkCountry(S, code, data) {
   const country = data.countries[code];
@@ -63,6 +68,7 @@ export function setWorkCountry(S, code, data) {
   }
   if (!S.touched.retExp) moved.retExp = Math.round(estimateRetireSpend(moved.expense ?? 0, code, S.retC, data));
   moved.lastValid = { ...S.lastValid, ...localAssumptions(country) };
+  moved.touched = Object.fromEntries(Object.entries(S.touched).filter(([id]) => !ASSUMPTION_FIELDS.includes(id)));
   return moved;
 }
 
@@ -102,7 +108,11 @@ export function loadState(data, storage) {
     const saved = JSON.parse(storage.getItem(STORAGE_KEY));
     if (!saved || !data.countries[saved.workC]?.roles.includes('work') || !data.countries[saved.retC]) return base;
     const dispOk = saved.dispCur === 'USD' || data.fx[saved.dispCur];
-    return { ...base, ...saved, dispCur: dispOk ? saved.dispCur : base.dispCur, lastValid: { ...base.lastValid, ...saved.lastValid }, touched: saved.touched ?? {} };
+    const touched = saved.touched ?? {};
+    // Assumptions nobody edited follow the current month's data rather than the saved copy.
+    const local = localAssumptions(data.countries[saved.workC]);
+    const fresh = Object.fromEntries(ASSUMPTION_FIELDS.filter(id => !touched[id]).map(id => [id, local[id]]));
+    return { ...base, ...saved, ...fresh, dispCur: dispOk ? saved.dispCur : base.dispCur, lastValid: { ...base.lastValid, ...saved.lastValid, ...fresh }, touched };
   } catch {
     return base;
   }

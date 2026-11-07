@@ -38,7 +38,7 @@ Known limits of this check:
 
 | What | When | If it fails |
 |---|---|---|
-| Market data update (`.github/workflows/update-data.yml`) | 16th of each month | Nothing is published, the site keeps the last good data, and GitHub emails you |
+| Market data update (`.github/workflows/update-data.yml`) | 16th of each month | One source failing keeps its last value, flagged on the sources page. If more than half fail, or one field stays on an old value for over 92 days, the job stops, nothing is published, and GitHub emails you |
 | Site deployment | On every push to `main` | Cloudflare keeps the previous version live |
 
 The China and Hong Kong 10-year yields are fixed assumptions that do not update. See [data-sources.md](data-sources.md).

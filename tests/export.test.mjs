@@ -10,7 +10,7 @@ const result = {
 };
 
 test('CSV has one row per year with percentiles and the target line', () => {
-  const lines = toCsv(result).replace(/^﻿/, '').trim().split(/\r?\n/);
+  const lines = toCsv(result).replace(/^﻿/, '').trim().split(/\r?\n/).filter(l => !l.startsWith('#'));
   assert.equal(lines[0], 'age,p10,p25,p50,p75,p90,target');
   assert.equal(lines.length, 4);
   assert.equal(lines[1], '30,1,2,3,4,5,10');

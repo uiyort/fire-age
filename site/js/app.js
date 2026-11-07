@@ -1,10 +1,10 @@
 // Page wiring: reads inputs into state, recomputes, renders.
 import DATA from './data-latest.js';
 import { bwdSolve, dualAges, fiNeed, fiYears, fwdSolve, monteCarlo } from './engine.js';
-import { loadState, saveState, safeStorage, setField, setRetireCountry, setWorkCountry, toParams } from './state.js';
+import { commitField, loadState, saveState, safeStorage, setField, setRetireCountry, setWorkCountry, toParams } from './state.js';
 import { rankLevers, impactOf } from './levers.js';
 import { PARAMS } from './params.js';
-import { makeGoal, compareVisit, loadGoal, saveGoal, clearGoal } from './goals.js';
+import { makeGoal, compareVisit, goalApplies, loadGoal, saveGoal, clearGoal } from './goals.js';
 import { initAnalytics, track } from './analytics.js';
 import { drawChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
@@ -148,7 +148,7 @@ function renderEstimate(p) {
       <div><span>组合实际年化收益</span><b>${pct(p.r, 2)}</b></div>
       <div><span>组合年化波动</span><b>${pct(p.sigma, 1)}</b></div>
       <div><span>债券实际收益</span><b>${pct(p.bondReal, 2)}</b></div>
-    </div><label class="chk"><input type="checkbox" id="p-autoswr"${S.autoSwr ? ' checked' : ''}> 提取率按退休年限自动调整</label>`;
+    </div><label class="chk"><input type="checkbox" id="p-autoswr"${S.autoSwr ? ' checked' : ''}> 提取率按退休年限自动调整</label>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}`;
     return;
   }
   const typing = document.activeElement?.id === 's-retexp';
@@ -213,6 +213,10 @@ function renderSimulation() {
 
 function renderGoal(p) {
   const box = $('goal');
+  if (goal && !goalApplies(goal, p)) {
+    goal = null;
+    clearGoal(storage);
+  }
   if (!goal || !storage) {
     box.hidden = true;
     return;
@@ -269,7 +273,7 @@ function fieldFromElement(id) {
 function onInput(ev) {
   const el = ev.target;
   if (el.id === 's-retexp') {
-    S = setField(S, 'retExp', el.value === '' ? '' : Number(el.value) * 12, DATA);
+    S = setField(S, 'retExp', el.value === '' ? '' : Number(el.value) * 12, DATA, { commit: false });
     countCalculation();
     refresh();
     return;
@@ -283,7 +287,7 @@ function onInput(ev) {
   const f = fieldFromElement(el.id);
   if (!f) return;
   const value = f.monthly && el.value !== '' ? Number(el.value) * 12 : el.value;
-  S = setField(S, f.id, value, DATA);
+  S = setField(S, f.id, value, DATA, { commit: false });
   countCalculation();
   refresh();
 }
@@ -395,7 +399,18 @@ function init() {
   fillCountrySelects();
   $('data-version').textContent = DATA.version;
   document.addEventListener('input', onInput);
-  document.addEventListener('change', ev => { if (ev.target.tagName === 'SELECT') onSelect(ev); });
+  document.addEventListener('change', ev => {
+    if (ev.target.tagName === 'SELECT') {
+      onSelect(ev);
+      return;
+    }
+    // A field leaving focus is finished, so its value can now be the fallback for a later blank.
+    const f = ev.target.id === 's-retexp' ? { id: 'retExp' } : fieldFromElement(ev.target.id);
+    if (f) {
+      S = commitField(S, f.id);
+      saveState(S, storage);
+    }
+  });
   document.addEventListener('click', onClick);
   for (const form of [$('simple-form'), $('pro-form')]) form.addEventListener('submit', ev => ev.preventDefault());
   const setMode = mode => () => {

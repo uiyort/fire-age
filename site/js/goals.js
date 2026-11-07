@@ -10,8 +10,11 @@ const KINDS = {
 };
 
 export function makeGoal(paramId, target, p, now) {
-  return { paramId, target, label: KINDS[paramId].label(target), years: fiYears(p), createdAt: now };
+  return { paramId, target, label: KINDS[paramId].label(target), years: fiYears(p), createdAt: now, cur: p.wCur };
 }
+
+// A goal's amounts and years only compare within the currency and country it was set in.
+export const goalApplies = (goal, p) => goal.cur === undefined || goal.cur === p.wCur;
 
 export function compareVisit(goal, p, now) {
   const kind = KINDS[goal.paramId];

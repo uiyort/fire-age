@@ -21,6 +21,8 @@ export function headlineText({ mode, p, t, bwd, dual, dispCur }) {
     say = bwd.s0 <= 0 ? `想 ${p.tAge} 岁放假，现在的存款已经够了。` : `想 ${p.tAge} 岁放假，每月需存 ${wholeMoney(monthly, dispCur)}。`;
   } else if (t === 0) {
     say = '恭喜，现在就可以放假。从今天起，余生皆假期。';
+  } else if (t !== null && savingsAt(p, 0) <= 0) {
+    say = `目前存不下钱，按现在的节奏要到 ${p.age + t} 岁才能放假。先让收入超过支出，每一步都算数。`;
   } else if (t !== null) {
     say = `你的放假年龄是 ${p.age + t} 岁。再坚持 ${t} 年，从 ${p.age + t} 岁起，余生皆假期。`;
   } else if (savingsAt(p, 0) <= 0) {
@@ -58,7 +60,7 @@ export function tilesHtml({ mode, p, t, bwd, mc, dispCur }) {
     parts.push(tile('今天放假所需资产', D(fiNeed(p, 0)), `每年花 ${money(p.retExp, p.rCur)}`));
   }
   if (success !== null) parts.push(tile('计划成功率', pct(success, 0), `${statusPill(success)} 资产撑到 ${p.life} 岁的概率`));
-  parts.push(tile('储蓄率', rate === null ? '—' : pct(rate, 0), rate !== null && rate > 0 ? `每年存 ${D(p.income - p.expense)}` : '目前存不下钱'));
+  parts.push(tile('储蓄率', rate === null || rate <= 0 ? '—' : pct(rate, 0), rate !== null && rate > 0 ? `每年存 ${D(p.income - p.expense)}` : '目前存不下钱'));
   return parts.join('');
 }
 
@@ -71,7 +73,7 @@ export function solvesHtml({ p, bwd, dispCur }) {
   const reqR = bwd.reqR === Infinity ? '> 30%' : bwd.reqR === -Infinity ? '< −10%' : pct(bwd.reqR, 2);
   const rows = [
     ['多存：第一年需存', bwd.s0 <= 0 ? '不用再存' : `${D(bwd.s0)}/年`,
-      bwd.s0 <= 0 ? '现有资产靠复利就能达到' : `约 ${D(bwd.s0 / 12)}/月，储蓄率 ${pct(needRate, 0)}（现在 ${rate === null ? '—' : pct(rate, 0)}）`],
+      bwd.s0 <= 0 ? '现有资产靠复利就能达到' : `约 ${D(bwd.s0 / 12)}/月，储蓄率 ${pct(needRate, 0)}（现在 ${rate === null || rate <= 0 ? '—' : pct(rate, 0)}）`],
     ['多赚：需要的实际年化收益', reqR, rNote],
     ['少花：退休后每年最多花', `${money(bwd.maxE, p.rCur)}/年`, `约 ${money(bwd.maxE / 12, p.rCur)}/月，现在设的是 ${money(p.retExp, p.rCur)}`],
     ['本金：今天需要有', D(bwd.reqA0), bwd.reqA0 <= p.assets ? '你已经有了' : `比现在多 ${D(bwd.reqA0 - p.assets)}`],
@@ -83,7 +85,10 @@ const yearsText = y => `${y.toFixed(1)} 年`;
 
 // Levers that map to a measurable goal: id -> [goal parameter, target for this person].
 export function goalFor(id, p) {
-  if (id === 'saveRate' && p.income > 0) return ['saveRate', (savingsRate(p) ?? 0) + 0.05];
+  if (id === 'saveRate') {
+    const rate = savingsRate(p);
+    return rate === null || rate < 0 || rate + 0.05 > 1 ? null : ['saveRate', rate + 0.05];
+  }
   if (id === 'spend') return ['expense', p.expense * 0.9];
   if (id === 'fee') return ['drag', Math.max(p.drag - 0.5, 0)];
   return null;
@@ -91,6 +96,11 @@ export function goalFor(id, p) {
 
 export function leversHtml(levers, p) {
   const intro = '<h2>你的最大杠杆</h2><p class="sub">对你来说，下面这几件事最能让放假提前。</p>';
+  const gap = p.expense - p.income;
+  if (!levers.length && gap >= 0) {
+    const detail = gap > 0 ? `现在每年还差 ${money(gap, p.wCur)}。` : '现在收入刚好等于支出，多存一点就能启动。';
+    return `${intro}<p class="fine">第一步是让收入超过支出。${detail}储蓄变成正数后，这里会告诉你哪一步最有效。</p>`;
+  }
   if (!levers.length) return `${intro}<p class="fine">现在的设定下，单改一项还看不出变化。试着先调整收入和支出。</p>`;
   const items = levers.map(l => {
     const gain = l.unlocks ? `能在 ${Math.round(p.age + l.afterYears)} 岁放假` : `提前 ${yearsText(l.gainYears)}`;
@@ -112,10 +122,11 @@ export function goalHtml(goal, cmp) {
     <p class="sub">${change}</p>`;
 }
 
-export function impactSentence({ stepLabel, gainYears }) {
+export function impactSentence({ stepLabel, gainYears, note = '' }) {
   if (gainYears === null) return stepLabel;
-  if (Math.abs(gainYears) < 0.05) return `${stepLabel}，放假年龄基本不变。`;
-  return gainYears > 0 ? `${stepLabel}，放假提前 ${yearsText(gainYears)}。` : `${stepLabel}，放假推后 ${yearsText(-gainYears)}。`;
+  if (Math.abs(gainYears) < 0.05) return `${stepLabel}，放假年龄基本不变。${note}`;
+  const change = gainYears > 0 ? `放假提前 ${yearsText(gainYears)}` : `放假推后 ${yearsText(-gainYears)}`;
+  return `${stepLabel}，${change}。${note}`;
 }
 
 export function cardBody(param, impact) {

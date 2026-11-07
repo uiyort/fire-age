@@ -36,7 +36,7 @@ test('backward solutions round-trip', () => {
   near(b.need, 3041559, 1);
   near(assetsAt(p, b.n, { s0: b.s0 }), b.need, 1);
   near(fiNeed(p, b.n, b.maxE), b.An, 1);
-  near(b.reqR, 0.0055, 1e-4);
+  near(assetsAt(p, b.n, { r: b.reqR }), fiNeed(p, b.n, p.retExp, b.reqR), 1);
 });
 
 test('fiYears falls inside the solved year and is fractional', () => {

@@ -48,7 +48,7 @@ const IMPACT_STEPS = {
   life: { stepLabel: '规划年龄多 5 岁', change: p => ({ life: p.life + 5 }) },
   pension: { stepLabel: '养老金多 10%', change: p => ({ pension: p.pension * 1.1 }) },
   pAge: { stepLabel: '早 1 年领取养老金', change: p => ({ pAge: p.pAge - 1 }) },
-  eq: { stepLabel: '股票占比高 10 个百分点', change: p => ({ eq: Math.min(p.eq + 10, 100) }) },
+  eq: { stepLabel: '股票占比高 10 个百分点', change: p => ({ eq: Math.min(p.eq + 10, 100) }), note: '代价是中途波动更大，成功率也会变，这是取舍，不是建议。' },
   eqReal: { stepLabel: '股票实际收益高 1 个百分点', change: p => ({ eqReal: p.eqReal + 1 }) },
   bondY: { stepLabel: '国债收益率高 1 个百分点', change: p => ({ bondY: p.bondY + 1 }) },
   infl: { stepLabel: '长期通胀低 0.5 个百分点', change: p => ({ infl: p.infl - 0.5 }) },
@@ -67,7 +67,8 @@ const NO_YEARS = {
 // gainYears is positive when the step brings the holiday age forward, negative when it pushes it back.
 export function impactOf(p, paramId) {
   if (NO_YEARS[paramId]) return { stepLabel: NO_YEARS[paramId], gainYears: null };
+  if (paramId === 'fxDrift' && p.rCur === p.wCur) return { stepLabel: '工作地和退休地用同一种货币，这一项不起作用。', gainYears: null };
   const step = IMPACT_STEPS[paramId];
   const before = fiYears(p), after = fiYears(rebuild(p, step.change(p)));
-  return { stepLabel: step.stepLabel, gainYears: before === null || after === null ? null : before - after };
+  return { stepLabel: step.stepLabel, note: step.note, gainYears: before === null || after === null ? null : before - after };
 }

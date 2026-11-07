@@ -38,8 +38,10 @@ export function swrFor(p, H) {
 }
 
 // Retirement spend and pension at year t, converted to the work currency.
-const spendW = (p, t, E) => conv(E, p.rCur, p.wCur, p.fx) * Math.pow(1 + p.fxDrift / 100, t);
-const pensW = (p, t) => conv(p.pension, p.rCur, p.wCur, p.fx) * Math.pow(1 + p.fxDrift / 100, t);
+// Currency drift only exists between two currencies.
+const drift = (p, t) => (p.rCur === p.wCur ? 1 : Math.pow(1 + p.fxDrift / 100, t));
+const spendW = (p, t, E) => conv(E, p.rCur, p.wCur, p.fx) * drift(p, t);
+const pensW = (p, t) => conv(p.pension, p.rCur, p.wCur, p.fx) * drift(p, t);
 
 // Assets needed at the start of year t to retire then and spend E (retirement currency) until p.life.
 export function fiNeed(p, t, E = p.retExp, r = p.r) {
@@ -51,15 +53,20 @@ export function fiNeed(p, t, E = p.retExp, r = p.r) {
   let pv = 0;
   for (let k = 0; k < b; k++) pv += Ew / Math.pow(1 + r, k);
   if (b < H) pv += Math.max(Ew - Pw, 0) / swrFor(p, H - b) / Math.pow(1 + r, b);
-  return pv;
+  // A pension can only help: never ask for more than the same plan with no pension.
+  return Math.min(pv, Ew / swrFor(p, H));
 }
 
 export const savingsAt = (p, t, s0 = null) =>
   s0 != null ? s0 * Math.pow(1 + p.growth / 100, t) : p.income * Math.pow(1 + p.growth / 100, t) - p.expense;
 
-export function assetsAt(p, n, { r = p.r, s0 = null, A0 = p.assets } = {}) {
+// Assets cannot fall below zero. Pass floor: false only to value a stream of savings on its own.
+export function assetsAt(p, n, { r = p.r, s0 = null, A0 = p.assets, floor = true } = {}) {
   let A = A0;
-  for (let t = 0; t < n; t++) A = A * (1 + r) + savingsAt(p, t, s0);
+  for (let t = 0; t < n; t++) {
+    A = A * (1 + r) + savingsAt(p, t, s0);
+    if (floor && A < 0) A = 0;
+  }
   return A;
 }
 
@@ -68,7 +75,7 @@ export function fwdSolve(p, { r = p.r, s0 = null, E = p.retExp } = {}) {
   const maxT = p.life - p.age - 1;
   for (let t = 0; t <= maxT; t++) {
     if (A >= fiNeed(p, t, E, r)) return t;
-    A = A * (1 + r) + savingsAt(p, t, s0);
+    A = Math.max(A * (1 + r) + savingsAt(p, t, s0), 0);
   }
   return null;
 }
@@ -105,10 +112,9 @@ export function bwdSolve(p) {
   else reqR = bisect(fr, -0.10, 0.30);
 
   const An = assetsAt(p, n);
-  let maxE = 0;
-  if (An > 0) maxE = bisect(E => An - fiNeed(p, n, E), 0, conv(An, p.wCur, p.rCur, p.fx) + 1);
+  const maxE = bisect(E => An - fiNeed(p, n, E), 0, conv(An, p.wCur, p.rCur, p.fx) + p.pension + 1);
 
-  const futureSav = assetsAt(p, n, { A0: 0 });
+  const futureSav = assetsAt(p, n, { A0: 0, floor: false });
   const reqA0 = Math.max((need - futureSav) / Math.pow(1 + r, n), 0);
   return { n, need, s0, reqR, maxE, reqA0, An };
 }
@@ -131,7 +137,9 @@ export function monteCarlo(p, retireT, s0 = null, { paths = DEFAULT_PATHS, seed 
   const cols = Array.from({ length: Y + 1 }, () => new Float64Array(paths));
   const spend = [], sav = [];
   for (let t = 0; t <= Y; t++) {
-    spend.push(Math.max(spendW(p, t, p.retExp) - (p.age + t >= p.pAge ? pensW(p, t) : 0), 0));
+    // Drift stops at retirement, matching fiNeed: the need is fixed in the year the holiday starts.
+    const k = retireT == null ? t : Math.min(t, retireT);
+    spend.push(Math.max(spendW(p, k, p.retExp) - (p.age + t >= p.pAge ? pensW(p, k) : 0), 0));
     sav.push(savingsAt(p, t, s0));
   }
   let ok = 0;
