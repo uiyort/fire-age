@@ -158,6 +158,12 @@ test('the professional tiles have no Mondays', async ({ page }) => {
   await expect(page.locator('#tiles')).not.toContainText('周一');
 });
 
+test('the story of the chosen life sits right under its chart', async ({ page }) => {
+  await page.goto('/');
+  const next = await page.evaluate(() => document.querySelector('#life-section .chart-box').nextElementSibling.id);
+  expect(next).toBe('life-story');
+});
+
 test('the empty fifth life points at what really writes it', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#life-fifth-empty')).toContainText('年景');

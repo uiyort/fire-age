@@ -182,8 +182,9 @@ function teaching(param) {
 export function scenarioHtml({ index, answers, base, effect, params }) {
   const total = SCENARIOS.length;
   if (index >= total) {
-    const rows = SCENARIOS.filter(s => answers[s.id] !== undefined).map(s => `<li><span>${params[s.param].name}</span><b>${scenarioOptions(s, base)[answers[s.id]].label}</b></li>`).join('');
-    return `<p class="scn-done">这是你对未来年景的判断。</p><ul class="scn-summary">${rows}</ul><p class="fine">打开专业模式后，可以一键带入这些假设。</p><div class="goal-row"><button type="button" class="ghost" id="scn-restart">重新回答</button></div>`;
+    const rows = SCENARIOS.map((s, i) => (answers[s.id] === undefined ? ''
+      : `<li><button type="button" class="scn-goto" data-scn-goto="${i}"><span>${params[s.param].name}</span><b>${scenarioOptions(s, base)[answers[s.id]].label}</b></button></li>`)).join('');
+    return `<p class="scn-done">这是你对未来年景的判断，点一项可以改。</p><ul class="scn-summary">${rows}</ul><p class="fine">打开专业模式后，可以一键带入这些假设。</p>`;
   }
   const scenario = SCENARIOS[index];
   const chosen = answers[scenario.id];
@@ -334,22 +335,20 @@ export function livesHtml(lives, stories, selected, { p, dispCur, fifth = null }
   return rows + last;
 }
 
-export function fifthCompareHtml(base, fifth, labels, { p, dispCur }) {
-  const D = v => money(toDisplay(v, p, dispCur), dispCur);
-  const plan = story => `${story.retireAge === null ? '还没放假' : `${story.retireAge} 岁放假`}，${endingText(story, D)}`;
-  return `<p class="fifth-compare">和「${lifeName(base)}」同样的年景。原计划：${plan(base)}。你写的：${plan(fifth)}。</p>`;
+export function fifthCompareHtml(base, fifth) {
+  return `<p class="fifth-compare">虚线是原来的「${lifeName(base)}」。${fifthSentence(base, fifth)}。</p>`;
 }
 
+// Years after the money runs out are not a holiday, so the change is counted in holiday years that still have money.
 export const fifthSentence = (base, fifth) => {
-  const end = s => (s.outcome === 'ruined' ? `${s.ruinAge} 岁花完` : s.outcome === 'working' ? '还在攒' : `撑到 ${s.endAge} 岁`);
-  const parts = [];
-  if (base.retireAge !== null && fifth.retireAge !== null && base.retireAge !== fifth.retireAge) {
-    const diff = base.retireAge - fifth.retireAge;
-    parts.push(`放假${diff > 0 ? '提前' : '推后'} ${Math.abs(diff)} 年`);
-  }
-  const spaced = text => (/^[0-9]/.test(text) ? ` ${text}` : text);
-  if (end(base) !== end(fifth)) parts.push(`从${spaced(end(base))}变成${spaced(end(fifth))}`);
-  return parts.length ? `同样的年景，${parts.join('，')}` : '同样的年景，结局没有变，换个选择再试试';
+  if (fifth.outcome === 'working') return `同样的年景，到 ${fifth.endAge} 岁也放不了假`;
+  const end = fifth.outcome === 'ruined' ? `${fifth.ruinAge} 岁花完` : `钱撑到 ${fifth.endAge} 岁`;
+  if (base.outcome === 'working') return `同样的年景，原来放不了假，现在 ${fifth.retireAge} 岁放假，${end}`;
+  const before = holidayYearsOf(base), after = holidayYearsOf(fifth), diff = base.retireAge - fifth.retireAge;
+  if (!diff && before === after && base.outcome === fifth.outcome) return '同样的年景，结局没有变，换个选择再试试';
+  const years = before === after ? `有钱花的假期还是 ${after} 年` : `有钱花的假期从 ${before} 年变成 ${after} 年`;
+  const when = diff ? [`${diff > 0 ? '早' : '晚'} ${Math.abs(diff)} 年放假`] : [];
+  return `同样的年景，${years}：${[...when, end].join('，')}`;
 };
 
 export function labChangesHtml(labels) {

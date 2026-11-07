@@ -85,11 +85,11 @@ export function drawChart(svg, tip, { age, bands, target, retireT, year0, money 
 
 const STATE_COLOUR = { work: 'var(--ink-3)', holiday: 'var(--good)', broke: 'var(--bad)' };
 
-// One life drawn in the same colours as its ribbon, which sits on the age axis below it.
+// One life drawn in the same colours as its ribbon, with a dot after each bad year.
 // Other lives stay grey; the life being compared against is dashed. Values are in the display currency.
 export function drawLivesChart(svg, tip, { age, lives, money }) {
   const W = svg.clientWidth || 340, H = svg.clientHeight || 300;
-  const m = { l: 48, r: 10, t: 40, b: 46 };
+  const m = { l: 48, r: 10, t: 40, b: 24 };
   const iw = W - m.l - m.r, ih = H - m.t - m.b;
   const selected = lives.find(l => l.kind === 'selected');
   const Y = Math.max(...lives.map(l => l.values.length)) - 1;
@@ -100,7 +100,6 @@ export function drawLivesChart(svg, tip, { age, lives, money }) {
   const x = t => m.l + iw * t / Y;
   const y = v => m.t + ih * (1 - Math.min(v, ymax) / ymax);
   const line = values => values.map((v, t) => `${t ? 'L' : 'M'}${x(t).toFixed(1)},${y(v).toFixed(1)}`).join('');
-  const axisTop = m.t + ih + 5, axisH = 12;
 
   let g = `<defs><clipPath id="plot-lives"><rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}"/></clipPath></defs>`;
   // Soft bands behind the plot, so the phases read before the line does.
@@ -122,20 +121,19 @@ export function drawLivesChart(svg, tip, { age, lives, money }) {
     g += `<line class="seg-${cell.state}" x1="${x(t).toFixed(1)}" y1="${y(selected.values[t]).toFixed(1)}" x2="${x(t + 1).toFixed(1)}" y2="${y(selected.values[t + 1]).toFixed(1)}" stroke="${STATE_COLOUR[cell.state]}" stroke-width="2.5" stroke-linecap="round"/>`;
   });
   g += '</g>';
-  // The ribbon is the axis: same years, same colours, ages below.
+  // A dot where a year fell 15% or more, at the value it fell to.
   selected.cells.forEach((cell, t) => {
-    const width = Math.max(x(t + 1) - x(t) - 1, 1).toFixed(1);
-    g += `<rect class="axis-cell ${cell.state}" x="${x(t).toFixed(1)}" y="${axisTop}" width="${width}" height="${axisH}" fill="${STATE_COLOUR[cell.state]}"/>`;
-    if (cell.bad) g += `<rect class="axis-bad" x="${x(t).toFixed(1)}" y="${axisTop - 4}" width="${width}" height="3" fill="var(--ink)"/>`;
+    if (!cell.bad || t + 1 >= selected.values.length) return;
+    g += `<circle class="bad-dot" cx="${x(t + 1).toFixed(1)}" cy="${y(selected.values[t + 1]).toFixed(1)}" r="4" fill="var(--ink)" stroke="var(--surface)" stroke-width="1.5"/>`;
   });
   const ageStep = Y > 50 ? 10 : 5;
   for (let a = Math.ceil(age / ageStep) * ageStep; a <= age + Y; a += ageStep) {
-    g += `<text x="${x(a - age)}" y="${H - 10}" text-anchor="middle">${a}岁</text>`;
+    g += `<text x="${x(a - age)}" y="${H - 6}" text-anchor="middle">${a}岁</text>`;
   }
   // The holiday year divides the life in two.
   if (selected.retireT !== null && selected.retireT !== undefined) {
     const rx = x(selected.retireT), workYears = selected.retireT, restYears = selected.values.length - 1 - selected.retireT;
-    g += `<line id="retire-line" x1="${rx}" x2="${rx}" y1="${m.t - 26}" y2="${axisTop + axisH}" stroke="var(--ink)" stroke-width="2"/>`;
+    g += `<line id="retire-line" x1="${rx}" x2="${rx}" y1="${m.t - 26}" y2="${m.t + ih}" stroke="var(--ink)" stroke-width="2"/>`;
     if (rx > 72) g += `<text x="${rx - 8}" y="${m.t - 16}" text-anchor="end" class="zone-label">上班 ${workYears} 年</text>`;
     if (W - m.r - rx > 116) g += `<text x="${rx + 8}" y="${m.t - 16}" class="zone-label on">${age + selected.retireT} 岁起放假 ${restYears} 年</text>`;
   } else {

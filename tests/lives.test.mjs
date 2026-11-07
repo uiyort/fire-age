@@ -4,7 +4,7 @@ import DATA from '../site/js/data-latest.js';
 import { bwdSolve, fiNeed, fwdSolve, lifePath } from '../site/js/engine.js';
 import { defaultState, setField, toParams } from '../site/js/state.js';
 import { LIFE_CHOICES, labPlan } from '../site/js/levers.js';
-import { fifthSentence, ribbonSvg } from '../site/js/views.js';
+import { fifthCompareHtml, fifthSentence, ribbonSvg } from '../site/js/views.js';
 import { hardestIndex, heroModel, holidayYearsOf, lifeName, lifeRibbon, lifeStory, peopleOf } from '../site/js/holiday.js';
 
 const person = (fields = {}) => {
@@ -149,14 +149,24 @@ test('the fifth life walks the same years as the life it rewrites', () => {
   assert.equal(original.years[10].ret, rewritten.years[10].ret);
 });
 
-test('the fifth life sentence says what actually changed', () => {
+test('the fifth life sentence counts the holiday that has money, not the years after it runs dry', () => {
   const base = story({ outcome: 'ruined', ruinAge: 71 });
-  assert.equal(fifthSentence(base, story({ outcome: 'ruined', ruinAge: 71, retireAge: 41 })), '同样的年景，放假提前 2 年');
-  assert.equal(fifthSentence(base, story({ outcome: 'lasted', retireAge: 41 })), '同样的年景，放假提前 2 年，从 71 岁花完变成撑到 95 岁');
-  assert.equal(fifthSentence(base, story({ outcome: 'lasted', retireAge: 45 })), '同样的年景，放假推后 2 年，从 71 岁花完变成撑到 95 岁');
-  assert.equal(fifthSentence(base, story({ outcome: 'lasted' })), '同样的年景，从 71 岁花完变成撑到 95 岁');
+  assert.equal(fifthSentence(base, story({ outcome: 'ruined', ruinAge: 71, retireAge: 41 })), '同样的年景，有钱花的假期从 28 年变成 30 年：早 2 年放假，71 岁花完');
+  assert.equal(fifthSentence(base, story({ outcome: 'lasted', retireAge: 41 })), '同样的年景，有钱花的假期从 28 年变成 54 年：早 2 年放假，钱撑到 95 岁');
+  assert.equal(fifthSentence(base, story({ outcome: 'lasted', retireAge: 45 })), '同样的年景，有钱花的假期从 28 年变成 50 年：晚 2 年放假，钱撑到 95 岁');
+  assert.equal(fifthSentence(base, story({ outcome: 'lasted' })), '同样的年景，有钱花的假期从 28 年变成 52 年：钱撑到 95 岁');
   assert.equal(fifthSentence(base, base), '同样的年景，结局没有变，换个选择再试试');
-  assert.equal(fifthSentence(story({ outcome: 'working', retireAge: null }), story({ outcome: 'lasted' })), '同样的年景，从还在攒变成撑到 95 岁');
+});
+
+test('an earlier holiday that runs dry just as early is not sold as a gain', () => {
+  const s = fifthSentence(story({ outcome: 'ruined', retireAge: 49, ruinAge: 88 }), story({ outcome: 'ruined', retireAge: 46, ruinAge: 85 }));
+  assert.equal(s, '同样的年景，有钱花的假期还是 39 年：早 3 年放假，85 岁花完');
+  assert.ok(!/变成 \d+ 岁花完/.test(s));
+});
+
+test('the fifth life sentence copes with a life that never takes the holiday', () => {
+  assert.equal(fifthSentence(story({ outcome: 'working', retireAge: null }), story({ outcome: 'lasted' })), '同样的年景，原来放不了假，现在 43 岁放假，钱撑到 95 岁');
+  assert.equal(fifthSentence(story({ outcome: 'lasted' }), story({ outcome: 'working', retireAge: null })), '同样的年景，到 95 岁也放不了假');
 });
 
 test('ribbons share one age scale even when a plan runs longer', () => {
@@ -235,7 +245,14 @@ test('the sensitivity table never claims age has no effect, and keeps the stock 
   assert.match(row('eq'), /波动/);
 });
 
-test('the written life sentence spaces a number after the change word', () => {
+test('a written life that runs dry sooner says so plainly', () => {
   const base = story({ outcome: 'ruined', ruinAge: 71 });
-  assert.equal(fifthSentence(base, story({ outcome: 'ruined', ruinAge: 68 })), '同样的年景，从 71 岁花完变成 68 岁花完');
+  assert.equal(fifthSentence(base, story({ outcome: 'ruined', ruinAge: 68 })), '同样的年景，有钱花的假期从 28 年变成 25 年：68 岁花完');
+});
+
+test('the written life is compared against the dashed life it rewrites', () => {
+  const html = fifthCompareHtml(story({ outcome: 'ruined', ruinAge: 71 }), story({ outcome: 'lasted' }));
+  assert.match(html, /虚线/);
+  assert.ok(html.includes(lifeName(story({ outcome: 'ruined', ruinAge: 71 }))));
+  assert.ok(html.includes('有钱花的假期从 28 年变成 52 年'));
 });

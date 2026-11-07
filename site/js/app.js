@@ -331,7 +331,7 @@ function renderLives() {
   $('life-changes').innerHTML = labChangesHtml(labLabels());
   $('life-summary').textContent = livesSummary(stories, mc);
   const story = selectedFifth ? fifth.story : stories[lifeIndex];
-  const compare = fifth ? fifthCompareHtml(fifth.base, fifth.story, [], { p, dispCur: cur }) : '';
+  const compare = fifth ? fifthCompareHtml(fifth.base, fifth.story) : '';
   $('life-story').innerHTML = `${selectedFifth ? compare : ''}${storyHtml(story, { p: selectedFifth ? fifth.plan : p, dispCur: cur })}`;
   $('life-seed').textContent = `随机种子 ${lifeSeed} 到 ${lifeSeed + lives.length - 1}，同样的输入可以复现这几条人生。收益是模型抽样，不是历史重演。`;
   const scale = v => toDisplay(v, p, cur);
@@ -590,10 +590,10 @@ function onClick(ev) {
     hideCard();
     return;
   }
-  if (ev.target.id === 'scn-restart') {
-    clearLab();
-    hideCard();
-    renderLives();
+  const scnGoto = ev.target.closest('[data-scn-goto]');
+  if (scnGoto) {
+    scnIndex = Number(scnGoto.dataset.scnGoto);
+    renderScenario();
     return;
   }
   if (ev.target.id === 'lab-clear') {

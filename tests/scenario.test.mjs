@@ -99,10 +99,11 @@ test('a question shows its options, and after an answer teaches the parameter wi
   assert.match(after, /放假推后 2 年/);
 });
 
-test('the last screen lists what was answered and offers a redo', () => {
+test('the last screen lists what was answered, and each answer opens its question again', () => {
   const answers = Object.fromEntries(SCENARIOS.map(s => [s.id, 0]));
   const html = scenarioHtml({ index: SCENARIOS.length, answers, base, effect: '', params });
-  assert.match(html, /scn-restart/);
+  assert.ok(!html.includes('scn-restart'), 'clearing everything lives in one place, next to the lives');
+  assert.equal((html.match(/data-scn-goto=/g) ?? []).length, SCENARIOS.length);
   for (const s of SCENARIOS) assert.ok(html.includes(scenarioOptions(s, base)[0].label), s.id);
 });
 

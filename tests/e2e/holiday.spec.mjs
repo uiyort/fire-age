@@ -218,17 +218,29 @@ test('answers light up their parameters and survive a reload', async ({ page }) 
   await expect(page.locator('#lives .life.fifth')).toHaveCount(1);
 });
 
-test('the questions finish with a summary and can be redone', async ({ page }) => {
+test('the questions finish with a summary, one answer can be changed, and one button clears them all', async ({ page }) => {
   await page.goto('/');
   const box = page.locator('#scenario');
   while (await box.locator('[data-scn]').count()) {
     await answer(page);
     await box.locator('#scn-next').click();
   }
-  await expect(box.locator('#scn-restart')).toBeVisible();
-  await box.locator('#scn-restart').click();
+  await expect(box.locator('#scn-restart')).toHaveCount(0);
+  await box.locator('[data-scn-goto]').nth(1).click();
+  await expect(box).toContainText('第 2 /');
+  await expect(box.locator('[data-scn]').first()).toHaveAttribute('aria-pressed', 'true');
+  await page.click('#lab-clear');
   await expect(box).toContainText('第 1 /');
   await expect(page.locator('#lives .life.fifth')).toHaveCount(0);
+});
+
+test('the questions stay the same when the years are redrawn, and the written life follows the new draw', async ({ page }) => {
+  await page.goto('/');
+  await answer(page);
+  await page.click('#life-draw');
+  await expect(page.locator('#lives .life.fifth')).toHaveCount(1);
+  await expect(page.locator('#scenario [data-scn]').first()).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#scenario-sub')).toContainText('换一批年景');
 });
 
 test('answers can be carried into the professional view, by choice', async ({ page }) => {
@@ -253,13 +265,14 @@ test('the bad-year cut is a professional assumption', async ({ page }) => {
   await expect(page.locator('#tiles')).not.toHaveText(before);
 });
 
-test('the chart shares the ribbon colours, the age axis and a line at the holiday', async ({ page }) => {
+test('the chart is coloured by year, marks bad years on the line, and has a line at the holiday', async ({ page }) => {
   await page.goto('/');
   const chart = page.locator('#lives-chart');
   await expect(chart.locator('.seg-work').first()).toBeAttached();
   await expect(chart.locator('.seg-holiday').first()).toBeAttached();
-  const cells = await chart.locator('.axis-cell').count();
-  expect(cells).toBe(65);
+  await expect(chart.locator('.axis-cell')).toHaveCount(0);
+  await expect(chart.locator('.bad-dot').first()).toBeAttached();
+  await expect(chart).toContainText('40岁');
   await expect(chart.locator('#retire-line')).toBeAttached();
   await expect(chart).toContainText('上班');
   await expect(chart).toContainText('放假');
@@ -267,12 +280,11 @@ test('the chart shares the ribbon colours, the age axis and a line at the holida
   for (const text of ['上班', '放假有钱花', '钱花完', '大跌']) await expect(legend).toContainText(text);
 });
 
-test('a life that runs out shows it on the line and on the axis', async ({ page }) => {
+test('a life that runs out shows it on the line', async ({ page }) => {
   await page.goto('/');
   await page.locator('#lives .life').nth(2).click();
   const chart = page.locator('#lives-chart');
   await expect(chart.locator('.seg-broke').first()).toBeAttached();
-  await expect(chart.locator('.axis-cell.broke').first()).toBeAttached();
 });
 
 test('the written life is drawn against the life it rewrites', async ({ page }) => {
