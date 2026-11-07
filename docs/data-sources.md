@@ -7,6 +7,7 @@
 | Exchange rates | ECB euro reference rates, crossed into units per USD | Free reuse with attribution; changes must be stated |
 | Price level | World Bank `PA.NUS.PRVT.PP` ÷ current market rate | CC BY 4.0 |
 | CPI | BIS `WS_LONG_CPI`, year on year | Usable in products with no extra charge to users; cite BIS |
+| China 10y | OECD financial market statistics, long-term interest rate `CHN.M.IRLT`, monthly, one to two months behind | CC BY 4.0, cite the OECD |
 | US 10y | US Treasury daily par yield curve | US government work, public domain |
 | Germany 10y | ECB `IRS` dataset | As ECB above |
 | UK 10y | Bank of England `IUDMNPY` | Open Government Licence |
@@ -18,11 +19,10 @@
 
 | Field | Value | Reason |
 |---|---|---|
-| China 10y | 1.6% | ChinaMoney's terms forbid republication without written authorisation |
 | Hong Kong 10y | 3.7% | HKMA's 10-year benchmark fields are currently empty and no other republishable automatic source was found |
 | Inflation target, retirement age, drag | per country | This tool's assumptions, listed in `data/assumptions.json` |
 
-Fixed assumptions do not update automatically. If the China figure drifts far from the market, change it in `data/assumptions.json`, or obtain authorisation from China Foreign Exchange Trade System and add it as an automatic source.
+Fixed assumptions do not update automatically. The China figure used to be one of them, because ChinaMoney's terms forbid republication; it now comes from the OECD's monthly series, which is licensed CC BY 4.0. The OECD does not publish a Hong Kong series.
 
 ## Sources rejected
 

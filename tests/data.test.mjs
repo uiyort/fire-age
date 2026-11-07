@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  parseEcbFx, crossToUsd, parseBisCpi, parseTreasury10y, parseEcbIrs, parseBoe, parseMofJp, parseRba, parseBoc,
+  parseEcbFx, crossToUsd, parseBisCpi, parseTreasury10y, parseEcbIrs, parseBoe, parseMofJp, parseRba, parseBoc, parseOecd, BOND_SOURCES,
   parseWorldBank, priceLevel, mergeField,
 } from '../scripts/update-data.mjs';
 import DATA from '../site/js/data-latest.js';
@@ -30,6 +30,22 @@ test('each bond source parses to the latest value and date', () => {
   assert.deepEqual(parseMofJp(fixture('mof-jp.csv')), { value: 2.806, observedAt: '2026-11-05' });
   assert.deepEqual(parseRba(fixture('rba.csv')), { value: 5.082, observedAt: '2026-11-04' });
   assert.deepEqual(parseBoc(fixture('boc.csv')), { value: 3.67, observedAt: '2026-11-05' });
+  assert.deepEqual(parseOecd(fixture('oecd-cn.csv')), { value: 1.68, observedAt: '2026-09' });
+});
+
+test('the China 10-year yield comes from the OECD, a source that allows reuse, and updates itself', async () => {
+  const { readFileSync: read } = await import('node:fs');
+  const assumptions = JSON.parse(read('data/assumptions.json', 'utf8'));
+  assert.equal(assumptions.countries.CN.y10Assumed, undefined);
+  assert.equal(BOND_SOURCES.CN.sourceId, 'oecd');
+  assert.match(BOND_SOURCES.CN.url(), /sdmx\.oecd\.org.*CHN\.M\.IRLT/);
+  const oecd = assumptions.sources.find(s => s.id === 'oecd');
+  assert.match(oecd.license, /CC BY 4\.0/);
+});
+
+test('the OECD parser ignores rows with no value', () => {
+  const csv = 'REF_AREA,TIME_PERIOD,OBS_VALUE\nCHN,2026-10,\nCHN,2026-09,1.68\nCHN,2026-08,1.69';
+  assert.deepEqual(parseOecd(csv), { value: 1.68, observedAt: '2026-09' });
 });
 
 test('World Bank parsing skips empty values', () => {

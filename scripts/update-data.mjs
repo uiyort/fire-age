@@ -78,6 +78,14 @@ export function parseBoc(csv) {
 
 const ISO3_TO_2 = { CHN: 'CN', USA: 'US', DEU: 'DE', GBR: 'GB', JPN: 'JP', HKG: 'HK', SGP: 'SG', MYS: 'MY', THA: 'TH', AUS: 'AU', CAN: 'CA' };
 
+// OECD SDMX CSV: the latest month that has a value.
+export function parseOecd(csv) {
+  const [header, ...rows] = lines(csv).map(l => l.split(','));
+  const iTime = header.indexOf('TIME_PERIOD'), iValue = header.indexOf('OBS_VALUE');
+  const latest = rows.filter(r => num(r[iValue]) !== null).sort((a, b) => (a[iTime] < b[iTime] ? 1 : -1))[0];
+  return { value: num(latest[iValue]), observedAt: latest[iTime] };
+}
+
 export function parseWorldBank(text) {
   const out = {};
   for (const row of JSON.parse(text)[1] ?? []) {
@@ -125,7 +133,11 @@ export function assertFresh(fields, now) {
   if (stale.length) throw new Error(`stale for over ${MAX_CARRIED_DAYS} days: ${stale.map(([name]) => name).join(', ')}`);
 }
 
-const BOND_SOURCES = {
+export const BOND_SOURCES = {
+  CN: { sourceId: 'oecd', parse: parseOecd, url: () => {
+    const from = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 7);
+    return `https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_FINMARK,4.0/CHN.M.IRLT.PA.....?startPeriod=${from}&format=csvfile`;
+  } },
   US: { sourceId: 'ustreasury', parse: parseTreasury10y, url: y => `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/${y}/all?type=daily_treasury_yield_curve&field_tdr_date_value=${y}&page&_format=csv` },
   DE: { sourceId: 'ecb', parse: parseEcbIrs, url: () => 'https://data-api.ecb.europa.eu/service/data/IRS/M.DE.L.L40.CI.0000.EUR.N.Z?lastNObservations=1&format=csvdata' },
   UK: { sourceId: 'boe', parse: parseBoe, url: () => {

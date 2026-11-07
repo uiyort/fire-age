@@ -1,9 +1,7 @@
 {
   "countries": {
     "CN": { "name": "中国大陆", "cur": "CNY", "roles": ["work", "retire"], "wb": "CN", "bis": "CN", "cpiNote": "",
-      "target": 2.0, "pAge": 63, "drag": 0.2,
-      "y10Assumed": { "value": 1.6, "observedAt": "2026-11",
-        "note": "中国货币网的条款不允许未经授权转载其数据，所以本工具不抓取、不转载。1.6% 是本工具按 2026 年 11 月公开市场水平设定的假设，不会自动更新，可在专业模式修改。" } },
+      "target": 2.0, "pAge": 63, "drag": 0.2 },
     "US": { "name": "美国", "cur": "USD", "roles": ["work", "retire"], "wb": "US", "bis": "US", "target": 2.0, "pAge": 67, "drag": 0.3 },
     "DE": { "name": "德国（欧元区）", "cur": "EUR", "roles": ["work", "retire"], "wb": "DE", "bis": "XM", "target": 2.0, "pAge": 67, "drag": 0.6 },
     "UK": { "name": "英国", "cur": "GBP", "roles": ["work", "retire"], "wb": "GB", "bis": "GB", "target": 2.0, "pAge": 67, "drag": 0.2 },
@@ -47,6 +45,9 @@
     { "id": "boc", "name": "加拿大央行（Bank of Canada）Valet API", "url": "https://www.bankofcanada.ca/valet/docs",
       "license": "可自由使用和分发，须注明加拿大央行为来源，不得暗示其背书。",
       "termsUrl": "https://www.bankofcanada.ca/terms/" },
+    { "id": "oecd", "name": "经合组织（OECD）Financial market statistics: Long-term interest rates (IRLT), China, monthly", "url": "https://data-explorer.oecd.org/",
+      "license": "CC BY 4.0，须注明 OECD 为来源。OECD 未对本工具背书。月度数据，通常晚 1 到 2 个月。",
+      "termsUrl": "https://www.oecd.org/en/about/oecd-open-by-default-policy.html" },
     { "id": "assumption", "name": "本工具的假设", "url": "method.html",
       "license": "AGPL-3.0", "termsUrl": "method.html" }
   ]

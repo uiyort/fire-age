@@ -9,8 +9,11 @@ test('sources page lists every source with its licence', async ({ page }) => {
 
 test('sources page marks assumed values and states their basis', async ({ page }) => {
   await page.goto('/sources.html');
-  await expect(page.locator('[data-field="CN.y10"]')).toContainText('假设');
-  await expect(page.locator('[data-field="CN.y10"]')).toContainText('中国货币网');
+  await expect(page.locator('[data-field="HK.y10"]')).toContainText('假设');
+  await expect(page.locator('[data-field="HK.y10"]')).toContainText('金管局');
+  await expect(page.locator('[data-field="CN.y10"]')).not.toContainText('假设');
+  await expect(page.locator('[data-field="CN.y10"]')).toContainText('官方');
+  await expect(page.locator('[data-source="oecd"]')).toContainText('CC BY 4.0');
 });
 
 test('method page publishes the formulas and the disclaimer', async ({ page }) => {
