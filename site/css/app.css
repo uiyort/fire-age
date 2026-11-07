@@ -226,16 +226,61 @@ h3 { font-family: var(--f-display); font-weight: 900; font-size: 16px; margin: 1
 .place.current .place-bar i { background: var(--s1); }
 .place-note { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
 
-.lives { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
-.lives:empty { display: none; }
-@media (min-width: 700px) { .lives { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.life { font: inherit; text-align: left; display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); cursor: pointer; }
-.life[aria-pressed="true"] { border: 2px solid var(--accent); padding: 7px 9px; }
-.spark { width: 100%; height: 44px; display: block; margin-bottom: 4px; overflow: visible; }
-.spark polyline { fill: none; stroke: var(--s1); stroke-width: 2px; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
-.spark-mark { stroke: var(--ink-3); stroke-width: 1px; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
-.life-head { font-weight: 700; font-size: 14px; }
-.life-sub { font-size: 12px; color: var(--ink-2); overflow-wrap: anywhere; }
+.life-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); margin: 10px 0 2px; }
+.life-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.life-legend .sw { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+.sw.r-work { background: color-mix(in oklab, var(--ink-3) 45%, var(--surface)); }
+.sw.r-holiday { background: var(--good); }
+.sw.r-broke { background: var(--bad); }
+.sw.r-bad { background: var(--ink); height: 3px; }
+.lives { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.life { font: inherit; text-align: left; display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); cursor: pointer; }
+.life[aria-pressed="true"] { border: 2px solid var(--s1); padding: 7px 9px; }
+.life.fifth { background: color-mix(in oklab, var(--s2) 8%, var(--bg)); }
+.life.fifth[aria-pressed="true"] { border-color: var(--s2); }
+.life-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 10px; }
+.life-name { font-family: var(--f-display); font-weight: 900; font-size: 17px; }
+.life-end { font-size: 13px; color: var(--ink-2); overflow-wrap: anywhere; }
+.life-sub { font-size: 12px; color: var(--ink-3); }
+.life-empty { padding: 10px 12px; border: 1px dashed var(--s2); border-radius: 8px; font-size: 13px; color: var(--ink-2); }
+.life-empty b { font-family: var(--f-display); font-size: 17px; color: var(--ink); margin-right: 8px; }
+.ribbon { width: 100%; height: 22px; display: block; }
+.ribbon .r-work { fill: color-mix(in oklab, var(--ink-3) 45%, var(--surface)); }
+.line-fifth { background: var(--s2); height: 3px; }
+.line-other { background: var(--ink-3); opacity: .5; height: 2px; }
+.dot-retire { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-2); }
+.ribbon .r-holiday { fill: var(--good); }
+.ribbon .r-broke { fill: var(--bad); }
+.ribbon .r-bad { fill: var(--ink); }
+.life-changes { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; margin-top: 8px; font-size: 13px; color: var(--ink-2); }
+#lives-chart { width: 100%; height: 240px; display: block; touch-action: pan-y; margin-top: 8px; }
+#lives-chart text { fill: var(--ink-2); font-family: var(--f-mono); font-size: 11px; }
+.fifth-compare { margin: 10px 0 0; padding: 8px 12px; border-radius: 8px; background: color-mix(in oklab, var(--s2) 10%, var(--bg)); font-size: 14px; font-weight: 700; }
+.quiz-written { margin: 0; font-size: 12px; color: var(--ink-3); }
+
+.hero { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
+.hero-big { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-family: var(--f-display); font-weight: 900; font-size: clamp(20px, 5vw, 26px); }
+.hero-big b { font-size: 1.6em; }
+.hero-work b { color: var(--ink-2); }
+.hero-rest b { color: var(--good); }
+.hero-arrow { color: var(--ink-3); }
+.lifebar { display: flex; height: 22px; border-radius: 6px; overflow: hidden; gap: 2px; margin-top: 4px; background: var(--surface-2); }
+.lifebar i { display: block; height: 100%; }
+.lifebar .work { background: var(--ink-3); }
+.lifebar .rest { background: var(--good); }
+.lifebar-ticks { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-2); gap: 8px; }
+.hero-mondays { margin: 6px 0 0; font-size: 14px; }
+.hero-mondays b { font-family: var(--f-mono); font-weight: 700; font-size: 20px; }
+.people { margin-top: 8px; }
+.people p { margin: 2px 0 0; font-size: 14px; }
+.people-row { display: flex; gap: 3px; max-width: 320px; }
+.person { flex: 1 1 0; min-width: 0; height: 34px; fill: var(--surface-2); stroke: var(--ink-3); stroke-width: 1; }
+.person.on { fill: var(--accent); stroke: var(--accent); }
+.fund { margin-top: 8px; }
+.fund p { margin: 2px 0 0; font-size: 13px; color: var(--ink-2); }
+.fund p b { color: var(--ink); }
+.fund-bar { height: 10px; background: var(--surface-2); border-radius: 5px; overflow: hidden; }
+.fund-bar i { display: block; height: 100%; background: var(--accent); border-radius: 5px; }
 .story-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .story-list li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; font-size: 14px; }
 .story-list b { font-family: var(--f-mono); font-weight: 500; color: var(--accent); white-space: nowrap; }

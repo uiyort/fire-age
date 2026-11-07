@@ -1,8 +1,8 @@
 // Turns model results into page text and tables. Strings only, no DOM access.
 import { coastNeed, conv, fiNeed, fwdSolve, swrFor, bwdSolve, savingsAt, savingsRate, buildParams } from './engine.js';
-import { AXES, GROUPS, TYPES, mondaysIn, workdaysIn } from './holiday.js';
+import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn, workdaysIn } from './holiday.js';
 import { quizScore, quizTitle } from './quiz.js';
-import { tryParam } from './levers.js';
+import { LIFE_CHOICES, tryParam } from './levers.js';
 
 const moneyFormats = {};
 export function money(v, cur) {
@@ -123,7 +123,7 @@ export function goalHtml(goal, cmp) {
   if (delta !== null && delta < -0.05) change = `和定目标时相比，放假推后了 ${yearsText(-delta)}，再调整一下。`;
   const state = cmp.achieved ? '<span class="pill good">✓ 已达成</span>' : '<span class="pill warn">… 进行中</span>';
   return `<h2>我的小目标</h2>
-    <div class="goal-row"><b>${goal.label}</b>${state}${cmp.achieved ? '<button type="button" class="ghost" id="goal-card">生成达成卡</button>' : ''}<button type="button" class="ghost" id="goal-clear">清除</button></div>
+    <div class="goal-row"><b>${goal.label}</b>${state}<button type="button" class="ghost" id="goal-clear">清除</button></div>
     <p class="sub">${change}</p>`;
 }
 
@@ -140,8 +140,9 @@ const tryValueText = (value, unit, p) => {
   return unit ? `${value} ${unit}` : String(value);
 };
 
-export function tryHtml(id, range) {
-  return `<div class="try"><label class="try-lab">拖一拖试试 <input type="range" data-try="${id}" min="${range.min}" max="${range.max}" step="${range.step}" value="${range.value}"></label><output>拖动滑杆，只是试算，不改你的计划。</output></div>`;
+export function tryHtml(id, range, current = range.value) {
+  const hint = LIFE_CHOICES.includes(id) ? '拖动后写入第五条人生，不改你的计划。' : '这一项不由你决定，只是试算。';
+  return `<div class="try"><label class="try-lab">拖一拖试试 <input type="range" data-try="${id}" min="${range.min}" max="${range.max}" step="${range.step}" value="${current}"></label><output>${hint}</output></div>`;
 }
 
 export function trySentence(p, id, value, range) {
@@ -162,7 +163,7 @@ export function quizHtml(rounds, index, answers) {
   if (index >= rounds.length) {
     const score = quizScore(rounds, answers);
     return `<div class="quiz-done"><div class="quiz-score">${score}/${rounds.length}</div><p>猜对 ${score} 题，你的称号是<b>${quizTitle(score, rounds.length)}</b>。</p>
-      <div class="goal-row"><button type="button" class="ghost" id="quiz-card">生成成绩卡片</button><button type="button" class="ghost" id="quiz-restart">再玩一次</button></div></div>`;
+      <div class="goal-row"><button type="button" class="ghost" id="quiz-restart">再玩一次</button></div></div>`;
   }
   const round = rounds[index], choice = answers[index];
   const head = `<p class="quiz-count">第 ${index + 1} / ${rounds.length} 题</p><p class="quiz-q">对你来说，哪一个对放假年龄的影响更大？先猜再看。</p>`;
@@ -177,7 +178,7 @@ export function quizHtml(rounds, index, answers) {
   };
   const verdict = round.answer === 'either' ? '差不多，都算对。' : right ? '猜对了。' : '这次猜错了。';
   const last = index === rounds.length - 1;
-  return `${head}<div class="quiz-reveal"><p class="quiz-verdict">${verdict}</p>${row('a')}${row('b')}<p class="quiz-insight">${round.insight}</p>
+  return `${head}<div class="quiz-reveal"><p class="quiz-verdict">${verdict}</p>${row('a')}${row('b')}<p class="quiz-insight">${round.insight}</p><p class="quiz-written">你选的这一项已写进第五条人生。</p>
     <button type="button" class="primary" id="quiz-next">${last ? '看成绩' : '下一题'}</button></div>`;
 }
 
@@ -273,33 +274,86 @@ export function placesHtml(rows) {
   }).join('');
 }
 
-const signedPct = v => {
+export const signedPct = v => {
   const whole = Math.round(v * 100);
   return whole === 0 ? '0%' : `${whole > 0 ? '+' : '−'}${Math.abs(whole)}%`;
 };
 
-function sparkline(path, maxAssets) {
-  const W = 120, H = 44, last = path.years.length - 1;
-  const x = i => (last ? i / last * W : 0);
-  const y = v => H - 2 - (maxAssets > 0 ? Math.min(v / maxAssets, 1) : 0) * (H - 4);
-  const points = path.years.map((d, i) => `${x(i).toFixed(1)},${y(d.assets).toFixed(1)}`).join(' ');
-  const marker = path.retireT === null ? '' : `<line class="spark-mark" x1="${x(path.retireT).toFixed(1)}" x2="${x(path.retireT).toFixed(1)}" y1="0" y2="${H}"/>`;
-  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${marker}<polyline points="${points}"/></svg>`;
+// Every ribbon uses the same scale, so a year sits at the same place in each life.
+export function ribbonSvg(path, maxCells) {
+  const cells = lifeRibbon(path);
+  const rects = cells.map((c, i) => `<rect class="r-${c.state}" x="${i * 10}" y="4" width="9" height="16"/>${c.bad ? `<rect class="r-bad" x="${i * 10}" y="0" width="9" height="3"/>` : ''}`).join('');
+  return `<svg class="ribbon" viewBox="0 0 ${maxCells * 10} 20" preserveAspectRatio="none" aria-hidden="true">${rects}</svg>`;
 }
 
 const endingText = (story, D) => {
-  if (story.outcome === 'working') return ['还在攒', `到 ${story.endAge} 岁有 ${D(story.endAssets)}`];
-  if (story.outcome === 'ruined') return [`${story.ruinAge} 岁花完`, `${story.retireAge} 岁放假`];
-  return [`撑到 ${story.endAge} 岁`, `还剩 ${D(story.endAssets)}`];
+  if (story.outcome === 'working') return `还在攒，${story.endAge} 岁有 ${D(story.endAssets)}`;
+  if (story.outcome === 'ruined') return `${story.ruinAge} 岁花完`;
+  return `撑到 ${story.endAge} 岁，还剩 ${D(story.endAssets)}`;
 };
 
-export function livesHtml(lives, stories, selected, { p, dispCur }) {
+function lifeRow(path, story, index, selected, D, { fifth = false, maxCells }) {
+  const facts = story.outcome === 'working' ? [] : [`放假 ${holidayYearsOf(story)} 年有钱花`];
+  if (story.worst && story.worst.ret < 0) facts.push(`最惨一年 ${signedPct(story.worst.ret)}`);
+  const name = fifth ? `第五条 · ${lifeName(story)}` : lifeName(story);
+  return `<button type="button" class="life${fifth ? ' fifth' : ''}" data-life="${index}" aria-pressed="${index === selected}"><span class="life-top"><span class="life-name">${name}</span><span class="life-end">${endingText(story, D)}</span></span>${ribbonSvg(path, maxCells)}<span class="life-sub">${facts.join(' · ')}</span></button>`;
+}
+
+export function livesHtml(lives, stories, selected, { p, dispCur, fifth = null }) {
   const D = v => money(toDisplay(v, p, dispCur), dispCur);
-  const maxAssets = Math.max(...lives.flatMap(l => l.years.map(y => y.assets)), 1);
-  return lives.map((life, i) => {
-    const [head, sub] = endingText(stories[i], D);
-    return `<button type="button" class="life" data-life="${i}" aria-pressed="${i === selected}">${sparkline(life, maxAssets)}<span class="life-head">${head}</span><span class="life-sub">${sub}</span></button>`;
-  }).join('');
+  const maxCells = Math.max(...[...lives, ...(fifth ? [fifth.path] : [])].map(l => l.years.length - 1));
+  const rows = lives.map((life, i) => lifeRow(life, stories[i], i, selected, D, { maxCells })).join('');
+  const last = fifth
+    ? lifeRow(fifth.path, fifth.story, lives.length, selected, D, { fifth: true, maxCells })
+    : '<div class="life-empty" id="life-fifth-empty"><b>第五条人生</b>等你来写。在下面的放假实验室做选择，它会用四条里最难的那段年景，换上你的计划重走一遍。</div>';
+  return rows + last;
+}
+
+export function fifthCompareHtml(base, fifth, labels, { p, dispCur }) {
+  const D = v => money(toDisplay(v, p, dispCur), dispCur);
+  const plan = story => `${story.retireAge === null ? '还没放假' : `${story.retireAge} 岁放假`}，${endingText(story, D)}`;
+  return `<p class="fifth-compare">和「${lifeName(base)}」同样的年景。原计划：${plan(base)}。你改写后：${plan(fifth)}。</p>`;
+}
+
+export const fifthSentence = (base, fifth) => {
+  const end = s => (s.outcome === 'ruined' ? `${s.ruinAge} 岁花完` : s.outcome === 'working' ? '还在攒' : `撑到 ${s.endAge} 岁`);
+  const parts = [];
+  if (base.retireAge !== null && fifth.retireAge !== null && base.retireAge !== fifth.retireAge) {
+    const diff = base.retireAge - fifth.retireAge;
+    parts.push(`放假${diff > 0 ? '提前' : '推后'} ${Math.abs(diff)} 年`);
+  }
+  if (end(base) !== end(fifth)) parts.push(`从 ${end(base)}变成${end(fifth)}`.replace('从 还在攒', '从还在攒'));
+  return parts.length ? `同样的年景，${parts.join('，')}` : '同样的年景，结局没有变，换个选择再试试';
+};
+
+export function labChangesHtml(labels) {
+  if (!labels.length) return '';
+  return `<div class="life-changes"><span>已写入第五条人生：${labels.join('、')}</span><button type="button" class="ghost" id="lab-clear">清空重写</button></div>`;
+}
+
+export function heroHtml(h, { p, dispCur }) {
+  const D = v => money(toDisplay(v, p, dispCur), dispCur);
+  const total = h.workYears + h.holidayYears;
+  const share = v => (v / total * 100).toFixed(1);
+  let big;
+  if (!h.reachable) big = '<span class="hero-line">还没看到放假那天，先把杠杆用起来</span>';
+  else if (h.workYears === 0) big = `<span class="hero-rest">现在就能放假 <b>${h.holidayYears}</b> 年</span>`;
+  else big = `<span class="hero-work">再上 <b>${h.workYears}</b> 年班</span><span class="hero-arrow">→</span><span class="hero-rest">放假 <b>${h.holidayYears}</b> 年</span>`;
+  const work = h.workYears ? `<i class="work" style="width:${share(h.workYears)}%"></i>` : '';
+  const rest = h.holidayYears ? `<i class="rest" style="width:${share(h.holidayYears)}%"></i>` : '';
+  const mid = h.reachable && h.workYears ? `<span>${h.holidayAge} 岁放假</span>` : '';
+  const mondays = h.mondays ? `<p class="hero-mondays">还有 <b>${h.mondays.toLocaleString('zh-CN')}</b> 个周一</p>` : '';
+  const people = h.people === null ? '' : `<div class="people" role="img" aria-label="10 个平行的你，约 ${h.people} 个的钱够花到 ${h.endAge} 岁"><div class="people-row">${Array.from({ length: 10 }, (_, i) => personSvg(i < h.people)).join('')}</div><p>10 个平行的你，约 <b>${h.people}</b> 个的钱够花到 ${h.endAge} 岁</p></div>`;
+  const fundPct = Math.round(h.fund.share * 100);
+  return `<div class="hero-big">${big}</div>
+    <div class="lifebar" role="img" aria-label="人生进度：上班 ${h.workYears} 年，放假 ${h.holidayYears} 年">${work}${rest}</div>
+    <div class="lifebar-ticks"><span>${h.startAge} 岁 · 今天</span>${mid}<span>${h.endAge} 岁</span></div>
+    ${mondays}${people}
+    <div class="fund"><div class="fund-bar" role="img" aria-label="放假资金已攒到 ${fundPct}%"><i style="width:${fundPct}%"></i></div><p>放假资金攒到 <b>${fundPct}%</b>（${D(h.fund.have)} / ${D(h.fund.need)}）</p></div>`;
+}
+
+function personSvg(on) {
+  return `<svg class="person${on ? ' on' : ''}" viewBox="0 0 20 28" aria-hidden="true"><circle cx="10" cy="6" r="5"/><path d="M2 27c0-9 3-13 8-13s8 4 8 13z"/></svg>`;
 }
 
 export function livesSummary(stories, mc) {

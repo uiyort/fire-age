@@ -119,8 +119,74 @@ export function lifeStory(path, p) {
     retireAge: retireT === null ? null : p.age + retireT,
     retireAssets: retireT === null ? null : years[retireT].assets,
     retireNeed: retireT === null ? null : fiNeed(p, retireT),
+    lowPoint: retireT === null ? null : Math.min(...years.slice(retireT).map(y => y.assets)),
     worst: pickBy((a, b) => a < b),
     best: pickBy((a, b) => a > b),
     firstFive,
+  };
+}
+
+const HARD_FALL = -0.15;
+const NEAR_END_YEARS = 10;
+const EARLY_RUIN_YEARS = 15;
+
+// One cell per year of a life: working, on holiday with money, or on holiday with the money gone.
+export function lifeRibbon(path) {
+  return path.years.filter(y => y.ret !== null).map(y => {
+    const state = path.retireT === null || y.t < path.retireT ? 'work' : path.ruinAge !== null && y.age >= path.ruinAge ? 'broke' : 'holiday';
+    return { age: y.age, state, bad: y.ret <= HARD_FALL };
+  });
+}
+
+export function holidayYearsOf(story) {
+  if (story.outcome === 'working') return 0;
+  return (story.outcome === 'ruined' ? story.ruinAge : story.endAge) - story.retireAge;
+}
+
+// A name for what happened, so four lines of numbers read as four different lives.
+export function lifeName(story) {
+  if (story.outcome === 'working') return '长跑局';
+  if (story.outcome === 'ruined') {
+    if (story.ruinAge >= story.endAge - NEAR_END_YEARS) return '差一口气';
+    return story.ruinAge - story.retireAge <= EARLY_RUIN_YEARS ? '开局暴击' : '中途断粮';
+  }
+  if (story.retireAssets > 0 && story.lowPoint < story.retireAssets * 0.25) return '虎口脱险';
+  if (story.worst && story.best && story.worst.ret <= -0.2 && story.best.ret >= 0.3) return '过山车';
+  if (story.endAssets >= story.retireAssets) return '顺风局';
+  return story.endAssets >= story.retireAssets * 0.5 ? '平稳局' : '细水长流';
+}
+
+// The life that went worst: the earliest to run out, otherwise the one with least left.
+export function hardestIndex(stories) {
+  const rank = s => (s.outcome === 'ruined' ? s.ruinAge - 1e6 : s.endAssets);
+  return stories.reduce((worst, s, i) => (rank(s) < rank(stories[worst]) ? i : worst), 0);
+}
+
+// Ten of ten is only for a certain result, and none of ten only for an impossible one.
+export function peopleOf(success) {
+  if (success === null || success === undefined) return null;
+  if (success >= 1) return 10;
+  if (success <= 0) return 0;
+  // Rounds the whole percentage shown on the page, so 64.5% reads as 65% and as 7 of 10.
+  return Math.min(Math.max(Math.round(Math.round(success * 100) / 10), 1), 9);
+}
+
+// The conclusion as shapes: how a life splits between work and holiday, and how far along the money is.
+export function heroModel({ mode, p, t, bwd, success }) {
+  const total = p.life - p.age;
+  const backward = mode === 'bwd';
+  const workYears = backward ? bwd.n : t;
+  const reachable = workYears !== null;
+  const need = backward ? bwd.need : fiNeed(p, t ?? 0);
+  return {
+    reachable,
+    startAge: p.age,
+    endAge: p.life,
+    holidayAge: reachable ? p.age + workYears : null,
+    workYears: reachable ? workYears : total,
+    holidayYears: reachable ? total - workYears : 0,
+    mondays: reachable ? mondaysIn(workYears) : 0,
+    people: reachable ? peopleOf(success) : null,
+    fund: { have: p.assets, need, share: need > 0 ? Math.min(p.assets / need, 1) : 1 },
   };
 }

@@ -1,6 +1,5 @@
 // Shareable cards: what they say (pure) and how they are drawn (canvas, local only, never uploaded).
 import { money, toDisplay, wholeMoney, pct } from './views.js';
-import { mondaysIn } from './holiday.js';
 
 const BRAND = '放假年龄 / FIRE Age';
 const SEARCH_HINT = '搜：放假年龄';
@@ -10,39 +9,36 @@ const INK = '#14201b', INK_2 = '#48564f', PAPER = '#f4f8f5', ACCENT = '#136f52',
 
 const trimYears = y => String(Math.round(y * 10) / 10);
 
-export function toCardInput(result) {
-  const { mode, p, t, bwd, mc, dispCur } = result;
-  const typeName = result.type ? `${result.type.code} ${result.type.name}` : undefined;
+// One image that gathers the whole result. Only what the person has actually done appears on it.
+export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, enough, place, fifth, quiz, goal }) {
+  let big, sentence;
   if (mode === 'bwd') {
-    return {
-      typeName, mondays: mondaysIn(bwd.n), mode, targetAge: p.tAge, enough: bwd.s0 <= 0, success: mc?.success ?? null,
-      monthlyText: wholeMoney(toDisplay(Math.max(bwd.s0, 0) / 12, p, dispCur), dispCur),
-    };
+    big = `${hero.holidayAge} 岁`;
+    sentence = enough ? `想 ${hero.holidayAge} 岁放假，现在的存款已经够了` : `想 ${hero.holidayAge} 岁放假，每月需存 ${monthlyText}`;
+  } else if (!hero.reachable) {
+    big = '还在路上';
+    sentence = '还没到放假那天，用杠杆一步步提前';
+  } else if (hero.workYears === 0) {
+    big = '现在';
+    sentence = '从今天起，余生皆假期';
+  } else {
+    big = `${hero.holidayAge} 岁`;
+    sentence = `从 ${hero.holidayAge} 岁起，余生皆假期`;
   }
+  const lines = [];
+  if (hero.mondays) lines.push(`还有 ${hero.mondays.toLocaleString('zh-CN')} 个周一就放假`);
+  if (place) lines.push(`同样的钱去${place.name}，早 ${trimYears(place.gain)} 年`);
+  if (fifth) lines.push(`第五条人生：${fifth}`);
+  if (quiz) lines.push(`放假实验室猜对 ${quiz.score}/${quiz.total}：${quiz.title}`);
+  if (goal) lines.push(`小目标达成：${goal}`);
   return {
-    typeName, mondays: t === null ? 0 : mondaysIn(t), mode, age: p.age, years: t, retireAge: t === null ? null : p.age + t, success: t === null ? null : mc?.success ?? null,
-    needText: t === null ? '' : money(toDisplay(result.target[t], p, dispCur), dispCur),
-  };
-}
-
-export function resultCardSpec(input) {
-  const base = { kind: 'result', size: [1080, 1080], brand: BRAND, searchHint: SEARCH_HINT, stats: [], ...(input.typeName ? { eyebrow: input.typeName } : {}) };
-  const mondays = input.mondays ? input.mondays.toLocaleString('zh-CN') : null;
-  const successStat = input.success === null || input.success === undefined ? [] : [{ label: '计划成功率', value: pct(input.success, 0) }];
-  if (input.mode === 'bwd') {
-    const sentence = input.enough
-      ? `想 ${input.targetAge} 岁放假，现在的存款已经够了`
-      : `想 ${input.targetAge} 岁放假，每月需存 ${input.monthlyText}`;
-    const lines = mondays ? [`离放假还有 ${mondays} 个周一`] : [];
-    return { ...base, hero: `${input.targetAge} 岁`, sentence, lines, stats: successStat };
-  }
-  if (input.years === null) return { ...base, hero: '还在路上', sentence: '还没到放假那天，用杠杆一步步提前' };
-  const stats = [...successStat, { label: '放假所需资产', value: input.needText }];
-  if (input.years === 0) return { ...base, hero: '现在', sentence: '从今天起，余生皆假期', stats };
-  return {
-    ...base, hero: `${input.retireAge} 岁`, sentence: `从 ${input.retireAge} 岁起，余生皆假期`,
-    stats: [{ label: '再坚持', value: `${input.years} 年` }, ...stats],
-    ...(mondays ? { lines: [`还有 ${mondays} 个周一就放假`] } : {}),
+    kind: 'summary', size: [1080, 1440], brand: BRAND, searchHint: SEARCH_HINT,
+    eyebrow: `${type.emoji} ${type.code} ${type.name} · ${type.group}`,
+    hero: big, sentence, lines, stats: [],
+    lifeBar: { work: hero.workYears, holiday: hero.holidayYears, startAge: hero.startAge, endAge: hero.endAge },
+    people: hero.people,
+    peopleText: hero.people === null ? '' : `10 个平行的你，约 ${hero.people} 个的钱够花到 ${hero.endAge} 岁`,
+    ribbons,
   };
 }
 
@@ -53,12 +49,6 @@ export function typeCardSpec(type) {
     stats: type.axes.map(axis => ({ label: `${axis.name} ${axis.letter}`, value: axis.pole })),
   };
 }
-
-export const quizCardSpec = ({ score, total, title }) => ({
-  kind: 'quiz', size: [1080, 1080], brand: BRAND, searchHint: SEARCH_HINT, stats: [],
-  eyebrow: '放假实验室', hero: `${score}/${total}`, sentence: `猜中 ${score} 题，我是${title}`,
-  lines: ['用自己的数字猜：哪件事最能提前放假？'],
-});
 
 const PLACE_LINES = 4;
 
@@ -93,16 +83,6 @@ export function lifeCardSpec(life) {
   const hit = life.worst && life.worst.ret < 0;
   const sentence = hit ? `${life.worst.age} 岁那年亏了 ${Math.round(-life.worst.ret * 100)}%，还是撑住了` : '一路没有亏损的年份，运气不错';
   return { ...base, hero: `撑到 ${life.endAge} 岁`, sentence, stats: [...stats, { label: '最后还剩', value: life.endText }] };
-}
-
-export function goalCardSpec(goal, comparison) {
-  const gained = comparison.yearsDelta !== null && comparison.yearsDelta > 0.05;
-  const sentence = gained ? `${goal.label}，放假年龄提前了 ${trimYears(comparison.yearsDelta)} 年` : `${goal.label}，小目标达成`;
-  return {
-    kind: 'goal', size: [1080, 1080], brand: BRAND, searchHint: SEARCH_HINT, stats: [],
-    hero: gained ? `提前 ${trimYears(comparison.yearsDelta)} 年` : '达成',
-    sentence,
-  };
 }
 
 export function fitFontSize(measure, text, maxWidth, startPx, minPx) {
@@ -142,7 +122,108 @@ export function fitLines(measure, paragraphs, maxWidth, available, startPx = 42,
   return px;
 }
 
+const HOLIDAY_GREEN = '#1d7a3a', WORK_GREY = '#c4d0c9', BROKE_RED = '#c0352f';
+const CELL_COLORS = { work: WORK_GREY, holiday: HOLIDAY_GREEN, broke: BROKE_RED };
+
+function drawPerson(ctx, x, y, size, on) {
+  const unit = size / 28;
+  ctx.fillStyle = on ? ACCENT : RULE;
+  ctx.beginPath();
+  ctx.arc(x + 10 * unit, y + 6 * unit, 5 * unit, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x + 2 * unit, y + 27 * unit);
+  ctx.quadraticCurveTo(x + 2 * unit, y + 14 * unit, x + 10 * unit, y + 14 * unit);
+  ctx.quadraticCurveTo(x + 18 * unit, y + 14 * unit, x + 18 * unit, y + 27 * unit);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function renderSummary(spec, canvas) {
+  const [W, H] = spec.size;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const margin = 80, inner = W - margin * 2;
+  const measureAt = family => (text, px) => { ctx.font = family(px); return ctx.measureText(text).width; };
+  const bold = px => `700 ${px}px ${FONT}`;
+  const plain = px => `400 ${px}px ${FONT}`;
+  const display = px => `900 ${px}px ${SERIF}`;
+  const put = (font, color, text, x, y) => { ctx.font = font; ctx.fillStyle = color; ctx.fillText(text, x, y); };
+
+  ctx.fillStyle = PAPER;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = ACCENT;
+  ctx.fillRect(0, 0, W, 16);
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+  put(bold(36), INK_2, spec.brand, margin, 96);
+  put(bold(fitFontSize(measureAt(bold), spec.eyebrow, inner, 44, 26)), ACCENT, spec.eyebrow, margin, 166);
+
+  const heroPx = fitFontSize(measureAt(display), spec.hero, inner, 190, 48);
+  put(display(heroPx), ACCENT, spec.hero, margin, 180 + heroPx);
+  let y = 180 + heroPx + 84;
+  const sentencePx = fitFontSize(measureAt(display), spec.sentence, inner, 56, 34);
+  put(display(sentencePx), INK, spec.sentence, margin, y);
+  y += 52;
+
+  // Life bar: the conclusion, drawn.
+  const { work, holiday, startAge, endAge } = spec.lifeBar;
+  const barH = 44, workW = inner * work / (work + holiday);
+  ctx.fillStyle = WORK_GREY;
+  ctx.fillRect(margin, y, workW, barH);
+  ctx.fillStyle = HOLIDAY_GREEN;
+  ctx.fillRect(margin + workW, y, inner - workW, barH);
+  y += barH + 40;
+  put(plain(30), INK_2, `${startAge} 岁`, margin, y);
+  const label = holiday ? (work ? `上班 ${work} 年，放假 ${holiday} 年` : `放假 ${holiday} 年`) : `上班 ${work} 年`;
+  ctx.textAlign = 'center';
+  put(bold(34), INK, label, W / 2, y);
+  ctx.textAlign = 'right';
+  put(plain(30), INK_2, `${endAge} 岁`, W - margin, y);
+  ctx.textAlign = 'left';
+  y += 34;
+
+  if (spec.people !== null) {
+    const size = 60, gap = 16;
+    for (let i = 0; i < 10; i++) drawPerson(ctx, margin + i * (size * 20 / 28 + gap), y, size, i < spec.people);
+    y += size + 44;
+    put(bold(fitFontSize(measureAt(bold), spec.peopleText, inner, 34, 24)), INK, spec.peopleText, margin, y);
+    y += 20;
+  }
+
+  const ribbonTop = H - 96 - 44 - spec.ribbons.length * 46;
+  const linePx = fitLines(measureAt(plain), spec.lines, inner, ribbonTop - y - 16, 36, 24);
+  for (const paragraph of spec.lines) {
+    y += LINE_GAP;
+    for (const line of wrapText(t => measureAt(plain)(t, linePx), paragraph, inner)) {
+      y += linePx;
+      put(plain(linePx), INK_2, line, margin, y);
+      y += linePx * (LINE_HEIGHT - 1);
+    }
+  }
+
+  // Ribbons: each drawn life as a strip of years.
+  let ry = ribbonTop;
+  const nameW = 200;
+  const maxCells = Math.max(1, ...spec.ribbons.map(r => r.cells.length));
+  for (const ribbon of spec.ribbons) {
+    put(plain(fitFontSize(measureAt(plain), ribbon.label, nameW - 12, 28, 18)), INK_2, ribbon.label, margin, ry + 26);
+    const cell = (inner - nameW) / maxCells;
+    ribbon.cells.forEach((state, i) => {
+      ctx.fillStyle = CELL_COLORS[state];
+      ctx.fillRect(margin + nameW + i * cell, ry, Math.max(cell - 1, 1), 32);
+    });
+    ry += 46;
+  }
+  put(bold(36), ACCENT, spec.searchHint, margin, H - 60);
+}
+
 export function renderCard(spec, canvas) {
+  if (spec.kind === 'summary') {
+    renderSummary(spec, canvas);
+    return;
+  }
   const [W, H] = spec.size;
   canvas.width = W;
   canvas.height = H;

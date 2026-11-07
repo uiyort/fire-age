@@ -29,18 +29,8 @@
     <main class="layout">
       <section class="headline" aria-live="polite">
         <div id="headline"></div>
-        <div class="tiles" id="tiles"></div>
-        <div class="share-row"><button type="button" class="primary" id="share-btn">生成结果卡片</button></div>
-        <div class="share-slot" id="slot-result">
-          <div class="share" id="share-panel" hidden>
-            <img id="share-img" alt="">
-            <p class="fine" id="share-hint">长按图片保存，发到评论区晒一晒。</p>
-            <div class="goal-row">
-              <a class="ghost save" id="share-download" download="fire-age.png">下载图片</a>
-              <button type="button" class="ghost" id="share-close">收起</button>
-            </div>
-          </div>
-        </div>
+        <div class="hero" id="hero"></div>
+        <div class="tiles pro-only" id="tiles" hidden></div>
       </section>
 
       <section class="inputs" aria-label="输入">
@@ -59,23 +49,18 @@
         <section class="card" id="type-section">
           <h2>你的放假类型</h2>
           <div id="type-now"></div>
-          <div class="goal-row"><button type="button" class="ghost" id="type-card-btn">生成类型卡片</button></div>
-          <div class="share-slot" id="slot-type"></div>
           <details id="type-all"></details>
         </section>
 
         <section class="card" id="levers"></section>
         <section class="card" id="goal" hidden>
           <div id="goal-body"></div>
-          <div class="share-slot" id="slot-goal"></div>
         </section>
 
         <section class="card" id="places-card">
           <h2>同样的钱，在哪放假最早</h2>
           <p class="sub">支出按当地物价折算，保持同样的生活水平。条越短，放假越早。没算签证、税和医疗，这些要自己查。</p>
           <div id="places"></div>
-          <div class="goal-row"><button type="button" class="ghost" id="place-card">生成排名卡片</button></div>
-          <div class="share-slot" id="slot-place"></div>
         </section>
 
         <section class="card">
@@ -100,15 +85,35 @@
         </section>
 
         <section class="card" id="life-section">
-          <h2>抽一条人生</h2>
-          <p class="sub">成功率是几千条人生的统计。抽几条出来，看看同样的计划在不同年景下是什么样。</p>
-          <div class="goal-row"><button type="button" class="primary" id="life-draw">抽一条人生</button></div>
+          <h2>五条人生</h2>
+          <p class="sub">同一个计划，碰上不同的年景。前四条靠运气，第五条由你来写。</p>
+          <div class="life-legend" id="life-legend">
+            <span><i class="sw r-work"></i>上班</span>
+            <span><i class="sw r-holiday"></i>放假有钱花</span>
+            <span><i class="sw r-broke"></i>钱花完</span>
+            <span><i class="sw r-bad"></i>当年大跌 15% 以上</span>
+          </div>
           <div class="lives" id="lives"></div>
+          <div id="life-changes"></div>
+          <div class="goal-row"><button type="button" class="ghost" id="life-draw">换一批年景</button></div>
           <p class="fine" id="life-summary"></p>
+          <div class="legend" id="lives-chart-legend"></div>
+          <div class="chart-box">
+            <svg id="lives-chart" role="img" aria-label="选中的人生和其他人生的资产变化对比"></svg>
+            <div class="tip" id="lives-tip" hidden></div>
+          </div>
           <div id="life-story"></div>
           <p class="fine" id="life-seed"></p>
-          <div class="goal-row"><button type="button" class="ghost" id="life-card" hidden>生成这条人生的卡片</button></div>
-          <div class="share-slot" id="slot-life"></div>
+
+          <div id="lab-section">
+            <h3>放假实验室：写你的第五条人生</h3>
+            <p class="sub">先猜再看答案。你选的每一项都会写进第五条人生，题目用你自己的数字算。</p>
+            <div id="quiz"></div>
+            <h3>拖一拖，认识每个参数</h3>
+            <p class="sub">点开任意一项，拖动滑杆看放假年龄怎么变。不会改你的计划。</p>
+            <p class="lab-progress" id="lab-progress" role="status"></p>
+            <div id="cards"></div>
+          </div>
         </section>
 
         <section class="card pro-only" hidden>
@@ -123,15 +128,18 @@
           <div class="tbl" id="heat-box"></div>
         </section>
 
-        <section class="card" id="lab-section">
-          <h2>放假实验室</h2>
-          <p class="sub">先猜再看答案。题目全部用你自己的数字算，所以每个人的答案都不一样。</p>
-          <div id="quiz"></div>
-          <div class="share-slot" id="slot-quiz"></div>
-          <h3>拖一拖，认识每个参数</h3>
-          <p class="sub">点开任意一项，拖动滑杆看放假年龄怎么变。只是试算，不会改你的计划。</p>
-          <p class="lab-progress" id="lab-progress" role="status"></p>
-          <div id="cards"></div>
+        <section class="card" id="share-section">
+          <h2>生成我的放假卡</h2>
+          <p class="sub">把上面的结论收进一张图：放假年龄、类型、人生条、五条人生，还有你在实验室的成绩。</p>
+          <div class="goal-row"><button type="button" class="primary" id="share-btn">生成放假卡</button></div>
+          <div class="share" id="share-panel" hidden>
+            <img id="share-img" alt="">
+            <p class="fine" id="share-hint">长按图片保存，发到评论区晒一晒。</p>
+            <div class="goal-row">
+              <a class="ghost save" id="share-download" download="fire-age.png">下载图片</a>
+              <button type="button" class="ghost" id="share-close">收起</button>
+            </div>
+          </div>
         </section>
       </div>
     </main>

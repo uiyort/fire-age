@@ -1,18 +1,18 @@
 // Page wiring: reads inputs into state, recomputes, renders.
 import DATA from './data-latest.js';
-import { DEFAULT_SEED, bwdSolve, dualAges, fiNeed, fiYears, fwdSolve, monteCarlo } from './engine.js';
-import { drawLives, holidayType, lifeStory, placeRanking } from './holiday.js';
+import { DEFAULT_SEED, bwdSolve, dualAges, fiNeed, fiYears, fwdSolve, lifePath, monteCarlo } from './engine.js';
+import { drawLives, hardestIndex, heroModel, holidayType, lifeName, lifeRibbon, lifeStory, placeRanking } from './holiday.js';
 import { commitField, loadState, saveState, safeStorage, setField, setRetireCountry, setWorkCountry, toParams } from './state.js';
-import { rankLevers, impactOf, tryRange } from './levers.js';
-import { quizRounds, quizScore, quizTitle } from './quiz.js';
+import { LIFE_CHOICES, labPlan, rankLevers, impactOf, tryRange } from './levers.js';
+import { pickedSteps, quizRounds, quizScore, quizTitle } from './quiz.js';
 import { PARAMS, PARAM_GROUPS } from './params.js';
 import { makeGoal, compareVisit, goalApplies, loadGoal, saveGoal, clearGoal } from './goals.js';
 import { initAnalytics, track } from './analytics.js';
-import { drawChart } from './chart.js';
+import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
-import { goalCardSpec, lifeCardSpec, placeCardSpec, quizCardSpec, renderCard, resultCardSpec, toCardInput, toLifeCardInput, typeCardSpec } from './card.js';
+import { renderCard, summaryCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, goalFor, goalHtml, headlineText, heatHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, quizHtml, solvesHtml, storyHtml, tilesHtml, toDisplay, tryHtml, trySentence, typeHtml, variantsHtml,
+  allTypesHtml, cardBody, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, quizHtml, solvesHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, tryHtml, trySentence, typeHtml, variantsHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -27,8 +27,9 @@ let latest = null;
 let mcTimer = 0;
 let frame = 0;
 let lastCardView = null;
-let lifeSeed = null;
+let lifeSeed = DEFAULT_SEED;
 let lifeIndex = 0;
+let labValues = {};
 let quizIndex = 0;
 let quizAnswers = {};
 const PLAYED_KEY = 'fire-age-played-v1';
@@ -212,6 +213,7 @@ function renderFast() {
   const { say, note } = headlineText({ mode: S.mode, p, t, bwd, dual, dispCur: cur });
   $('headline').innerHTML = `<p class="say">${say}</p><p class="say-note">${note}</p>`;
   $('tiles').innerHTML = tilesHtml({ mode: S.mode, p, t, bwd, mc: latest.mc, dispCur: cur });
+  renderHero();
   if (S.mode === 'bwd') $('solves').innerHTML = solvesHtml({ p, bwd, dispCur: cur });
   $('type-now').innerHTML = typeHtml(type, levers[0]);
   document.querySelectorAll('.type-cell').forEach(cell => cell.classList.toggle('mine', cell.dataset.code === type.code));
@@ -227,12 +229,19 @@ function renderFast() {
   saveState(S, storage);
 }
 
+function renderHero() {
+  const { mode, p, t, bwd, mc, dispCur: cur } = latest;
+  latest.hero = heroModel({ mode, p, t, bwd, success: mc?.success ?? null });
+  $('hero').innerHTML = heroHtml(latest.hero, { p, dispCur: cur });
+}
+
 function renderSimulation() {
   const { p, retireT, mode, bwd, dispCur: cur, target } = latest;
   const s0 = mode === 'bwd' ? Math.max(bwd.s0, 0) : null;
   const mc = monteCarlo(p, retireT, s0);
   latest.mc = mc;
   $('tiles').innerHTML = tilesHtml({ mode, p, t: latest.t, bwd, mc, dispCur: cur });
+  renderHero();
   const scale = v => toDisplay(v, p, cur);
   drawChart($('chart'), $('tip'), {
     age: p.age,
@@ -252,20 +261,60 @@ function renderSimulation() {
   renderLives();
 }
 
+function labLabels(p) {
+  const fromQuiz = pickedSteps(latest.quiz, quizAnswers).map(id => impactOf(p, id).stepLabel);
+  const fromSliders = Object.keys(labValues).map(id => paramById[id].name);
+  return [...fromQuiz, ...fromSliders];
+}
+
+// The fifth life: the hardest of the four years of luck, walked with the person's rewritten plan.
+function fifthLife(p, lives, stories) {
+  const steps = pickedSteps(latest.quiz, quizAnswers);
+  if (!steps.length && !Object.keys(labValues).length) return null;
+  const base = hardestIndex(stories);
+  const q = labPlan(p, { steps, values: labValues });
+  const path = lifePath(q, fwdSolve(q), null, lives[base].seed);
+  return { path, story: lifeStory(path, q), base: stories[base], plan: q };
+}
+
 // The drawn lives follow the current plan, so changing an input redraws them with the same seeds.
 function renderLives() {
-  if (lifeSeed === null) return;
   const { p, retireT, mode, bwd, mc, dispCur: cur } = latest;
   const s0 = mode === 'bwd' ? Math.max(bwd.s0, 0) : null;
   const lives = drawLives(p, retireT, s0, lifeSeed);
   const stories = lives.map(life => lifeStory(life, p));
-  latest.lifeStory = stories[lifeIndex];
-  $('lives').innerHTML = livesHtml(lives, stories, lifeIndex, { p, dispCur: cur });
+  const fifth = fifthLife(p, lives, stories);
+  if (!fifth && lifeIndex === lives.length) lifeIndex = 0;
+  latest.lives = lives;
+  latest.stories = stories;
+  latest.fifth = fifth;
+  const selectedFifth = fifth && lifeIndex === lives.length;
+  $('lives').innerHTML = livesHtml(lives, stories, lifeIndex, { p, dispCur: cur, fifth });
+  $('life-changes').innerHTML = labChangesHtml(labLabels(p));
   $('life-summary').textContent = livesSummary(stories, mc);
-  $('life-story').innerHTML = storyHtml(stories[lifeIndex], { p, dispCur: cur });
+  const story = selectedFifth ? fifth.story : stories[lifeIndex];
+  const compare = fifth ? fifthCompareHtml(fifth.base, fifth.story, [], { p, dispCur: cur }) : '';
+  $('life-story').innerHTML = `${selectedFifth ? compare : ''}${storyHtml(story, { p: selectedFifth ? fifth.plan : p, dispCur: cur })}`;
   $('life-seed').textContent = `随机种子 ${lifeSeed} 到 ${lifeSeed + lives.length - 1}，同样的输入可以复现这几条人生。收益是模型抽样，不是历史重演。`;
-  $('life-draw').textContent = '再抽一次';
-  $('life-card').hidden = false;
+  const scale = v => toDisplay(v, p, cur);
+  // With the fifth life open, the life it rewrites is the one to compare against.
+  const highlighted = selectedFifth ? hardestIndex(stories) : lifeIndex;
+  const series = lives.map((life, i) => ({ label: lifeName(stories[i]), kind: i === highlighted ? 'selected' : 'other', retireT: life.retireT, values: life.years.map(y => scale(y.assets)) }));
+  if (fifth) series.push({ label: '第五条', kind: 'fifth', retireT: fifth.path.retireT, values: fifth.path.years.map(y => scale(y.assets)) });
+  const chartKey = [
+    `<span><i class="sw line-mid"></i>${selectedFifth ? '原计划' : '选中'}：${lifeName(stories[highlighted])}</span>`,
+    ...(fifth ? ['<span><i class="sw line-fifth"></i>第五条：你改写的</span>'] : []),
+    '<span><i class="sw line-other"></i>其他几条</span>',
+    '<span><i class="sw dot-retire"></i>放假那年</span>',
+  ];
+  $('lives-chart-legend').innerHTML = chartKey.join('');
+  drawLivesChart($('lives-chart'), $('lives-tip'), { age: p.age, lives: series, money: v => money(v, cur) });
+}
+
+function clearLab() {
+  quizIndex = 0;
+  quizAnswers = {};
+  labValues = {};
 }
 
 function renderQuiz(p) {
@@ -287,7 +336,7 @@ function renderGoal(p) {
   $('goal-body').innerHTML = goalHtml(goal, compareVisit(goal, p, today()));
 }
 
-const fullCard = (param, p) => cardBody(param, impactOf(p, param.id), tryHtml(param.id, tryRange(p, param.id)));
+const fullCard = (param, p) => cardBody(param, impactOf(p, param.id), tryHtml(param.id, tryRange(p, param.id), labValues[param.id]));
 
 function renderCards(p) {
   for (const param of PARAMS) {
@@ -339,11 +388,19 @@ function fieldFromElement(id) {
 function onInput(ev) {
   const el = ev.target;
   if (el.dataset.try) {
+    const id = el.dataset.try;
     const p = toParams(S, DATA);
-    el.closest('.try').querySelector('output').textContent = trySentence(p, el.dataset.try, Number(el.value), tryRange(p, el.dataset.try));
-    markPlayed(el.dataset.try);
+    el.closest('.try').querySelector('output').textContent = trySentence(p, id, Number(el.value), tryRange(p, id));
+    markPlayed(id);
+    if (LIFE_CHOICES.includes(id)) {
+      labValues = { ...labValues, [id]: Number(el.value) };
+      hideCard();
+      renderLives();
+      focusFifth();
+    }
     return;
   }
+  labValues = {};
   if (el.id === 's-retexp') {
     S = setField(S, 'retExp', el.value === '' ? '' : Number(el.value) * 12, DATA, { commit: false });
     countCalculation();
@@ -364,8 +421,17 @@ function onInput(ev) {
   refresh();
 }
 
+// The first change opens the fifth life, so the person sees what they wrote.
+function focusFifth() {
+  if (latest.fifth && lifeIndex !== latest.lives.length) {
+    lifeIndex = latest.lives.length;
+    renderLives();
+  }
+}
+
 function onSelect(ev) {
   const { id, value } = ev.target;
+  labValues = {};
   countCalculation();
   if (id === 's-work' || id === 'p-work') {
     const wasWorkCur = S.dispCur === DATA.countries[S.workC].cur;
@@ -385,15 +451,33 @@ function hideCard() {
   $('share-panel').hidden = true;
 }
 
-// The card opens inside the section it came from, next to what it shows.
-function showCard(spec, slotId) {
+function summaryInput() {
+  const { mode, p, bwd, type, hero, places, lives, stories, fifth, quiz, dispCur: cur } = latest;
+  const best = places[0], here = places.find(r => r.current);
+  const gain = best.years !== null && here?.years != null ? here.years - best.years : 0;
+  const finished = quiz.length > 0 && quizIndex >= quiz.length;
+  const score = finished ? quizScore(quiz, quizAnswers) : 0;
+  const achieved = goal && goalApplies(goal, p) && compareVisit(goal, p, today()).achieved;
+  const ribbons = lives.map((life, i) => ({ label: lifeName(stories[i]), cells: lifeRibbon(life).map(c => c.state) }));
+  if (fifth) ribbons.push({ label: '第五条', cells: lifeRibbon(fifth.path).map(c => c.state) });
+  return {
+    mode, type, hero, ribbons,
+    enough: bwd.s0 <= 0,
+    monthlyText: wholeMoney(toDisplay(Math.max(bwd.s0, 0) / 12, p, cur), cur),
+    place: gain >= 0.05 ? { name: best.name, gain } : null,
+    fifth: fifth ? fifthSentence(fifth.base, fifth.story) : null,
+    quiz: finished ? { score, total: quiz.length, title: quizTitle(score, quiz.length) } : null,
+    goal: achieved ? goal.label : null,
+  };
+}
+
+function showCard(spec) {
   const canvas = document.createElement('canvas');
   renderCard(spec, canvas);
   const png = canvas.toDataURL('image/png');
   $('share-img').src = png;
   $('share-download').href = png;
   $('share-img').alt = [spec.eyebrow, spec.hero, spec.sentence].filter(Boolean).join('，');
-  $(slotId).append($('share-panel'));
   $('share-panel').hidden = false;
   $('share-panel').scrollIntoView({ block: 'nearest' });
 }
@@ -428,22 +512,11 @@ function onClick(ev) {
   if (ev.target.id === 'share-btn') {
     track('card_generate');
     flushSimulation();
-    showCard(resultCardSpec(toCardInput(latest)), 'slot-result');
+    showCard(summaryCardSpec(summaryInput()));
     return;
   }
   if (ev.target.id === 'share-close') {
     hideCard();
-    return;
-  }
-  if (ev.target.id === 'type-card-btn') {
-    track('card_generate');
-    showCard(typeCardSpec(latest.type), 'slot-type');
-    return;
-  }
-  if (ev.target.id === 'quiz-card') {
-    track('card_generate');
-    const score = quizScore(latest.quiz, quizAnswers), total = latest.quiz.length;
-    showCard(quizCardSpec({ score, total, title: quizTitle(score, total) }), 'slot-quiz');
     return;
   }
   if (ev.target.id === 'quiz-restart') {
@@ -451,6 +524,15 @@ function onClick(ev) {
     quizAnswers = {};
     hideCard();
     renderQuiz(latest.p);
+    renderLives();
+    return;
+  }
+  if (ev.target.id === 'lab-clear') {
+    clearLab();
+    hideCard();
+    renderQuiz(latest.p);
+    renderCards(latest.p);
+    renderLives();
     return;
   }
   if (ev.target.id === 'quiz-next') {
@@ -462,12 +544,10 @@ function onClick(ev) {
   const quizOption = ev.target.closest('[data-quiz]');
   if (quizOption) {
     quizAnswers[quizIndex] = quizOption.dataset.quiz;
+    hideCard();
     renderQuiz(latest.p);
-    return;
-  }
-  if (ev.target.id === 'place-card') {
-    track('card_generate');
-    showCard(placeCardSpec(latest.places), 'slot-place');
+    renderLives();
+    focusFifth();
     return;
   }
   if (ev.target.id === 'life-draw') {
@@ -478,22 +558,11 @@ function onClick(ev) {
     flushSimulation();
     return;
   }
-  if (ev.target.id === 'life-card') {
-    track('card_generate');
-    flushSimulation();
-    showCard(lifeCardSpec(toLifeCardInput(latest.lifeStory, latest)), 'slot-life');
-    return;
-  }
   const lifeButton = ev.target.closest('[data-life]');
   if (lifeButton) {
     lifeIndex = Number(lifeButton.dataset.life);
     hideCard();
     renderLives();
-    return;
-  }
-  if (ev.target.id === 'goal-card') {
-    track('card_generate');
-    showCard(goalCardSpec(goal, compareVisit(goal, toParams(S, DATA), today())), 'slot-goal');
     return;
   }
   const help = ev.target.closest('.help');

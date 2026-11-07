@@ -40,3 +40,7 @@ export function quizTitle(score, total) {
   if (share >= 0.5) return '识途老马';
   return '新手上路';
 }
+
+// The changes picked so far, which become the plan of the fifth life.
+export const pickedSteps = (rounds, answers) =>
+  [...new Set(rounds.flatMap((round, i) => (answers[i] ? [round[answers[i]].id] : [])))];

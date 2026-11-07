@@ -123,3 +123,13 @@ export function tryParam(p, id, value) {
     success: RISK_PARAMS.includes(id) && t !== null ? monteCarlo(q, t, null, { paths: TRY_PATHS }).success : null,
   };
 }
+
+// What a person can decide. Age, savings already made and the market are not choices, so sliders for those only preview.
+export const LIFE_CHOICES = ['income', 'expense', 'growth', 'retExp', 'life', 'pension', 'pAge', 'swr', 'drag'];
+
+// The plan with lab changes applied: quiz picks first, each once, then slider values on top. The real plan is untouched.
+export function labPlan(p, { steps = [], values = {} } = {}) {
+  let q = p;
+  for (const id of new Set(steps)) q = rebuild(q, IMPACT_STEPS[id].change(q));
+  return rebuild(q, { ...values, ...(values.swr === undefined ? {} : { autoSwr: false }) });
+}
