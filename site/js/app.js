@@ -6,6 +6,7 @@ import { rankLevers, impactOf } from './levers.js';
 import { PARAMS } from './params.js';
 import { makeGoal, compareVisit, loadGoal, saveGoal, clearGoal } from './goals.js';
 import { drawChart } from './chart.js';
+import { copyText, goalCardSpec, renderCard, resultCardSpec, toCardInput } from './card.js';
 import {
   cardBody, goalFor, goalHtml, headlineText, heatHtml, leversHtml, money, pct, pctTableHtml, solvesHtml, tilesHtml, toDisplay, variantsHtml,
 } from './views.js';
@@ -285,7 +286,41 @@ function onSelect(ev) {
   }
 }
 
+function showCard(spec) {
+  const canvas = document.createElement('canvas');
+  renderCard(spec, canvas);
+  const png = canvas.toDataURL('image/png');
+  $('share-img').src = png;
+  $('share-download').href = png;
+  $('share-comment').textContent = spec.comment;
+  $('share-copy-status').textContent = '';
+  $('share-panel').hidden = false;
+}
+
+// A pending simulation would put a stale success rate on the card, so finish it first.
+function flushSimulation() {
+  clearTimeout(mcTimer);
+  cancelAnimationFrame(frame);
+  renderFast();
+  renderSimulation();
+}
+
 function onClick(ev) {
+  if (ev.target.id === 'share-btn') {
+    flushSimulation();
+    showCard(resultCardSpec(toCardInput(latest)));
+    return;
+  }
+  if (ev.target.id === 'goal-card') {
+    showCard(goalCardSpec(goal, compareVisit(goal, toParams(S, DATA), today())));
+    return;
+  }
+  if (ev.target.id === 'share-copy') {
+    copyText($('share-comment').textContent, $('share-comment')).then(result => {
+      $('share-copy-status').textContent = result === 'copied' ? '已复制' : '请长按选中文字复制';
+    });
+    return;
+  }
   const help = ev.target.closest('.help');
   if (help) {
     const id = help.id.replace('help-', '');

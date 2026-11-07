@@ -108,7 +108,7 @@ export function goalHtml(goal, cmp) {
   if (delta !== null && delta < -0.05) change = `和定目标时相比，放假推后了 ${yearsText(-delta)}，再调整一下。`;
   const state = cmp.achieved ? '<span class="pill good">✓ 已达成</span>' : '<span class="pill warn">… 进行中</span>';
   return `<h2>我的小目标</h2>
-    <div class="goal-row"><b>${goal.label}</b>${state}<button type="button" class="ghost" id="goal-clear">清除</button></div>
+    <div class="goal-row"><b>${goal.label}</b>${state}${cmp.achieved ? '<button type="button" class="ghost" id="goal-card">生成达成卡</button>' : ''}<button type="button" class="ghost" id="goal-clear">清除</button></div>
     <p class="sub">${change}</p>`;
 }
 

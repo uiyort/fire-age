@@ -30,6 +30,17 @@
       <section class="headline" aria-live="polite">
         <div id="headline"></div>
         <div class="tiles" id="tiles"></div>
+        <div class="share-row"><button type="button" class="primary" id="share-btn">生成结果卡片</button></div>
+        <div class="share" id="share-panel" hidden>
+          <img id="share-img" alt="放假年龄结果卡片">
+          <p class="fine" id="share-hint">长按图片保存，发到评论区晒一晒。</p>
+          <a class="ghost save" id="share-download" download="fire-age.png">下载图片</a>
+          <p class="share-comment" id="share-comment"></p>
+          <div class="goal-row">
+            <button type="button" class="ghost" id="share-copy">复制这句话</button>
+            <span class="fine" id="share-copy-status" role="status"></span>
+          </div>
+        </div>
       </section>
 
       <section class="inputs" aria-label="输入">
