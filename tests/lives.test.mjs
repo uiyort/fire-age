@@ -234,3 +234,8 @@ test('the sensitivity table never claims age has no effect, and keeps the stock 
   assert.match(row('sigEq'), /成功率/);
   assert.match(row('eq'), /波动/);
 });
+
+test('the written life sentence spaces a number after the change word', () => {
+  const base = story({ outcome: 'ruined', ruinAge: 71 });
+  assert.equal(fifthSentence(base, story({ outcome: 'ruined', ruinAge: 68 })), '同样的年景，从 71 岁花完变成 68 岁花完');
+});

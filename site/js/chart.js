@@ -89,7 +89,7 @@ const STATE_COLOUR = { work: 'var(--ink-3)', holiday: 'var(--good)', broke: 'var
 // Other lives stay grey; the life being compared against is dashed. Values are in the display currency.
 export function drawLivesChart(svg, tip, { age, lives, money }) {
   const W = svg.clientWidth || 340, H = svg.clientHeight || 300;
-  const m = { l: 48, r: 10, t: 26, b: 46 };
+  const m = { l: 48, r: 10, t: 40, b: 46 };
   const iw = W - m.l - m.r, ih = H - m.t - m.b;
   const selected = lives.find(l => l.kind === 'selected');
   const Y = Math.max(...lives.map(l => l.values.length)) - 1;
@@ -135,11 +135,11 @@ export function drawLivesChart(svg, tip, { age, lives, money }) {
   // The holiday year divides the life in two.
   if (selected.retireT !== null && selected.retireT !== undefined) {
     const rx = x(selected.retireT), workYears = selected.retireT, restYears = selected.values.length - 1 - selected.retireT;
-    g += `<line id="retire-line" x1="${rx}" x2="${rx}" y1="${m.t - 16}" y2="${axisTop + axisH}" stroke="var(--ink)" stroke-width="2"/>`;
-    if (rx > 72) g += `<text x="${rx - 8}" y="${m.t - 6}" text-anchor="end" class="zone-label">上班 ${workYears} 年</text>`;
-    if (W - m.r - rx > 116) g += `<text x="${rx + 8}" y="${m.t - 6}" class="zone-label on">${age + selected.retireT} 岁起放假 ${restYears} 年</text>`;
+    g += `<line id="retire-line" x1="${rx}" x2="${rx}" y1="${m.t - 26}" y2="${axisTop + axisH}" stroke="var(--ink)" stroke-width="2"/>`;
+    if (rx > 72) g += `<text x="${rx - 8}" y="${m.t - 16}" text-anchor="end" class="zone-label">上班 ${workYears} 年</text>`;
+    if (W - m.r - rx > 116) g += `<text x="${rx + 8}" y="${m.t - 16}" class="zone-label on">${age + selected.retireT} 岁起放假 ${restYears} 年</text>`;
   } else {
-    g += `<text x="${m.l}" y="${m.t - 6}" class="zone-label">一直在上班</text>`;
+    g += `<text x="${m.l}" y="${m.t - 16}" class="zone-label">一直在上班</text>`;
   }
   g += `<line id="lives-cross" y1="${m.t}" y2="${m.t + ih}" stroke="var(--ink-2)" visibility="hidden"/>`;
   g += `<rect id="lives-hit" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/>`;

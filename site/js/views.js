@@ -347,7 +347,8 @@ export const fifthSentence = (base, fifth) => {
     const diff = base.retireAge - fifth.retireAge;
     parts.push(`放假${diff > 0 ? '提前' : '推后'} ${Math.abs(diff)} 年`);
   }
-  if (end(base) !== end(fifth)) parts.push(`从 ${end(base)}变成${end(fifth)}`.replace('从 还在攒', '从还在攒'));
+  const spaced = text => (/^[0-9]/.test(text) ? ` ${text}` : text);
+  if (end(base) !== end(fifth)) parts.push(`从${spaced(end(base))}变成${spaced(end(fifth))}`);
   return parts.length ? `同样的年景，${parts.join('，')}` : '同样的年景，结局没有变，换个选择再试试';
 };
 

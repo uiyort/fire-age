@@ -48,7 +48,8 @@ test('the summary card has no links or QR codes and passes the compliance lint',
 
 test('an unreachable result stays upbeat and shows no fake age', () => {
   const s = summaryCardSpec({ mode: 'fwd', type, hero: { ...hero, reachable: false, holidayAge: null, workYears: 65, holidayYears: 0, mondays: 0, people: null }, ribbons: [] });
-  assert.ok(!/null|NaN|undefined/.test(JSON.stringify([s.hero, s.sentence, s.note, s.mondays])));
+  assert.ok(!/null|NaN|undefined/.test(JSON.stringify([s.hero, s.sentence, s.note])));
+  assert.equal(s.mondays, null, 'no countdown when there is no holiday to count down to');
   assert.equal(s.hero, '还在路上');
   assert.match(s.sentence, /一步步|杠杆/);
   assert.equal(s.people, null);

@@ -35,7 +35,7 @@ export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, e
     code: type.code, typeName: type.name, emoji: type.emoji, group: type.group,
     route: { startAge: hero.startAge, holidayAge: hero.holidayAge, endAge: hero.endAge, work: hero.workYears, holiday: hero.holidayYears },
     people: hero.people,
-    mondays: hero.mondays,
+    mondays: hero.reachable ? hero.mondays : null,
     lit,
     note,
     ribbons,
@@ -262,7 +262,9 @@ function renderSummary(spec, canvas) {
     put(display(64), STUB_INK, `${spec.people}/10`, left, stampBase);
     for (let i = 0; i < 10; i++) drawPerson(ctx, left + i * 25, stampBase + 16, 34, i < spec.people ? DEEP : STUB_RULE);
   }
-  if (spec.mondays) {
+  if (spec.mondays === null) {
+    put(bold(40), STUB_INK, '还没开始数', left + colW, stampBase);
+  } else if (spec.mondays) {
     put(display(64), STUB_INK, spec.mondays.toLocaleString('zh-CN'), left + colW, stampBase);
     put(plain(26), STUB_MUTED, '个', left + colW + measureAt(display)(spec.mondays.toLocaleString('zh-CN'), 64) + 10, stampBase);
   } else {
