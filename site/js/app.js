@@ -368,13 +368,6 @@ function renderViewsBanner() {
   $('views-banner').innerHTML = viewsBannerHtml(scnAnswers, baseline(), paramById, viewsApplied());
 }
 
-function clearLab() {
-  scnIndex = 0;
-  scnAnswers = {};
-  labValues = {};
-  saveAnswers();
-}
-
 function renderGoal(p) {
   const box = $('goal');
   if (goal && !goalApplies(goal, p)) {
@@ -594,13 +587,6 @@ function onClick(ev) {
   if (scnGoto) {
     scnIndex = Number(scnGoto.dataset.scnGoto);
     renderScenario();
-    return;
-  }
-  if (ev.target.id === 'lab-clear') {
-    clearLab();
-    hideCard();
-    renderCards(latest.p);
-    renderLives();
     return;
   }
   if (ev.target.id === 'scn-next') {

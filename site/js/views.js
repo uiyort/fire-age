@@ -318,9 +318,11 @@ const endingText = (story, D) => {
   return `撑到 ${story.endAge} 岁，还剩 ${D(story.endAssets)}`;
 };
 
-function lifeRow(path, story, index, selected, D, { fifth = false, maxCells }) {
-  const facts = story.outcome === 'working' ? [] : [`放假 ${holidayYearsOf(story)} 年有钱花`];
-  if (story.worst && story.worst.ret < 0) facts.push(`最惨一年 ${signedPct(story.worst.ret)}`);
+// What sets one draw of years apart from another: the first holiday years, the whole holiday, and the hard falls.
+function lifeRow(path, story, index, selected, D, { fifth = false, maxCells, p }) {
+  const rate = r => `<b class="${Math.round(r * 100) < 0 ? 'bad' : r >= p.r ? 'good' : ''}">${signedPct(r)}/年</b>`;
+  const luck = story.holidayReturn === null ? ['一直在上班'] : [`放假头 5 年 ${rate(story.firstFive)}`, `整个假期 ${rate(story.holidayReturn)}`];
+  const facts = [...luck, `大跌 ${story.badYears} 次`];
   const name = fifth ? '等你来写' : lifeName(story);
   return `<button type="button" class="life${fifth ? ' fifth' : ''}" data-life="${index}" aria-pressed="${index === selected}"><span class="life-top"><span class="life-name">${name}</span><span class="life-end">${endingText(story, D)}</span></span>${ribbonSvg(path, maxCells)}<span class="life-sub">${facts.join(' · ')}</span></button>`;
 }
@@ -328,9 +330,9 @@ function lifeRow(path, story, index, selected, D, { fifth = false, maxCells }) {
 export function livesHtml(lives, stories, selected, { p, dispCur, fifth = null }) {
   const D = v => money(toDisplay(v, p, dispCur), dispCur);
   const maxCells = Math.max(...[...lives, ...(fifth ? [fifth.path] : [])].map(l => l.years.length - 1));
-  const rows = lives.map((life, i) => lifeRow(life, stories[i], i, selected, D, { maxCells })).join('');
+  const rows = lives.map((life, i) => lifeRow(life, stories[i], i, selected, D, { maxCells, p })).join('');
   const last = fifth
-    ? lifeRow(fifth.path, fifth.story, lives.length, selected, D, { fifth: true, maxCells })
+    ? lifeRow(fifth.path, fifth.story, lives.length, selected, D, { fifth: true, maxCells, p })
     : '<div class="life-empty" id="life-fifth-empty"><b>等你来写</b>说说你对未来年景的判断，它会用这四条里最难的那段日子，按你的判断重走一遍。</div>';
   return rows + last;
 }
@@ -353,7 +355,7 @@ export const fifthSentence = (base, fifth) => {
 
 export function labChangesHtml(labels) {
   if (!labels.length) return '';
-  return `<div class="life-changes"><span>已写入：${labels.join('、')}</span><button type="button" class="ghost" id="lab-clear">清空重写</button></div>`;
+  return `<div class="life-changes"><span>已写入：${labels.join('、')}</span></div>`;
 }
 
 export function stickyHtml(h, { p, dispCur, success, pro }) {

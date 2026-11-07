@@ -110,6 +110,10 @@ export function lifeStory(path, p) {
   const pickBy = better => (lived.length ? moment(years, lived.reduce((a, b) => (better(years[b].ret, years[a].ret) ? b : a))) : null);
   const retired = retireT === null ? [] : years.slice(retireT, retireT + 5).filter(y => y.ret !== null).map(y => y.ret);
   const firstFive = retired.length ? Math.pow(retired.reduce((acc, r) => acc * (1 + r), 1), 1 / retired.length) - 1 : null;
+  // The luck of a life, counted only while the money lasts.
+  const kept = years.filter(y => y.ret !== null && (ruinAge === null || y.age < ruinAge));
+  const onHoliday = retireT === null ? [] : kept.filter(y => y.t >= retireT).map(y => y.ret);
+  const holidayReturn = onHoliday.length ? Math.pow(onHoliday.reduce((acc, r) => acc * (1 + r), 1), 1 / onHoliday.length) - 1 : null;
   const last = years[years.length - 1];
   return {
     outcome: retireT === null ? 'working' : ruinAge !== null ? 'ruined' : 'lasted',
@@ -123,6 +127,8 @@ export function lifeStory(path, p) {
     worst: pickBy((a, b) => a < b),
     best: pickBy((a, b) => a > b),
     firstFive,
+    holidayReturn,
+    badYears: kept.filter(y => y.ret <= HARD_FALL).length,
   };
 }
 

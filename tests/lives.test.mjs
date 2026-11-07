@@ -4,7 +4,7 @@ import DATA from '../site/js/data-latest.js';
 import { bwdSolve, fiNeed, fwdSolve, lifePath } from '../site/js/engine.js';
 import { defaultState, setField, toParams } from '../site/js/state.js';
 import { LIFE_CHOICES, labPlan } from '../site/js/levers.js';
-import { fifthCompareHtml, fifthSentence, ribbonSvg } from '../site/js/views.js';
+import { fifthCompareHtml, fifthSentence, labChangesHtml, livesHtml, ribbonSvg } from '../site/js/views.js';
 import { hardestIndex, heroModel, holidayYearsOf, lifeName, lifeRibbon, lifeStory, peopleOf } from '../site/js/holiday.js';
 
 const person = (fields = {}) => {
@@ -119,6 +119,49 @@ test('a story reports the lowest point of the holiday', () => {
   const s = lifeStory(life, p);
   const holiday = life.years.slice(t).map(y => y.assets);
   assert.equal(s.lowPoint, Math.min(...holiday));
+});
+
+test('a story sums up the luck of a holiday: its yearly return and its hard falls', () => {
+  const s = lifeStory(path(1, null, [-0.2, 0.1, -0.2, 0.21]), person());
+  assert.ok(Math.abs(s.holidayReturn - (Math.cbrt(1.1 * 0.8 * 1.21) - 1)) < 1e-12);
+  assert.equal(s.badYears, 2);
+});
+
+test('years after the money runs out are not part of the holiday luck', () => {
+  const s = lifeStory(path(0, 32, [0.1, -0.3, -0.5, -0.5]), person());
+  assert.ok(Math.abs(s.holidayReturn - (Math.sqrt(1.1 * 0.7) - 1)) < 1e-12);
+  assert.equal(s.badYears, 1);
+});
+
+test('a life that never takes the holiday has no holiday return', () => {
+  assert.equal(lifeStory(path(null, null, [0.1, -0.2]), person()).holidayReturn, null);
+});
+
+test('each life row shows what set its years apart', () => {
+  const p = person();
+  const t = fwdSolve(p);
+  const lives = [5, 6].map(seed => lifePath(p, t, null, seed));
+  const html = livesHtml(lives, lives.map(l => lifeStory(l, p)), 0, { p, dispCur: p.wCur });
+  assert.equal((html.match(/放假头 5 年/g) ?? []).length, 2);
+  assert.equal((html.match(/整个假期/g) ?? []).length, 2);
+  assert.equal((html.match(/大跌 \d+ 次/g) ?? []).length, 2);
+  assert.ok(!html.includes('最惨一年'));
+});
+
+test('a return that rounds to zero is not painted as a loss', () => {
+  const p = person();
+  const t = fwdSolve(p);
+  const life = lifePath(p, t, null, 5);
+  const s = { ...lifeStory(life, p), firstFive: -0.004, holidayReturn: -0.03 };
+  const html = livesHtml([life], [s], 0, { p, dispCur: p.wCur });
+  assert.match(html, /<b class="">0%\/年<\/b>/);
+  assert.match(html, /<b class="bad">−3%\/年<\/b>/);
+});
+
+test('what wrote the last life is listed, with no clear-all button', () => {
+  const html = labChangesHtml(['股票实际收益']);
+  assert.match(html, /股票实际收益/);
+  assert.ok(!html.includes('<button'));
 });
 
 test('the rewritten plan applies values, leaving the real plan alone', () => {

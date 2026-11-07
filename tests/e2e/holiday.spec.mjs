@@ -125,9 +125,7 @@ test('a decision slider writes the fifth life, and clearing removes it', async (
   await expect(details.locator('output')).toContainText('→');
   await expect(page.locator('#lives .life.fifth')).toHaveCount(1);
   expect(await page.locator('#headline .say').innerText()).toBe(before);
-  await page.click('#lab-clear');
-  await expect(page.locator('#lives .life.fifth')).toHaveCount(0);
-  await expect(page.locator('#life-fifth-empty')).toBeVisible();
+  await expect(page.locator('#lab-clear')).toHaveCount(0);
 });
 
 test('an assumption slider only previews, because nobody chooses the market', async ({ page }) => {
@@ -218,7 +216,7 @@ test('answers light up their parameters and survive a reload', async ({ page }) 
   await expect(page.locator('#lives .life.fifth')).toHaveCount(1);
 });
 
-test('the questions finish with a summary, one answer can be changed, and one button clears them all', async ({ page }) => {
+test('the questions finish with a summary, and one answer can be changed from it', async ({ page }) => {
   await page.goto('/');
   const box = page.locator('#scenario');
   while (await box.locator('[data-scn]').count()) {
@@ -229,9 +227,15 @@ test('the questions finish with a summary, one answer can be changed, and one bu
   await box.locator('[data-scn-goto]').nth(1).click();
   await expect(box).toContainText('第 2 /');
   await expect(box.locator('[data-scn]').first()).toHaveAttribute('aria-pressed', 'true');
-  await page.click('#lab-clear');
-  await expect(box).toContainText('第 1 /');
-  await expect(page.locator('#lives .life.fifth')).toHaveCount(0);
+  await expect(page.locator('#lab-clear')).toHaveCount(0);
+});
+
+test('every life row names its holiday luck', async ({ page }) => {
+  await page.goto('/');
+  for (const row of await page.locator('#lives .life').all()) {
+    await expect(row.locator('.life-sub')).toContainText('整个假期');
+    await expect(row.locator('.life-sub')).toContainText('大跌');
+  }
 });
 
 test('the questions stay the same when the years are redrawn, and the written life follows the new draw', async ({ page }) => {
