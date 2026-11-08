@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { summaryCardSpec, placeCardSpec, lifeCardSpec, typeCardSpec, fitFontSize, fitLines, noteLayout, wrapText } from '../site/js/card.js';
+import { barcodeBars, summaryCardSpec, placeCardSpec, lifeCardSpec, typeCardSpec, fitFontSize, fitLines, noteLayout, wrapText } from '../site/js/card.js';
 import { findBannedCopy } from '../scripts/lint-copy.mjs';
 
 const type = {
@@ -32,10 +32,34 @@ test('the card keeps every label short', () => {
 
 test('with a written life, the card shows only that life and the one it rewrote', () => {
   const row = (label, extra = {}) => ({ label, cells: ['work', 'holiday'], ...extra });
-  const ribbons = [row('顺风局'), row('中途断粮', { base: true }), row('起步就难'), row('你的版本', { fifth: true })];
+  const ribbons = [row('顺风局'), row('中途断粮', { base: true }), row('起步就难'), row('改签后', { fifth: true })];
   const fifth = { main: '有钱花的假期 25 → 22 年', detail: '', baseName: '中途断粮' };
-  assert.deepEqual(summaryCardSpec({ ...summary, ribbons, fifth }).ribbons.map(r => r.label), ['中途断粮', '你的版本']);
+  assert.deepEqual(summaryCardSpec({ ...summary, ribbons, fifth }).ribbons.map(r => r.label), ['中途断粮', '改签后']);
   assert.equal(summaryCardSpec({ ...summary, ribbons: ribbons.slice(0, 3) }).ribbons.length, 3);
+});
+
+test('a written life reads like a changed ticket: the old value struck out, the new one beside it', () => {
+  const note = main => summaryCardSpec({ ...summary, fifth: { main, detail: '', baseName: '中途断粮' } }).note;
+  assert.deepEqual(note('最后剩下 120万 → 80万').change, { prefix: '最后剩下 ', was: '120万', now: '80万' });
+  assert.equal(note('52 岁就能放假').change, null, 'nothing to strike out');
+  assert.equal(note('52 岁就能放假').tag, '已改签');
+});
+
+test('the age wears a boarding stamp that tells how far the trip has got', () => {
+  assert.deepEqual(summaryCardSpec(summary).boarding, { main: '已登机', sub: 'BOARDED' });
+  assert.deepEqual(summaryCardSpec({ ...summary, hero: { ...hero, workYears: 0 } }).boarding, { main: '已起飞', sub: 'DEPARTED' });
+  assert.deepEqual(summaryCardSpec({ ...summary, hero: { ...hero, reachable: false } }).boarding, { main: '候补中', sub: 'STANDBY' });
+  assert.deepEqual(summaryCardSpec({ ...summary, mode: 'bwd', monthlyText: '8,600', enough: false }).boarding, { main: '待登机', sub: 'BOARDING' });
+  assert.deepEqual(summaryCardSpec({ ...summary, mode: 'bwd', enough: true }).boarding, { main: '已登机', sub: 'BOARDED' });
+});
+
+test('the foot of the card is a barcode with the pass number under it', () => {
+  const s = summaryCardSpec(summary);
+  assert.equal(s.barcode, 'FIRE AGE · ' + s.code + ' · 43');
+  assert.deepEqual(barcodeBars('FIRE AGE · EHTS · 43', 300), barcodeBars('FIRE AGE · EHTS · 43', 300), 'the same pass draws the same bars');
+  assert.notDeepEqual(barcodeBars('FIRE AGE · EHTS · 43', 300), barcodeBars('FIRE AGE · LAFG · 51', 300));
+  const bars = barcodeBars('FIRE AGE · EHTS · 43', 300);
+  assert.ok(bars.every(([x, w]) => x >= 0 && x + w <= 300 && w >= 2));
 });
 
 test('the summary card spells out the type as four ticket fields', () => {
@@ -61,7 +85,10 @@ test('the summary card carries one note at most, the most personal one, as a lab
   const lever = { action: '每月多存 ¥1,250', gain: 1.4 };
   const fifth = { main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完', baseName: '中途断粮' };
   const all = { ...summary, place: { name: '泰国', gain: 4.3 }, fifth, goal: '储蓄率到 45%', lever };
-  assert.deepEqual(summaryCardSpec(all).note, { label: '你写的人生', main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完' });
+  assert.deepEqual(summaryCardSpec(all).note, {
+    label: '你写的人生', tag: '已改签', main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完',
+    change: { prefix: '有钱花的假期 ', was: '25', now: '22 年' },
+  });
   assert.deepEqual(summaryCardSpec({ ...all, fifth: null }).note, { label: '小目标达成', main: '储蓄率到 45%', detail: '' });
   assert.deepEqual(summaryCardSpec({ ...all, fifth: null, goal: null }).note, { label: '你的杠杆', main: '每月多存 ¥1,250', detail: '早 1.4 年放假' });
   assert.deepEqual(summaryCardSpec({ ...all, fifth: null, goal: null, lever: null }).note, { label: '同样的钱', main: '去泰国放假', detail: '早 4.3 年' });

@@ -22,8 +22,18 @@ export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, e
     big = hero.workYears === 0 ? '现在' : `${hero.holidayAge} 岁`;
     sentence = '余生皆假期';
   }
+  // The stamp over the age, as at a gate: boarded, departed, waiting for a seat, or still boarding.
+  let boarding = { main: '已登机', sub: 'BOARDED' };
+  if (mode === 'bwd') { if (!enough) boarding = { main: '待登机', sub: 'BOARDING' }; }
+  else if (!hero.reachable) boarding = { main: '候补中', sub: 'STANDBY' };
+  else if (hero.workYears === 0) boarding = { main: '已起飞', sub: 'DEPARTED' };
+  const barcode = ['FIRE AGE', type.code, ...(hero.reachable || mode === 'bwd' ? [hero.holidayAge] : [])].join(' · ');
   let note = null;
-  if (fifth) note = { label: '你写的人生', main: fifth.main, detail: fifth.detail };
+  if (fifth) {
+    // A rewritten life is a changed ticket: the old value is struck out and the new one printed beside it.
+    const m = fifth.main.match(/^(.*?)(\S+) → (.+)$/);
+    note = { label: '你写的人生', tag: '已改签', main: fifth.main, detail: fifth.detail, change: m ? { prefix: m[1], was: m[2], now: m[3] } : null };
+  }
   else if (goal) note = { label: '小目标达成', main: goal, detail: '' };
   else if (lever) note = { label: '你的杠杆', main: lever.action, detail: lever.unlockAge ? `就能在 ${lever.unlockAge} 岁放假` : `早 ${trimYears(lever.gain)} 年放假` };
   else if (place) note = { label: '同样的钱', main: `去${place.name}放假`, detail: `早 ${trimYears(place.gain)} 年` };
@@ -39,6 +49,8 @@ export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, e
     // A written life is shown beside only the life it rewrote: one before, one after.
     ribbons: ribbons.some(r => r.fifth) ? ribbons.filter(r => r.base || r.fifth) : ribbons,
     lit,
+    boarding,
+    barcode,
     stampLabels: [`撑到 ${hero.endAge} 岁`, '还要上的周一', '点亮参数'],
   };
 }
@@ -134,6 +146,7 @@ export function fitLines(measure, paragraphs, maxWidth, available, startPx = 42,
 
 const DEEP = '#0d4a38', DEEP_2 = '#0a3a2c', CREAM = '#f6f1e3', CREAM_DIM = '#a9c4b4', SUN = '#f2b544';
 const STUB_INK = '#14201b', STUB_MUTED = '#6a7871', STUB_RULE = '#d9d3c1';
+const CHANGE_INK = '#c2412b';
 const CELL_COLORS = { work: '#c9c4b4', holiday: '#1d7a3a', broke: '#c0352f' };
 
 function roundedRect(ctx, x, y, w, h, r) {
@@ -212,8 +225,9 @@ function renderSummary(spec, canvas) {
     const numberW = measureAt(display)(match[1], 330);
     put(display(84), CREAM, '岁', left + numberW + 14, heroY);
   } else {
-    put(display(fitFontSize(measureAt(display), spec.hero, inner - 240, 190, 80)), SUN, spec.hero, left, heroY - 40);
+    put(display(fitFontSize(measureAt(display), spec.hero, inner - 400, 190, 80)), SUN, spec.hero, left, heroY - 40);
   }
+  if (spec.boarding) drawBoarding(ctx, spec.boarding, right - 170, heroY - 55);
 
   const sentencePx = fitFontSize(measureAt(display), spec.sentence, inner, 58, 34);
   put(display(sentencePx), CREAM, spec.sentence, left, heroY + 96);
@@ -298,21 +312,41 @@ function renderSummary(spec, canvas) {
   // The note reads in three weights: a small label, the main line, a quiet detail.
   let noteY = stampBase + 108;
   if (spec.note) {
-    put(plain(24), STUB_MUTED, spec.note.label, left, stampBase + 90);
-    const { px, lines } = noteLayout(measureAt(bold), spec.note.main, inner, 40, 28);
+    let labelX = left;
+    if (spec.note.tag) labelX += drawTag(ctx, spec.note.tag, left, stampBase + 90) + 14;
+    put(plain(24), STUB_MUTED, spec.note.label, labelX, stampBase + 90);
     noteY = stampBase + 136;
-    lines.forEach((line, i) => put(bold(px), STUB_INK, line, left, noteY + i * px * 1.25));
-    noteY += (lines.length - 1) * px * 1.25;
+    const ch = spec.note.change;
+    let mainW;
+    const changeW = ch && (measureAt(bold)(ch.prefix, 40) + measureAt(plain)(ch.was, 34) + 16 + measureAt(bold)(ch.now, 40));
+    if (ch && changeW <= inner) {
+      // Like a rebooked ticket: the old value struck out in grey, the new one in the stamp's ink.
+      put(bold(40), STUB_INK, ch.prefix, left, noteY);
+      let x = left + measureAt(bold)(ch.prefix, 40);
+      const wasW = measureAt(plain)(ch.was, 34);
+      put(plain(34), STUB_MUTED, ch.was, x, noteY);
+      ctx.strokeStyle = CHANGE_INK;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x - 3, noteY - 12); ctx.lineTo(x + wasW + 3, noteY - 12); ctx.stroke();
+      x += wasW + 16;
+      put(bold(40), CHANGE_INK, ch.now, x, noteY);
+      mainW = changeW;
+    } else {
+      const { px, lines } = noteLayout(measureAt(bold), spec.note.main, inner, 40, 28);
+      lines.forEach((line, i) => put(bold(px), STUB_INK, line, left, noteY + i * px * 1.25));
+      noteY += (lines.length - 1) * px * 1.25;
+      mainW = measureAt(bold)(lines[lines.length - 1], px);
+    }
     if (spec.note.detail) {
       // The detail sits after the main line when it fits, so the lives below keep their room.
-      const mainW = measureAt(bold)(lines[lines.length - 1], px), detailW = measureAt(plain)(spec.note.detail, 26);
+      const detailW = measureAt(plain)(spec.note.detail, 26);
       if (mainW + 24 + detailW <= inner) put(plain(26), STUB_MUTED, spec.note.detail, left + mainW + 24, noteY);
       else { noteY += 38; put(plain(26), STUB_MUTED, spec.note.detail, left, noteY); }
     }
   }
   // The lives as thin lines on one age scale: one run per stretch, the person's own row in full colour.
   const hintY = ty + th - 44;
-  const barsBottom = hintY - 64;
+  const barsBottom = hintY - 84;
   const rows = spec.ribbons.length;
   // Each row gets the same pitch; the line and its name both fit inside it.
   const pitch = rows ? Math.min((barsBottom - noteY - 30) / rows, 40) : 0;
@@ -332,7 +366,72 @@ function renderSummary(spec, canvas) {
     ctx.globalAlpha = 1;
   });
   put(bold(36), DEEP, spec.searchHint, left, hintY);
-  put(plain(26), STUB_MUTED, spec.brand, right, hintY, 'right');
+  // The foot of a boarding pass: a barcode, and the pass number under it.
+  if (spec.barcode) {
+    const codeW = 320, codeX = right - codeW;
+    ctx.fillStyle = STUB_INK;
+    barcodeBars(spec.barcode, codeW).forEach(([x, w]) => ctx.fillRect(codeX + x, hintY - 50, w, 38));
+    put(`500 18px ui-monospace, "SF Mono", Menlo, Consolas, monospace`, STUB_MUTED, spec.barcode, right, hintY + 14, 'right');
+  } else {
+    put(plain(26), STUB_MUTED, spec.brand, right, hintY, 'right');
+  }
+}
+
+// A small outlined tag in the change ink, its baseline on y; returns its width.
+function drawTag(ctx, text, x, y) {
+  ctx.font = `700 20px ${FONT}`;
+  const w = ctx.measureText(text).width + 20, h = 30;
+  ctx.strokeStyle = CHANGE_INK;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y - 22, w, h, 6); else ctx.rect(x, y - 22, w, h);
+  ctx.stroke();
+  ctx.fillStyle = CHANGE_INK;
+  ctx.textAlign = 'left';
+  ctx.fillText(text, x + 10, y);
+  return w;
+}
+
+// A rubber stamp: two rounded frames, tilted, with the word and its English under it.
+function drawBoarding(ctx, { main, sub }, cx, cy) {
+  const w = 300, h = 150, ink = '#ff8a6b';
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.17);
+  ctx.globalAlpha = 0.9;
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') ctx.roundRect(-w / 2, -h / 2, w, h, 18); else ctx.rect(-w / 2, -h / 2, w, h);
+  ctx.stroke();
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') ctx.roundRect(-w / 2 + 10, -h / 2 + 10, w - 20, h - 20, 12); else ctx.rect(-w / 2 + 10, -h / 2 + 10, w - 20, h - 20);
+  ctx.stroke();
+  ctx.fillStyle = ink;
+  ctx.textAlign = 'center';
+  ctx.font = `900 68px ${SERIF}`;
+  ctx.fillText(main, 0, 14);
+  ctx.font = `800 24px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+  ctx.fillText(sub.split('').join(' '), 0, 50);
+  ctx.restore();
+  ctx.textAlign = 'left';
+}
+
+// Bars from the pass number, so the same pass always draws the same code: [x, width] pairs.
+export function barcodeBars(text, width) {
+  let seed = 2166136261;
+  for (const ch of text) seed = Math.imul(seed ^ ch.codePointAt(0), 16777619) >>> 0;
+  const next = () => { seed = Math.imul(seed ^ (seed >>> 15), 2246822507) >>> 0; seed = (seed ^ (seed >>> 13)) >>> 0; return seed % 4; };
+  const bars = [];
+  let x = 0;
+  while (true) {
+    const w = 2 + next(), gap = 2 + next();
+    if (x + w > width) break;
+    bars.push([x, w]);
+    x += w + gap;
+  }
+  return bars;
 }
 
 // Consecutive cells of one state, as one stretch each.

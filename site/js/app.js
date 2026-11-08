@@ -612,7 +612,7 @@ function summaryInput() {
   const gain = best.years !== null && here?.years != null ? here.years - best.years : 0;
   const achieved = goal && goalApplies(goal, p) && compareVisit(goal, p, today()).achieved;
   const ribbons = lives.map((life, i) => ({ label: (latest.names ?? lifeNames(stories))[i], base: fifth?.baseIndex === i, cells: lifeRibbon(life).map(c => c.state) }));
-  if (fifth) ribbons.push({ label: '你的版本', fifth: true, cells: lifeRibbon(fifth.path).map(c => c.state) });
+  if (fifth) ribbons.push({ label: '改签后', fifth: true, cells: lifeRibbon(fifth.path).map(c => c.state) });
   return {
     mode, type, hero, ribbons,
     lit: litCount(),
