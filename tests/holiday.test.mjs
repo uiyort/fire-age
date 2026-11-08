@@ -43,6 +43,11 @@ test('working backward, the type starts the holiday at the age asked for', () =>
   assert.equal(t.status.why, `还有 ${50 - p.age} 年到站。`);
 });
 
+test('the luggage value says it compares the holiday lifestyle with today\'s income', () => {
+  const t = typeOf(person());
+  assert.match(t.axes.find(a => a.key === 'pack').value, /^退休生活≈收入的 \d+%$/);
+});
+
 test('the code has one letter from each of the four axes', () => {
   const t = typeOf(person());
   assert.match(t.code, /^[EL][HA][TF][SG]$/);

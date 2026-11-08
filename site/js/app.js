@@ -12,7 +12,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { renderCard, summaryCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, fasterLead, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, tryHtml, trySentence, typeHtml, variantsHtml, viewsBannerHtml,
+  allTypesHtml, cardBody, fasterLead, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -115,9 +115,16 @@ function loadPlayed() {
   }
 }
 
+// The simple view lights only what it offers: the questions about the years ahead and the sliders that write the last life.
+function litCount() {
+  const offered = new Set([...SCENARIOS.map(s => s.param), ...lifeChoices(S.mode)]);
+  return { done: [...played].filter(id => offered.has(id)).length, total: offered.size };
+}
+
 function renderPlayed() {
-  const done = played.size === PARAMS.length;
-  $('lab-progress').textContent = done ? `${played.size}/${PARAMS.length}，全部点亮。这些参数你都亲手试过了。` : `已点亮 ${played.size}/${PARAMS.length} 个参数`;
+  const { done: lit, total } = litCount();
+  const done = lit === total;
+  $('lab-progress').textContent = done ? `${lit}/${total}，全部点亮。这些参数你都亲手试过了。` : `已点亮 ${lit}/${total} 个参数`;
   for (const details of $('cards').querySelectorAll('details')) details.classList.toggle('played', played.has(details.dataset.id));
 }
 
@@ -411,13 +418,17 @@ function renderScenario() {
   renderViewsBanner();
 }
 
+// Everything the simple view collected, as plan values.
+const collected = () => ({ ...answerValues(scnAnswers, baseline()), ...writtenSliders() });
+
 function viewsApplied() {
-  const values = answerValues(scnAnswers, baseline());
-  return Object.entries(values).every(([id, value]) => S[id] === value);
+  return Object.entries(collected()).every(([id, value]) => S[id] === value);
 }
 
 function renderViewsBanner() {
-  $('views-banner').innerHTML = viewsBannerHtml(scnAnswers, baseline(), paramById, viewsApplied());
+  const p = toParams(S, DATA);
+  const sliders = Object.entries(writtenSliders()).map(([id, value]) => ({ id, name: paramById[id].name, text: tryValueText(value, tryRange(p, id).unit, p) }));
+  $('views-banner').innerHTML = viewsBannerHtml(scnAnswers, baseline(), paramById, viewsApplied(), sliders);
 }
 
 function renderGoal(p) {
@@ -441,9 +452,13 @@ function renderCards(p) {
     const inline = $(`card-${param.id}`);
     if (inline && !inline.hidden) inline.innerHTML = fullCard(param, p);
   }
+  // The simple list keeps only what writes the last life; every parameter stays in the professional view.
   const box = $('cards');
-  if (!box.childElementCount) {
-    box.innerHTML = PARAM_GROUPS.map(group => `<h4>${group.name}</h4>${group.ids.map(id => `<details data-id="${id}"><summary>${paramById[id].name}</summary><div class="lcard"></div></details>`).join('')}`).join('');
+  if (box.dataset.mode !== S.mode) {
+    const offered = lifeChoices(S.mode);
+    box.innerHTML = PARAM_GROUPS.map(group => ({ ...group, ids: group.ids.filter(id => offered.includes(id)) })).filter(group => group.ids.length)
+      .map(group => `<h4>${group.name}</h4>${group.ids.map(id => `<details data-id="${id}"><summary>${paramById[id].name}</summary><div class="lcard"></div></details>`).join('')}`).join('');
+    box.dataset.mode = S.mode;
     renderPlayed();
   }
   // Update in place so an open card stays open, keeps focus, and is not counted again.
@@ -599,8 +614,8 @@ function summaryInput() {
     enough: bwd.s0 <= 0,
     monthlyText: wholeMoney(toDisplay(Math.max(bwd.s0, 0) / 12, p, cur), cur),
     place: gain >= 0.05 ? { name: best.name, gain } : null,
-    fifth: fifth ? fifthSentence(fifth.base, fifth.story, latestMoney()) : null,
-    lit: { done: played.size, total: PARAMS.length },
+    fifth: fifth ? fifthBrief(fifth.base, fifth.story, latestMoney()) : null,
+    lit: litCount(),
     goal: achieved ? goal.label : null,
     lever: personalLever(rankLevers(p, DATA, { retC: S.retC, top: 6 }), p, v => money(Math.round(toDisplay(v, p, cur)), cur)),
   };
@@ -709,7 +724,8 @@ function onClick(ev) {
     return;
   }
   if (ev.target.id === 'views-apply') {
-    for (const [id, value] of Object.entries(answerValues(scnAnswers, baseline()))) S = setField(S, id, String(value), DATA);
+    for (const [id, value] of Object.entries(collected())) S = setField(S, id, String(value), DATA);
+    if (writtenSliders().swr !== undefined) S = { ...S, autoSwr: false };
     refresh();
     return;
   }

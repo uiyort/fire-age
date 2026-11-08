@@ -16,7 +16,7 @@ const GROW_SHARE = 0.5;
 export const AXES = [
   { key: 'when', name: '启程', poles: { E: '早', L: '晚' }, rule: '放假年龄在 50 岁及以前是 E，之后或还到不了是 L。' },
   { key: 'where', name: '目的地', poles: { H: '在地', A: '远方' }, rule: '在现在生活的地方放假是 H，换个地方是 A。' },
-  { key: 'pack', name: '行李', poles: { T: '轻装', F: '宽裕' }, rule: '放假后的开销（按当地物价折算）不超过现在收入的 60% 是 T，超过是 F。' },
+  { key: 'pack', name: '行李', poles: { T: '轻装', F: '宽裕' }, rule: '放假后的生活水平（按两地物价折算）相当于现在收入的多少：不超过 60% 是 T，超过是 F。放假后的钱来自积蓄，所以可以超过 100%。' },
   { key: 'fare', name: '路费', poles: { S: '靠存', G: '靠滚' }, rule: '放假时一半以上的资产来自现有本金的复利是 G，否则是 S。' },
 ];
 
@@ -73,7 +73,7 @@ export function holidayType(p, data, { workC, retC, retireT }) {
   const picks = {
     when: [age !== null && age <= EARLY_AGE ? 'E' : 'L', age === null ? '还没到' : `${age} 岁放假`],
     where: [workC === retC ? 'H' : 'A', data.countries[retC].name],
-    pack: [spendShare <= LIGHT_SHARE ? 'T' : 'F', Number.isFinite(spendShare) ? `开销占收入 ${percent(spendShare)}` : '目前没有收入'],
+    pack: [spendShare <= LIGHT_SHARE ? 'T' : 'F', Number.isFinite(spendShare) ? `退休生活≈收入的 ${percent(spendShare)}` : '目前没有收入'],
     fare: [capitalShare >= GROW_SHARE ? 'G' : 'S', t === null ? '还在攒' : `本金复利占 ${percent(capitalShare)}`],
   };
   const axes = AXES.map(axis => {

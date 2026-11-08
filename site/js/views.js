@@ -150,7 +150,7 @@ export function impactSentence({ stepLabel, gainYears, note = '' }) {
   return `${stepLabel}，${change}。${note}`;
 }
 
-const tryValueText = (value, unit, p) => {
+export const tryValueText = (value, unit, p) => {
   if (unit === 'work') return money(value, p.wCur);
   if (unit === 'retire') return money(value, p.rCur);
   return unit ? `${value} ${unit}` : String(value);
@@ -207,16 +207,18 @@ export function scenarioHtml({ index, answers, base, effect, params, crowd = { s
   const scenario = SCENARIOS[index];
   const chosen = answers[scenario.id];
   const options = scenarioOptions(scenario, base).map((o, i) => `<button type="button" class="scn-option" data-scn="${i}" aria-pressed="${chosen === i}">${o.label}</button>`).join('');
-  const reveal = chosen === undefined ? '' : `<div class="scn-reveal">${effect ? `<p class="scn-effect">${effect}</p>` : ''}<p class="scn-insight">${scenario.insight}</p>${teaching(params[scenario.param])}<button type="button" class="primary" id="scn-next">${index === total - 1 ? '看我的判断' : '下一题'}</button></div>`;
+  const reveal = chosen === undefined ? '' : `<div class="scn-reveal">${effect ? `<p class="scn-effect">${effect}</p>` : ''}<p class="scn-insight">${scenario.insight}</p>${teaching(params[scenario.param])}<button type="button" class="ghost" id="scn-next">${index === total - 1 ? '看我的判断' : '下一题'}</button></div>`;
   return `<p class="quiz-count">第 ${index + 1} / ${total} 题</p><p class="quiz-q">${scenario.question}</p><div class="scn-options">${options}</div>${reveal}`;
 }
 
-export function viewsBannerHtml(answers, base, params, applied) {
+// What the simple view collected: answers about the years ahead and slider choices, carried over on request.
+export function viewsBannerHtml(answers, base, params, applied, sliders = []) {
   const values = answerValues(answers, base);
-  const items = SCENARIOS.filter(s => values[s.param] !== undefined).map(s => `<li><span>${params[s.param].name}</span><b>${scenarioOptions(s, base)[answers[s.id]].label}</b></li>`).join('');
-  if (!items) return '';
+  const views = SCENARIOS.filter(s => values[s.param] !== undefined).map(s => `<li><span>${params[s.param].name}</span><b>${scenarioOptions(s, base)[answers[s.id]].label}</b></li>`);
+  const chosen = sliders.map(s => `<li><span>${s.name}</span><b>${s.text}</b></li>`);
+  if (!views.length && !chosen.length) return '';
   const action = applied ? '<span class="pill">已带入假设</span>' : '<button type="button" class="ghost" id="views-apply">带入假设</button>';
-  return `<h2>你的年景判断</h2><p class="sub">来自简单模式的回答，带入后可以继续手动调整。</p><ul class="scn-summary">${items}</ul><div class="goal-row">${action}</div>`;
+  return `<h2>你在简单模式里的判断</h2><p class="sub">来自年景题和"等你来写"的滑杆，带入后可以继续手动调整。</p><ul class="scn-summary">${[...views, ...chosen].join('')}</ul><div class="goal-row">${action}</div>`;
 }
 
 export function cardBody(param, impact, tryBlock = '') {
@@ -360,6 +362,20 @@ export function livesHtml(lives, stories, selected, { p, dispCur, fifth = null, 
     ? lifeRow(fifth.path, fifth.story, lives.length, selected, D, { fifth: true, maxCells, p: fifth.plan ?? p })
     : '<div class="life-empty" id="life-fifth-empty"><b>等你来写</b>说说你对未来年景的判断，它会用这四条里最难的那段日子，按你的判断重走一遍。</div>';
   return rows + last;
+}
+
+// The written life for the card: one short main line and a quiet detail, or nothing when nothing changed.
+export function fifthBrief(base, fifth, D = wan) {
+  if (fifth.outcome === 'working') return { main: `到 ${fifth.endAge} 岁也放不了假`, detail: '' };
+  const end = fifth.outcome === 'ruined' ? `${fifth.ruinAge} 岁花完` : `钱撑到 ${fifth.endAge} 岁`;
+  if (base.outcome === 'working') return { main: `${fifth.retireAge} 岁就能放假`, detail: end };
+  const before = holidayYearsOf(base), after = holidayYearsOf(fifth), diff = base.retireAge - fifth.retireAge;
+  if (!diff && before === after && base.outcome === fifth.outcome) {
+    const moved = base.outcome === 'lasted' && Math.abs(fifth.endAssets - base.endAssets) > Math.max(Math.abs(base.endAssets), 1) * 0.01;
+    return moved ? { main: `最后剩下 ${D(base.endAssets)} → ${D(fifth.endAssets)}`, detail: `钱都撑到 ${fifth.endAge} 岁` } : null;
+  }
+  const when = diff ? [`${diff > 0 ? '早' : '晚'} ${Math.abs(diff)} 年放假`] : [];
+  return { main: `有钱花的假期 ${before} → ${after} 年`, detail: [...when, end].join(' · ') };
 }
 
 export function fifthCompareHtml(base, fifth, baseName = lifeName(base), D = wan) {

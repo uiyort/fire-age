@@ -42,18 +42,19 @@ test('the summary card is a ticket: route, people, Mondays, lit parameters and a
   assert.equal(s.ribbons.length, 1);
 });
 
-test('the summary card carries one extra line at most, the most personal one', () => {
+test('the summary card carries one note at most, the most personal one, as a label, a main line and a detail', () => {
   const lever = { action: '每月多存 ¥1,250', gain: 1.4 };
-  const all = { ...summary, place: { name: '泰国', gain: 4.3 }, fifth: '同样的年景，从 71 岁花完变成撑到 95 岁', goal: '储蓄率到 45%', lever };
-  assert.equal(summaryCardSpec(all).note, '等你来写：同样的年景，从 71 岁花完变成撑到 95 岁');
-  assert.match(summaryCardSpec({ ...all, fifth: null }).note, /储蓄率到 45%/);
-  assert.equal(summaryCardSpec({ ...all, fifth: null, goal: null }).note, '你的杠杆：每月多存 ¥1,250，早 1.4 年');
-  assert.match(summaryCardSpec({ ...all, fifth: null, goal: null, lever: null }).note, /泰国.*4\.3 年/);
-  assert.equal(summaryCardSpec(summary).note, '');
+  const fifth = { main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完' };
+  const all = { ...summary, place: { name: '泰国', gain: 4.3 }, fifth, goal: '储蓄率到 45%', lever };
+  assert.deepEqual(summaryCardSpec(all).note, { label: '等你来写', main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完' });
+  assert.deepEqual(summaryCardSpec({ ...all, fifth: null }).note, { label: '小目标达成', main: '储蓄率到 45%', detail: '' });
+  assert.deepEqual(summaryCardSpec({ ...all, fifth: null, goal: null }).note, { label: '你的杠杆', main: '每月多存 ¥1,250', detail: '早 1.4 年放假' });
+  assert.deepEqual(summaryCardSpec({ ...all, fifth: null, goal: null, lever: null }).note, { label: '同样的钱', main: '去泰国放假', detail: '早 4.3 年' });
+  assert.equal(summaryCardSpec(summary).note, null);
 });
 
 test('a lever that makes the holiday reachable says the age', () => {
-  assert.equal(summaryCardSpec({ ...summary, lever: { action: '每月多存 ¥1,250', unlockAge: 58 } }).note, '你的杠杆：每月多存 ¥1,250，就能在 58 岁放假');
+  assert.deepEqual(summaryCardSpec({ ...summary, lever: { action: '每月多存 ¥1,250', unlockAge: 58 } }).note, { label: '你的杠杆', main: '每月多存 ¥1,250', detail: '就能在 58 岁放假' });
 });
 
 test('the summary card has no links or QR codes and passes the compliance lint', () => {
@@ -64,7 +65,7 @@ test('the summary card has no links or QR codes and passes the compliance lint',
 
 test('an unreachable result stays upbeat and shows no fake age', () => {
   const s = summaryCardSpec({ mode: 'fwd', type, hero: { ...hero, reachable: false, holidayAge: null, workYears: 65, holidayYears: 0, mondays: 0, people: null }, ribbons: [] });
-  assert.ok(!/null|NaN|undefined/.test(JSON.stringify([s.hero, s.sentence, s.note])));
+  assert.ok(!/null|NaN|undefined/.test(JSON.stringify([s.hero, s.sentence, s.note ?? {}])));
   assert.equal(s.mondays, null, 'no countdown when there is no holiday to count down to');
   assert.equal(s.hero, '还在路上');
   assert.match(s.sentence, /一步步|杠杆/);

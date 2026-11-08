@@ -82,15 +82,37 @@ test('the one card opens beside its button, stays open and follows the numbers',
   await expect.poll(() => page.locator('#share-img').getAttribute('src')).not.toBe(before);
 });
 
-test('once the card is made, its button gives way to two matching next steps', async ({ page }) => {
+const buttonLook = el => { const s = getComputedStyle(el); return [s.fontSize, s.paddingTop, s.paddingLeft, s.borderRadius, s.borderTopWidth].join(' '); };
+
+test('once the card is made, its button gives way to next steps, and every action button looks the same', async ({ page }) => {
   await page.goto('/');
+  const look = await page.locator('#life-draw').evaluate(buttonLook);
+  expect(await page.locator('#share-btn').evaluate(buttonLook)).toBe(look);
   await page.click('#share-btn');
   await expect(page.locator('#share-btn')).toBeHidden();
-  const save = await page.locator('#share-save').boundingBox();
-  const pro = await page.locator('#pro-enter').boundingBox();
-  expect(Math.abs(save.height - pro.height)).toBeLessThan(1);
-  expect(Math.abs(save.width - pro.width)).toBeLessThan(2);
   await expect(page.locator('#share-section h2')).toHaveText('你的放假卡');
+  for (const id of ['#share-save', '#pro-enter']) expect(await page.locator(id).evaluate(buttonLook)).toBe(look);
+  await page.locator('#scenario [data-scn]').first().click();
+  expect(await page.locator('#scn-next').evaluate(buttonLook)).toBe(look);
+});
+
+test('the simple list of parameters keeps only what writes the last life', async ({ page }) => {
+  await page.goto('/');
+  const ids = await page.locator('#cards details').evaluateAll(els => els.map(e => e.dataset.id));
+  expect(ids.sort()).toEqual(['drag', 'expense', 'income', 'life', 'pAge', 'pension', 'retExp', 'swr']);
+  await page.click('#to-bwd');
+  await expect(page.locator('#cards details')).toHaveCount(6);
+});
+
+test('a slider choice is carried into the professional view on request', async ({ page }) => {
+  await page.goto('/');
+  const details = page.locator('#cards details[data-id="life"]');
+  await details.locator('summary').click();
+  await details.locator('input[type=range]').fill('90');
+  await page.click('#to-pro');
+  await expect(page.locator('#views-banner')).toContainText('规划');
+  await page.click('#views-apply');
+  await expect(page.locator('#p-life')).toHaveValue('90');
 });
 
 test('on a phone the card has a save button that hands the picture to the phone', async ({ page }) => {
@@ -148,15 +170,6 @@ test('a decision slider writes the fifth life, and clearing removes it', async (
   await expect(page.locator('#lab-clear')).toHaveCount(0);
 });
 
-test('an assumption slider only previews, because nobody chooses the market', async ({ page }) => {
-  await page.goto('/');
-  const details = page.locator('#cards details[data-id="sigEq"]');
-  await details.locator('summary').click();
-  await details.locator('input[type=range]').fill('0.3');
-  await expect(details.locator('output')).toContainText('成功率');
-  await expect(page.locator('#lives .life.fifth')).toHaveCount(0);
-});
-
 test('changing the real plan clears slider rewrites', async ({ page }) => {
   await page.goto('/');
   const details = page.locator('#cards details[data-id="retExp"]');
@@ -169,21 +182,21 @@ test('changing the real plan clears slider rewrites', async ({ page }) => {
 
 test('moving a slider lights up that parameter, and progress survives a reload', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('#lab-progress')).toContainText('0/20');
-  const details = page.locator('#cards details[data-id="assets"]');
+  await expect(page.locator('#lab-progress')).toContainText('0/14');
+  const details = page.locator('#cards details[data-id="retExp"]');
   await details.locator('summary').click();
-  await details.locator('input[type=range]').fill('900000');
-  await expect(page.locator('#lab-progress')).toContainText('1/20');
+  await details.locator('input[type=range]').fill('60000');
+  await expect(page.locator('#lab-progress')).toContainText('1/14');
   await expect(details).toHaveClass(/played/);
   await page.reload();
-  await expect(page.locator('#lab-progress')).toContainText('1/20');
-  await expect(page.locator('#cards details[data-id="assets"]')).toHaveClass(/played/);
+  await expect(page.locator('#lab-progress')).toContainText('1/14');
+  await expect(page.locator('#cards details[data-id="retExp"]')).toHaveClass(/played/);
 });
 
 test('parameters are grouped under headings', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('#cards h4')).toHaveCount(4);
-  await expect(page.locator('#cards details')).toHaveCount(14);
+  await expect(page.locator('#cards h4')).toHaveCount(3);
+  await expect(page.locator('#cards details')).toHaveCount(8);
 });
 
 test('the page stays within a phone screen', async ({ page }) => {
@@ -230,9 +243,9 @@ test('an answer can be changed before moving on', async ({ page }) => {
 test('answers light up their parameters and survive a reload', async ({ page }) => {
   await page.goto('/');
   await answer(page);
-  await expect(page.locator('#lab-progress')).toContainText('1/20');
+  await expect(page.locator('#lab-progress')).toContainText('1/14');
   await page.reload();
-  await expect(page.locator('#lab-progress')).toContainText('1/20');
+  await expect(page.locator('#lab-progress')).toContainText('1/14');
   await expect(page.locator('#lives .life.fifth')).toHaveCount(1);
 });
 
@@ -346,11 +359,8 @@ test('working backward, the type and the saving sliders follow the asked-for age
   await page.fill('#s-tage', '45');
   await page.waitForTimeout(400);
   await expect(page.locator('#type-section')).toContainText('45 岁放假');
-  const details = page.locator('#cards details[data-id="income"]');
-  await details.locator('summary').click();
-  await expect(details.locator('output')).toContainText('只是试算');
-  await details.locator('input[type=range]').fill(await details.locator('input[type=range]').getAttribute('max'));
-  await expect(page.locator('#lives .life.fifth')).toHaveCount(0);
+  await expect(page.locator('#cards details[data-id="income"]')).toHaveCount(0);
+  await expect(page.locator('#cards details[data-id="retExp"]')).toHaveCount(1);
 });
 
 test('broken stored answers are dropped instead of breaking the section', async ({ page }) => {

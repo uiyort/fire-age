@@ -5,7 +5,7 @@ import { bwdSolve, fiNeed, fwdSolve, lifePath } from '../site/js/engine.js';
 import { defaultState, setField, toParams } from '../site/js/state.js';
 import { LIFE_CHOICES, labPlan, lifeChoices } from '../site/js/levers.js';
 import { tipRows } from '../site/js/chart.js';
-import { fifthCompareHtml, fifthSentence, labChangesHtml, livesHtml, ribbonSvg, tryHtml } from '../site/js/views.js';
+import { fifthBrief, fifthCompareHtml, fifthSentence, labChangesHtml, livesHtml, ribbonSvg, tryHtml, viewsBannerHtml } from '../site/js/views.js';
 import { hardestIndex, heroModel, holidayYearsOf, lifeName, lifeNames, lifeRibbon, lifeStory, peopleOf } from '../site/js/holiday.js';
 
 const person = (fields = {}) => {
@@ -369,6 +369,23 @@ test('a written plan never ends before the holiday it keeps', () => {
   const p = person();
   assert.equal(labPlan(p, { values: { life: 70 }, minLife: 81 }).life, 81);
   assert.equal(labPlan(p, { values: { life: 90 }, minLife: 81 }).life, 90);
+});
+
+test('the card gets the written life as one short main line and a quiet detail', () => {
+  const D = v => `¥${Math.round(v / 1e4)}万`;
+  const base = story({ outcome: 'ruined', retireAge: 39, ruinAge: 64 });
+  assert.deepEqual(fifthBrief(base, story({ outcome: 'ruined', retireAge: 42, ruinAge: 64 }), D), { main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 64 岁花完' });
+  assert.deepEqual(fifthBrief(story({ outcome: 'ruined', ruinAge: 71 }), story({ outcome: 'lasted' }), D), { main: '有钱花的假期 28 → 52 年', detail: '钱撑到 95 岁' });
+  assert.deepEqual(fifthBrief(story({ endAssets: 5770000 }), story({ endAssets: 1880000 }), D), { main: '最后剩下 ¥577万 → ¥188万', detail: '钱都撑到 95 岁' });
+  assert.equal(fifthBrief(story(), story(), D), null, 'nothing changed, so the card says something else');
+  assert.deepEqual(fifthBrief(story(), story({ outcome: 'working', retireAge: null }), D), { main: '到 95 岁也放不了假', detail: '' });
+});
+
+test('slider choices join the views carried into the professional view', () => {
+  const html = viewsBannerHtml({}, {}, {}, false, [{ id: 'retExp', name: '退休后每年支出', text: '¥6万' }]);
+  assert.match(html, /退休后每年支出/);
+  assert.match(html, /¥6万/);
+  assert.match(html, /views-apply/);
 });
 
 test('a written life that runs dry sooner says so plainly', () => {

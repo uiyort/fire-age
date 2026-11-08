@@ -25,11 +25,11 @@ export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, e
     big = `${hero.holidayAge} 岁`;
     sentence = `从 ${hero.holidayAge} 岁起，余生皆假期`;
   }
-  let note = '';
-  if (fifth) note = `等你来写：${fifth}`;
-  else if (goal) note = `小目标达成：${goal}`;
-  else if (lever) note = lever.unlockAge ? `你的杠杆：${lever.action}，就能在 ${lever.unlockAge} 岁放假` : `你的杠杆：${lever.action}，早 ${trimYears(lever.gain)} 年`;
-  else if (place) note = `同样的钱去${place.name}，早 ${trimYears(place.gain)} 年`;
+  let note = null;
+  if (fifth) note = { label: '等你来写', main: fifth.main, detail: fifth.detail };
+  else if (goal) note = { label: '小目标达成', main: goal, detail: '' };
+  else if (lever) note = { label: '你的杠杆', main: lever.action, detail: lever.unlockAge ? `就能在 ${lever.unlockAge} 岁放假` : `早 ${trimYears(lever.gain)} 年放假` };
+  else if (place) note = { label: '同样的钱', main: `去${place.name}放假`, detail: `早 ${trimYears(place.gain)} 年` };
   return {
     kind: 'summary', size: [1080, 1440], brand: BRAND, searchHint: SEARCH_HINT,
     eyebrow: `${type.code} ${type.name}`, hero: big, sentence, stats: [],
@@ -300,11 +300,18 @@ function renderSummary(spec, canvas) {
   }
 
   // One line at most, then the lives as a barcode.
+  // The note reads in three weights: a small label, the main line, a quiet detail.
   let noteY = stampBase + 108;
   if (spec.note) {
-    const { px, lines } = noteLayout(measureAt(bold), spec.note, inner);
-    lines.forEach((line, i) => put(bold(px), STUB_INK, line, left, noteY + i * px * 1.3));
-    noteY += (lines.length - 1) * px * 1.3;
+    put(plain(24), STUB_MUTED, spec.note.label, left, stampBase + 96);
+    const { px, lines } = noteLayout(measureAt(bold), spec.note.main, inner, 40, 28);
+    noteY = stampBase + 142;
+    lines.forEach((line, i) => put(bold(px), STUB_INK, line, left, noteY + i * px * 1.25));
+    noteY += (lines.length - 1) * px * 1.25;
+    if (spec.note.detail) {
+      noteY += 38;
+      put(plain(26), STUB_MUTED, spec.note.detail, left, noteY);
+    }
   }
   const hintY = ty + th - 44;
   const barsBottom = hintY - 54;
