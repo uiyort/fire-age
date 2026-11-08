@@ -43,9 +43,11 @@ test('working backward, the type starts the holiday at the age asked for', () =>
   assert.equal(t.status.why, `还有 ${50 - p.age} 年到站。`);
 });
 
-test('the luggage value says it compares the holiday lifestyle with today\'s income', () => {
-  const t = typeOf(person());
-  assert.match(t.axes.find(a => a.key === 'pack').value, /^退休生活≈收入的 \d+%$/);
+test('luggage compares the holiday lifestyle with today\'s, at local prices', () => {
+  const pack = fields => typeOf(person(fields)).axes.find(a => a.key === 'pack');
+  assert.deepEqual([pack({}).letter, pack({}).value], ['T', '退休和现在过得差不多']);
+  assert.deepEqual([pack({ retExp: 180000 }).letter, pack({ retExp: 180000 }).value], ['F', '退休比现在宽裕 1.5 倍']);
+  assert.deepEqual([pack({ retExp: 60000 }).letter, pack({ retExp: 60000 }).value], ['T', '退休只花现在的 50%']);
 });
 
 test('the code has one letter from each of the four axes', () => {
@@ -65,11 +67,11 @@ test('staying put is H, retiring in another place is A', () => {
   assert.equal(letters(typeOf(person({}, { retC: 'TH' })))[1], 'A');
 });
 
-test('spending at most 60% of income is T, more is F, adjusted for local prices', () => {
-  assert.equal(letters(typeOf(person({ income: 300000, expense: 120000, retExp: 180000 })))[2], 'T');
-  assert.equal(letters(typeOf(person({ income: 300000, expense: 120000, retExp: 181000 })))[2], 'F');
+test('a holiday no richer than today is T, a richer one is F, adjusted for local prices', () => {
+  assert.equal(letters(typeOf(person({ income: 300000, expense: 120000, retExp: 126000 })))[2], 'T');
+  assert.equal(letters(typeOf(person({ income: 300000, expense: 120000, retExp: 127000 })))[2], 'F');
   const sameLife = person({ income: 300000, expense: 240000 }, { retC: 'TH' });
-  assert.equal(letters(typeOf(sameLife))[2], 'F', 'cheap places do not change how much luggage you carry');
+  assert.equal(letters(typeOf(sameLife))[2], 'T', 'the same life in a cheap place is still the same luggage');
 });
 
 test('capital doing most of the work is G, savings doing it is S', () => {
@@ -108,8 +110,9 @@ test('progress is reported separately from the type', () => {
 
 test('realistic people land across the types rather than in one', () => {
   const seen = new Set();
-  for (const age of [25, 35, 45, 55]) for (const assets of [50000, 500000, 3000000]) for (const income of [120000, 300000, 800000]) for (const share of [0.4, 0.8]) for (const retC of ['CN', 'TH']) {
-    seen.add(typeOf(person({ age, assets, income, expense: income * share }, { retC })).code);
+  for (const age of [25, 35, 45, 55]) for (const assets of [50000, 500000, 3000000]) for (const income of [120000, 300000, 800000]) for (const share of [0.4, 0.8]) for (const richer of [0.8, 1.3]) {
+    seen.add(typeOf(person({ age, assets, income, expense: income * share, retExp: income * share * richer })).code);
+    seen.add(typeOf(person({ age, assets, income, expense: income * share }, { retC: 'TH' })).code);
   }
   assert.ok(seen.size >= 12, [...seen].join(' '));
 });

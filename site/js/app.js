@@ -608,13 +608,13 @@ function summaryInput() {
   const gain = best.years !== null && here?.years != null ? here.years - best.years : 0;
   const achieved = goal && goalApplies(goal, p) && compareVisit(goal, p, today()).achieved;
   const ribbons = lives.map((life, i) => ({ label: (latest.names ?? lifeNames(stories))[i], cells: lifeRibbon(life).map(c => c.state) }));
-  if (fifth) ribbons.push({ label: '等你来写', cells: lifeRibbon(fifth.path).map(c => c.state) });
+  if (fifth) ribbons.push({ label: '你写的', fifth: true, cells: lifeRibbon(fifth.path).map(c => c.state) });
   return {
     mode, type, hero, ribbons,
     enough: bwd.s0 <= 0,
     monthlyText: wholeMoney(toDisplay(Math.max(bwd.s0, 0) / 12, p, cur), cur),
     place: gain >= 0.05 ? { name: best.name, gain } : null,
-    fifth: fifth ? fifthBrief(fifth.base, fifth.story, latestMoney()) : null,
+    fifth: fifth && fifthBrief(fifth.base, fifth.story, latestMoney()) ? { ...fifthBrief(fifth.base, fifth.story, latestMoney()), baseName: (latest.names ?? lifeNames(stories))[fifth.baseIndex] } : null,
     lit: litCount(),
     goal: achieved ? goal.label : null,
     lever: personalLever(rankLevers(p, DATA, { retC: S.retC, top: 6 }), p, v => money(Math.round(toDisplay(v, p, cur)), cur)),

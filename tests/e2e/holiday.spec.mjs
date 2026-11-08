@@ -92,6 +92,8 @@ test('once the card is made, its button gives way to next steps, and every actio
   await expect(page.locator('#share-btn')).toBeHidden();
   await expect(page.locator('#share-section h2')).toHaveText('你的放假卡');
   for (const id of ['#share-save', '#pro-enter']) expect(await page.locator(id).evaluate(buttonLook)).toBe(look);
+  const fill = await page.locator('#share-save').evaluate(el => getComputedStyle(el).backgroundColor);
+  expect(fill).not.toBe('rgba(0, 0, 0, 0)');
   await page.locator('#scenario [data-scn]').first().click();
   expect(await page.locator('#scn-next').evaluate(buttonLook)).toBe(look);
 });

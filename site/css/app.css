@@ -106,6 +106,8 @@ h2 { font-family: var(--f-display); font-weight: 900; font-size: 19px; line-heig
 .lever .gain { font-family: var(--f-mono); color: var(--accent); font-weight: 500; white-space: nowrap; }
 .ghost { font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; }
 .ghost:hover, .ghost:focus-visible { background: var(--accent-soft); }
+.ghost.fill { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.ghost.fill:hover, .ghost.fill:focus-visible { background: var(--accent); filter: brightness(1.1); }
 .goal-row { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-top: 8px; }
 
 .solves { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 10px; margin-top: 10px; }

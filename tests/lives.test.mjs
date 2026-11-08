@@ -183,7 +183,7 @@ test('working backward, the saving sliders are only a trial and do not write the
   }
   const range = { min: 0, max: 10, step: 1, value: 5 };
   assert.match(tryHtml('income', range, 5, { mode: 'bwd' }), /只是试算/);
-  assert.match(tryHtml('income', range, 5, { mode: 'fwd' }), /等你来写/);
+  assert.ok(!/等你来写|不改你的计划/.test(tryHtml('income', range, 5, { mode: 'fwd' })), 'the section heading already says this');
 });
 
 test('a return that rounds to zero is not painted as a loss', () => {

@@ -159,7 +159,7 @@ export const tryValueText = (value, unit, p) => {
 export function tryHtml(id, range, current = range.value, { mode = 'fwd' } = {}) {
   const fixed = mode === 'bwd' && !lifeChoices('bwd').includes(id) && lifeChoices('fwd').includes(id);
   const hint = fixed ? '按想几岁放假反推时，存多少由目标决定，这一项只是试算。'
-    : lifeChoices(mode).includes(id) ? '拖动后写进“等你来写”，不改你的计划。' : '这一项不由你决定，只是试算。';
+    : lifeChoices(mode).includes(id) ? '' : '这一项不由你决定，只是试算。';
   return `<div class="try"><label class="try-lab">拖一拖试试 <input type="range" data-try="${id}" min="${range.min}" max="${range.max}" step="${range.step}" value="${current}"></label><output>${hint}</output></div>`;
 }
 

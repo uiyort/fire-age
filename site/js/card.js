@@ -26,7 +26,7 @@ export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, e
     sentence = `从 ${hero.holidayAge} 岁起，余生皆假期`;
   }
   let note = null;
-  if (fifth) note = { label: '等你来写', main: fifth.main, detail: fifth.detail };
+  if (fifth) note = { label: `最下面那行是你写的：按你的判断，重走「${fifth.baseName}」那段年景`, main: fifth.main, detail: fifth.detail };
   else if (goal) note = { label: '小目标达成', main: goal, detail: '' };
   else if (lever) note = { label: '你的杠杆', main: lever.action, detail: lever.unlockAge ? `就能在 ${lever.unlockAge} 岁放假` : `早 ${trimYears(lever.gain)} 年放假` };
   else if (place) note = { label: '同样的钱', main: `去${place.name}放假`, detail: `早 ${trimYears(place.gain)} 年` };
@@ -303,29 +303,44 @@ function renderSummary(spec, canvas) {
   // The note reads in three weights: a small label, the main line, a quiet detail.
   let noteY = stampBase + 108;
   if (spec.note) {
-    put(plain(24), STUB_MUTED, spec.note.label, left, stampBase + 96);
+    put(plain(24), STUB_MUTED, spec.note.label, left, stampBase + 90);
     const { px, lines } = noteLayout(measureAt(bold), spec.note.main, inner, 40, 28);
-    noteY = stampBase + 142;
+    noteY = stampBase + 136;
     lines.forEach((line, i) => put(bold(px), STUB_INK, line, left, noteY + i * px * 1.25));
     noteY += (lines.length - 1) * px * 1.25;
     if (spec.note.detail) {
-      noteY += 38;
-      put(plain(26), STUB_MUTED, spec.note.detail, left, noteY);
+      // The detail sits after the main line when it fits, so the lives below keep their room.
+      const mainW = measureAt(bold)(lines[lines.length - 1], px), detailW = measureAt(plain)(spec.note.detail, 26);
+      if (mainW + 24 + detailW <= inner) put(plain(26), STUB_MUTED, spec.note.detail, left + mainW + 24, noteY);
+      else { noteY += 38; put(plain(26), STUB_MUTED, spec.note.detail, left, noteY); }
     }
   }
+  // The lives, one named row each on one age scale; the row the person wrote is picked out.
   const hintY = ty + th - 44;
-  const barsBottom = hintY - 54;
+  const barsBottom = hintY - 78;
   const rows = spec.ribbons.length;
-  const gap = 5, barH = rows ? Math.min((barsBottom - noteY - 18 - gap * (rows - 1)) / rows, 22) : 0;
+  const gap = 5, barH = rows ? Math.min((barsBottom - noteY - 22 - gap * (rows - 1)) / rows, 22) : 0;
   const maxCells = Math.max(1, ...spec.ribbons.map(r => r.cells.length));
-  const cellW = inner / maxCells;
+  const labelW = 128, barLeft = left + labelW;
+  const cellW = (inner - labelW) / maxCells;
+  const labelPx = Math.max(Math.min(barH + 4, 22), 15);
   spec.ribbons.forEach((ribbon, row) => {
     const y = barsBottom - (rows - row) * (barH + gap) + gap;
+    put(ribbon.fifth ? bold(labelPx) : plain(labelPx), ribbon.fifth ? DEEP : STUB_MUTED, ribbon.label, left, y + barH / 2 + labelPx * 0.36);
+    if (ribbon.fifth) {
+      ctx.strokeStyle = SUN;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(barLeft - 4, y - 3, inner - labelW + 6, barH + 6);
+    }
     ribbon.cells.forEach((state, i) => {
       ctx.fillStyle = CELL_COLORS[state];
-      ctx.fillRect(left + i * cellW, y, Math.max(cellW - 2, 1), barH);
+      ctx.fillRect(barLeft + i * cellW, y, Math.max(cellW - 2, 1), barH);
     });
   });
+  if (rows) {
+    put(plain(22), STUB_MUTED, `${spec.route.startAge} 岁`, barLeft, barsBottom + 30);
+    put(plain(22), STUB_MUTED, `${spec.route.endAge} 岁`, right, barsBottom + 30, 'right');
+  }
   put(bold(36), DEEP, spec.searchHint, left, hintY);
   put(plain(26), STUB_MUTED, spec.brand, right, hintY, 'right');
 }

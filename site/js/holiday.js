@@ -9,14 +9,15 @@ export const mondaysIn = years => Math.round(years * DAYS_PER_YEAR / 7);
 export const workdaysIn = years => Math.round(years * WORKDAYS_PER_YEAR);
 
 const EARLY_AGE = 50;
-const LIGHT_SHARE = 0.6;
+// Within 5% of today's lifestyle counts as the same.
+const SAME_BAND = 0.05;
 const GROW_SHARE = 0.5;
 
 // Four questions about a holiday, each with two answers. One letter from each makes the type.
 export const AXES = [
   { key: 'when', name: '启程', poles: { E: '早', L: '晚' }, rule: '放假年龄在 50 岁及以前是 E，之后或还到不了是 L。' },
   { key: 'where', name: '目的地', poles: { H: '在地', A: '远方' }, rule: '在现在生活的地方放假是 H，换个地方是 A。' },
-  { key: 'pack', name: '行李', poles: { T: '轻装', F: '宽裕' }, rule: '放假后的生活水平（按两地物价折算）相当于现在收入的多少：不超过 60% 是 T，超过是 F。放假后的钱来自积蓄，所以可以超过 100%。' },
+  { key: 'pack', name: '行李', poles: { T: '轻装', F: '宽裕' }, rule: '放假后的生活和现在比（按两地物价折算）：不比现在宽裕是 T，比现在宽裕是 F。' },
   { key: 'fare', name: '路费', poles: { S: '靠存', G: '靠滚' }, rule: '放假时一半以上的资产来自现有本金的复利是 G，否则是 S。' },
 ];
 
@@ -61,19 +62,25 @@ function progress(p, t) {
 }
 
 // Working backward, retireT is the asked-for holiday, and the plan arrives exactly at the money it needs.
+function packText(lifestyle) {
+  if (!Number.isFinite(lifestyle)) return '现在没有填支出';
+  if (Math.abs(lifestyle - 1) <= SAME_BAND) return '退休和现在过得差不多';
+  return lifestyle > 1 ? `退休比现在宽裕 ${lifestyle.toFixed(1)} 倍` : `退休只花现在的 ${percent(lifestyle)}`;
+}
+
 export function holidayType(p, data, { workC, retC, retireT }) {
   const backward = retireT !== undefined;
   const t = backward ? retireT : fwdSolve(p);
   const age = t === null ? null : p.age + t;
   const priceRatio = data.countries[retC].priceLevel.value / data.countries[workC].priceLevel.value;
-  const spendShare = p.income > 0 ? conv(p.retExp, p.rCur, p.wCur, p.fx) / priceRatio / p.income : Infinity;
+  const lifestyle = p.expense > 0 ? conv(p.retExp, p.rCur, p.wCur, p.fx) / priceRatio / p.expense : Infinity;
   const atHoliday = t === null ? 0 : backward ? fiNeed(p, t) : assetsAt(p, t);
   const capitalShare = atHoliday > 0 ? Math.min(p.assets * Math.pow(1 + p.r, t) / atHoliday, 1) : 0;
 
   const picks = {
     when: [age !== null && age <= EARLY_AGE ? 'E' : 'L', age === null ? '还没到' : `${age} 岁放假`],
     where: [workC === retC ? 'H' : 'A', data.countries[retC].name],
-    pack: [spendShare <= LIGHT_SHARE ? 'T' : 'F', Number.isFinite(spendShare) ? `退休生活≈收入的 ${percent(spendShare)}` : '目前没有收入'],
+    pack: [lifestyle <= 1 + SAME_BAND ? 'T' : 'F', packText(lifestyle)],
     fare: [capitalShare >= GROW_SHARE ? 'G' : 'S', t === null ? '还在攒' : `本金复利占 ${percent(capitalShare)}`],
   };
   const axes = AXES.map(axis => {

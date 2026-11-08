@@ -44,9 +44,9 @@ test('the summary card is a ticket: route, people, Mondays, lit parameters and a
 
 test('the summary card carries one note at most, the most personal one, as a label, a main line and a detail', () => {
   const lever = { action: '每月多存 ¥1,250', gain: 1.4 };
-  const fifth = { main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完' };
+  const fifth = { main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完', baseName: '中途断粮' };
   const all = { ...summary, place: { name: '泰国', gain: 4.3 }, fifth, goal: '储蓄率到 45%', lever };
-  assert.deepEqual(summaryCardSpec(all).note, { label: '等你来写', main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完' });
+  assert.deepEqual(summaryCardSpec(all).note, { label: '最下面那行是你写的：按你的判断，重走「中途断粮」那段年景', main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完' });
   assert.deepEqual(summaryCardSpec({ ...all, fifth: null }).note, { label: '小目标达成', main: '储蓄率到 45%', detail: '' });
   assert.deepEqual(summaryCardSpec({ ...all, fifth: null, goal: null }).note, { label: '你的杠杆', main: '每月多存 ¥1,250', detail: '早 1.4 年放假' });
   assert.deepEqual(summaryCardSpec({ ...all, fifth: null, goal: null, lever: null }).note, { label: '同样的钱', main: '去泰国放假', detail: '早 4.3 年' });
