@@ -2,7 +2,7 @@
 import { coastNeed, conv, fiNeed, fwdSolve, swrFor, bwdSolve, savingsAt, savingsRate, buildParams } from './engine.js';
 import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn } from './holiday.js';
 import { MIN_SHOWN, SCENARIOS, answerValues, scenarioOptions } from './scenario.js';
-import { LIFE_CHOICES, impactOf, tryParam } from './levers.js';
+import { impactOf, lifeChoices, tryParam } from './levers.js';
 
 const moneyFormats = {};
 export function money(v, cur) {
@@ -156,8 +156,10 @@ const tryValueText = (value, unit, p) => {
   return unit ? `${value} ${unit}` : String(value);
 };
 
-export function tryHtml(id, range, current = range.value) {
-  const hint = LIFE_CHOICES.includes(id) ? '拖动后写进“等你来写”，不改你的计划。' : '这一项不由你决定，只是试算。';
+export function tryHtml(id, range, current = range.value, { mode = 'fwd' } = {}) {
+  const fixed = mode === 'bwd' && !lifeChoices('bwd').includes(id) && lifeChoices('fwd').includes(id);
+  const hint = fixed ? '按想几岁放假反推时，存多少由目标决定，这一项只是试算。'
+    : lifeChoices(mode).includes(id) ? '拖动后写进“等你来写”，不改你的计划。' : '这一项不由你决定，只是试算。';
   return `<div class="try"><label class="try-lab">拖一拖试试 <input type="range" data-try="${id}" min="${range.min}" max="${range.max}" step="${range.step}" value="${current}"></label><output>${hint}</output></div>`;
 }
 
@@ -335,9 +337,15 @@ const endingText = (story, D) => {
 };
 
 // What sets one draw of years apart from another: the first holiday years, the whole holiday, and the hard falls.
+// Rates are coloured against the plan the row belongs to, compared as shown (whole percent).
 function lifeRow(path, story, index, selected, D, { fifth = false, maxCells, p, name: given, hardest = false }) {
-  const rate = r => `<b class="${Math.round(r * 100) < 0 ? 'bad' : r >= p.r ? 'good' : ''}">${signedPct(r)}/年</b>`;
-  const luck = story.holidayReturn === null ? ['一直在上班'] : [`放假头 5 年 ${rate(story.firstFive)}`, `整个假期 ${rate(story.holidayReturn)}`];
+  const expected = Math.round(p.r * 100);
+  const rate = r => {
+    if (r === null || r === undefined) return '<b>—</b>';
+    const whole = Math.round(r * 100);
+    return `<b class="${whole < 0 ? 'bad' : whole >= expected ? 'good' : ''}">${signedPct(r)}/年</b>`;
+  };
+  const luck = story.outcome === 'working' ? ['一直在上班'] : [`放假头 5 年 ${rate(story.firstFive)}`, `整个假期 ${rate(story.holidayReturn)}`];
   const facts = [...luck, `大跌 ${story.badYears} 次`];
   const name = fifth ? '等你来写' : given ?? lifeName(story);
   const tag = hardest ? '<span class="pill bad life-tag">最难</span>' : '';
@@ -349,7 +357,7 @@ export function livesHtml(lives, stories, selected, { p, dispCur, fifth = null, 
   const maxCells = Math.max(...[...lives, ...(fifth ? [fifth.path] : [])].map(l => l.years.length - 1));
   const rows = lives.map((life, i) => lifeRow(life, stories[i], i, selected, D, { maxCells, p, name: names[i], hardest: i === hardest })).join('');
   const last = fifth
-    ? lifeRow(fifth.path, fifth.story, lives.length, selected, D, { fifth: true, maxCells, p })
+    ? lifeRow(fifth.path, fifth.story, lives.length, selected, D, { fifth: true, maxCells, p: fifth.plan ?? p })
     : '<div class="life-empty" id="life-fifth-empty"><b>等你来写</b>说说你对未来年景的判断，它会用这四条里最难的那段日子，按你的判断重走一遍。</div>';
   return rows + last;
 }

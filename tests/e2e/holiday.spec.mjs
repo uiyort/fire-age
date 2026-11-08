@@ -320,6 +320,19 @@ test('working backward, a shorter plan in the written life does not break the se
   expect(errors).toEqual([]);
 });
 
+test('working backward, the type and the saving sliders follow the asked-for age', async ({ page }) => {
+  await page.goto('/');
+  await page.click('#to-bwd');
+  await page.fill('#s-tage', '45');
+  await page.waitForTimeout(400);
+  await expect(page.locator('#type-section')).toContainText('45 岁放假');
+  const details = page.locator('#cards details[data-id="income"]');
+  await details.locator('summary').click();
+  await expect(details.locator('output')).toContainText('只是试算');
+  await details.locator('input[type=range]').fill(await details.locator('input[type=range]').getAttribute('max'));
+  await expect(page.locator('#lives .life.fifth')).toHaveCount(0);
+});
+
 test('broken stored answers are dropped instead of breaking the section', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('fire-age-views-v1', JSON.stringify({ market: 9, crash: 1, gone: 1, nerve: 'x' })));
   await page.goto('/');

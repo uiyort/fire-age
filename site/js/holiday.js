@@ -60,12 +60,14 @@ function progress(p, t) {
   return { id: 'onway', name: '在路上', why: `还有 ${t} 年到站。` };
 }
 
-export function holidayType(p, data, { workC, retC }) {
-  const t = fwdSolve(p);
+// Working backward, retireT is the asked-for holiday, and the plan arrives exactly at the money it needs.
+export function holidayType(p, data, { workC, retC, retireT }) {
+  const backward = retireT !== undefined;
+  const t = backward ? retireT : fwdSolve(p);
   const age = t === null ? null : p.age + t;
   const priceRatio = data.countries[retC].priceLevel.value / data.countries[workC].priceLevel.value;
   const spendShare = p.income > 0 ? conv(p.retExp, p.rCur, p.wCur, p.fx) / priceRatio / p.income : Infinity;
-  const atHoliday = t === null ? 0 : assetsAt(p, t);
+  const atHoliday = t === null ? 0 : backward ? fiNeed(p, t) : assetsAt(p, t);
   const capitalShare = atHoliday > 0 ? Math.min(p.assets * Math.pow(1 + p.r, t) / atHoliday, 1) : 0;
 
   const picks = {
@@ -113,7 +115,8 @@ export function lifeStory(path, p) {
   // The luck of a life, counted only while the money lasts.
   const kept = years.filter(y => y.ret !== null && (ruinAge === null || y.age < ruinAge));
   const onHoliday = retireT === null ? [] : kept.filter(y => y.t >= retireT).map(y => y.ret);
-  const holidayReturn = onHoliday.length ? Math.pow(onHoliday.reduce((acc, r) => acc * (1 + r), 1), 1 / onHoliday.length) - 1 : null;
+  // A life that runs dry in its first holiday year falls back to its first holiday years.
+  const holidayReturn = onHoliday.length ? Math.pow(onHoliday.reduce((acc, r) => acc * (1 + r), 1), 1 / onHoliday.length) - 1 : retireT === null ? null : firstFive;
   const last = years[years.length - 1];
   return {
     outcome: retireT === null ? 'working' : ruinAge !== null ? 'ruined' : 'lasted',

@@ -33,6 +33,16 @@ test('years become Mondays and workdays', () => {
 
 const letters = t => t.code.split('');
 
+test('working backward, the type starts the holiday at the age asked for', () => {
+  const { p, workC, retC } = person();
+  const t = holidayType(p, DATA, { workC, retC, retireT: 50 - p.age });
+  const when = t.axes.find(a => a.key === 'when');
+  assert.equal(when.value, '50 岁放假');
+  assert.equal(when.letter, 'E');
+  assert.equal(holidayType(p, DATA, { workC, retC, retireT: 60 - p.age }).axes.find(a => a.key === 'when').letter, 'L');
+  assert.equal(t.status.why, `还有 ${50 - p.age} 年到站。`);
+});
+
 test('the code has one letter from each of the four axes', () => {
   const t = typeOf(person());
   assert.match(t.code, /^[EL][HA][TF][SG]$/);

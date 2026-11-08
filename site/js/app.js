@@ -3,7 +3,7 @@ import DATA from './data-latest.js';
 import { DEFAULT_SEED, bwdSolve, dualAges, fiNeed, fiYears, fwdSolve, lifePath, monteCarlo } from './engine.js';
 import { drawLives, hardestIndex, heroModel, holidayType, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking } from './holiday.js';
 import { commitField, isProUnlocked, loadState, saveState, safeStorage, setField, unlockPro, setRetireCountry, setWorkCountry, toParams } from './state.js';
-import { LIFE_CHOICES, labPlan, rankLevers, impactOf, tryRange } from './levers.js';
+import { labPlan, lifeChoices, rankLevers, impactOf, tryRange } from './levers.js';
 import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody } from './scenario.js';
 import { PARAMS, PARAM_GROUPS } from './params.js';
 import { makeGoal, compareVisit, goalApplies, loadGoal, saveGoal, clearGoal } from './goals.js';
@@ -38,6 +38,8 @@ let frame = 0;
 let lifeSeed = DEFAULT_SEED;
 let lifeIndex = 0;
 let labValues = {};
+// Slider values that write the last life. Working backward, the saving plan is fixed, so saving sliders are left out.
+const writtenSliders = () => Object.fromEntries(Object.entries(labValues).filter(([id]) => lifeChoices(S.mode).includes(id)));
 const VIEWS_KEY = 'fire-age-views-v1';
 let scnIndex = 0;
 let scnAnswers = loadAnswers();
@@ -267,7 +269,7 @@ function renderFast() {
   const levers = rankLevers(p, DATA, { retC: S.retC });
   const retireT = S.mode === 'bwd' ? bwd.n : t;
   const target = Array.from({ length: p.life - p.age + 1 }, (_, i) => fiNeed(p, i));
-  const type = holidayType(p, DATA, { workC: S.workC, retC: S.retC });
+  const type = holidayType(p, DATA, { workC: S.workC, retC: S.retC, ...(S.mode === 'bwd' ? { retireT: bwd.n } : {}) });
   const places = placeRanking(p, DATA, S.retC);
   latest = { ...(latest ?? {}), view: S.view, mode: S.mode, p, t, retireT, years: fiYears(p), dual, bwd, levers, target, type, places, dataVersion: DATA.version, dispCur: cur };
 
@@ -336,14 +338,14 @@ const baseline = () => baselineOf(DATA, S.workC);
 
 function labLabels() {
   const fromViews = SCENARIOS.filter(s => scnAnswers[s.id] !== undefined).map(s => paramById[s.param].name);
-  const fromSliders = Object.keys(labValues).map(id => paramById[id].name);
+  const fromSliders = Object.keys(writtenSliders()).map(id => paramById[id].name);
   return [...new Set([...fromViews, ...fromSliders])];
 }
 
 // The life waiting to be written: the hardest of the four years of luck, walked with the person's own view of the future.
 // Working backward, it keeps the holiday age and the saving plan that were asked for.
 function fifthLife(p, lives, stories, { mode, retireT, s0 }) {
-  const values = { ...answerValues(scnAnswers, baseline()), ...labValues };
+  const values = { ...answerValues(scnAnswers, baseline()), ...writtenSliders() };
   if (!Object.keys(values).length) return null;
   const base = hardestIndex(stories);
   const q = labPlan(p, { values, minLife: mode === 'bwd' ? p.age + retireT + 1 : 0 });
@@ -424,7 +426,7 @@ function renderGoal(p) {
   $('goal-body').innerHTML = goalHtml(goal, compareVisit(goal, p, today()));
 }
 
-const fullCard = (param, p) => cardBody(param, impactOf(p, param.id), tryHtml(param.id, tryRange(p, param.id), labValues[param.id]));
+const fullCard = (param, p) => cardBody(param, impactOf(p, param.id), tryHtml(param.id, tryRange(p, param.id), labValues[param.id], { mode: S.mode }));
 
 function renderCards(p) {
   for (const param of PARAMS) {
@@ -477,7 +479,7 @@ function onInput(ev) {
     const p = toParams(S, DATA);
     el.closest('.try').querySelector('output').textContent = trySentence(p, id, Number(el.value), tryRange(p, id));
     markPlayed(id);
-    if (LIFE_CHOICES.includes(id)) {
+    if (lifeChoices(S.mode).includes(id)) {
       labValues = { ...labValues, [id]: Number(el.value) };
       hideCard();
       renderLives();

@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
 import { bwdSolve, fiNeed, fwdSolve, lifePath } from '../site/js/engine.js';
 import { defaultState, setField, toParams } from '../site/js/state.js';
-import { LIFE_CHOICES, labPlan } from '../site/js/levers.js';
-import { fifthCompareHtml, fifthSentence, labChangesHtml, livesHtml, ribbonSvg } from '../site/js/views.js';
+import { LIFE_CHOICES, labPlan, lifeChoices } from '../site/js/levers.js';
+import { tipRows } from '../site/js/chart.js';
+import { fifthCompareHtml, fifthSentence, labChangesHtml, livesHtml, ribbonSvg, tryHtml } from '../site/js/views.js';
 import { hardestIndex, heroModel, holidayYearsOf, lifeName, lifeNames, lifeRibbon, lifeStory, peopleOf } from '../site/js/holiday.js';
 
 const person = (fields = {}) => {
@@ -146,6 +147,43 @@ test('each life row shows what set its years apart', () => {
   assert.equal((html.match(/整个假期/g) ?? []).length, 2);
   assert.equal((html.match(/大跌 \d+ 次/g) ?? []).length, 2);
   assert.ok(!html.includes('最惨一年'));
+});
+
+test('the written life is coloured against its own plan, and equal-looking rates get the same colour', () => {
+  const p = { ...person(), r: 0.0345 };
+  const t = fwdSolve(p);
+  const life = lifePath(p, t, null, 5);
+  const s = { ...lifeStory(life, p), firstFive: 0.0344, holidayReturn: 0.05 };
+  const base = livesHtml([life], [s], 0, { p, dispCur: p.wCur });
+  assert.match(base, /<b class="good">\+3%\/年<\/b>/, 'shows the same +3% as the plan, so it is not below it');
+  const fifth = { path: life, story: s, plan: { ...p, r: 0.08 } };
+  const html = livesHtml([life], [s], 0, { p, dispCur: p.wCur, fifth });
+  const row = html.split('data-life=')[2];
+  assert.ok(!row.includes('class="good"'), 'its own plan expects 8%, so 5% is not a win');
+});
+
+test('a life that runs dry in its first holiday year still shows its holiday luck', () => {
+  const s = lifeStory(path(0, 30, [-0.6, -0.5, 0.1]), person());
+  assert.notEqual(s.holidayReturn, null);
+  const p = person();
+  const life = lifePath(p, 0, null, 5);
+  const html = livesHtml([life], [{ ...lifeStory(life, p), outcome: 'ruined', ruinAge: p.age, holidayReturn: null, firstFive: null }], 0, { p, dispCur: p.wCur });
+  assert.ok(!html.includes('一直在上班'));
+});
+
+test('the chart tip lists only lives that reach that age', () => {
+  const rows = tipRows([{ label: 'a', values: [1, 2, 3] }, { label: 'b', values: [1, 2] }], 2, v => String(v));
+  assert.deepEqual(rows, [['a', '3']]);
+});
+
+test('working backward, the saving sliders are only a trial and do not write the life', () => {
+  for (const id of ['income', 'expense', 'growth']) {
+    assert.ok(!lifeChoices('bwd').includes(id), id);
+    assert.ok(lifeChoices('fwd').includes(id), id);
+  }
+  const range = { min: 0, max: 10, step: 1, value: 5 };
+  assert.match(tryHtml('income', range, 5, { mode: 'bwd' }), /只是试算/);
+  assert.match(tryHtml('income', range, 5, { mode: 'fwd' }), /等你来写/);
 });
 
 test('a return that rounds to zero is not painted as a loss', () => {

@@ -128,6 +128,9 @@ export function tryParam(p, id, value) {
 
 // What a person can decide. Age, savings already made and the market are not choices, so sliders for those only preview.
 export const LIFE_CHOICES = ['income', 'expense', 'growth', 'retExp', 'life', 'pension', 'pAge', 'swr', 'drag'];
+// Working backward from a chosen age, the saving plan is set by that age, so income, spending and wage growth change nothing.
+const FIXED_WHEN_BACKWARD = ['income', 'expense', 'growth'];
+export const lifeChoices = mode => (mode === 'bwd' ? LIFE_CHOICES.filter(id => !FIXED_WHEN_BACKWARD.includes(id)) : LIFE_CHOICES);
 
 // The plan with the person's answers and slider values applied. The real plan is untouched.
 export function labPlan(p, { values = {}, minLife = 0 } = {}) {

@@ -83,6 +83,9 @@ export function drawChart(svg, tip, { age, bands, target, retireT, year0, money 
   hit.addEventListener('touchend', hide);
 }
 
+// Tooltip rows for one age: lives that end earlier are left out rather than shown as NaN.
+export const tipRows = (lives, t, money) => lives.filter(l => Number.isFinite(l.values[t])).map(l => [l.label, money(l.values[t])]);
+
 const STATE_COLOUR = { work: 'var(--ink-3)', holiday: 'var(--good)', broke: 'var(--bad)' };
 
 // One life drawn in the same colours as its ribbon, with a dot after each bad year.
@@ -149,7 +152,7 @@ export function drawLivesChart(svg, tip, { age, lives, money }) {
     const px = (ev.touches ? ev.touches[0].clientX : ev.clientX) - svg.getBoundingClientRect().left;
     const t = Math.max(0, Math.min(Y, Math.round((px - m.l) / iw * Y)));
     cross.setAttribute('x1', x(t)); cross.setAttribute('x2', x(t)); cross.setAttribute('visibility', 'visible');
-    tip.innerHTML = `<div class="h">${age + t} 岁</div>${shown.map(l => `<div class="r"><span>${l.label}</span><b>${money(l.values[t])}</b></div>`).join('')}`;
+    tip.innerHTML = `<div class="h">${age + t} 岁</div>${tipRows(shown, t, money).map(([label, value]) => `<div class="r"><span>${label}</span><b>${value}</b></div>`).join('')}`;
     tip.hidden = false;
     const tw = tip.offsetWidth;
     tip.style.left = `${x(t) + 12 + tw > W ? Math.max(x(t) - tw - 12, 0) : x(t) + 12}px`;
