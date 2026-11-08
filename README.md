@@ -4,7 +4,7 @@
 
 [English](README.en.md)
 
-线上地址：上线后填写
+线上地址：https://fire-age.pages.dev
 
 ## 它能做什么
 
