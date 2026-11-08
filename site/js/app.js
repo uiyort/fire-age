@@ -617,6 +617,7 @@ function summaryInput() {
     mode, type, hero, ribbons,
     lit: litCount(),
     issued: latest.dataVersion,
+    years: latest.mc?.bands?.map(b => b[2]) ?? [],
     enough: bwd.s0 <= 0,
     monthlyText: wholeMoney(toDisplay(Math.max(bwd.s0, 0) / 12, p, cur), cur),
     place: gain >= 0.05 ? { name: best.name, gain } : null,

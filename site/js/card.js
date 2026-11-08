@@ -18,7 +18,7 @@ const GROUP_STAMPS = {
 };
 
 // One image, shaped like a boarding pass to the holiday. At most one extra line, the most personal available.
-export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, enough, place, fifth, goal, lever, lit = { done: 0, total: 0 }, issued = '' }) {
+export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, enough, place, fifth, goal, lever, lit = { done: 0, total: 0 }, issued = '', years = [] }) {
   let big, sentence;
   if (mode === 'bwd') {
     big = `${hero.holidayAge} 岁`;
@@ -71,6 +71,7 @@ export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, e
     lit,
     boarding,
     barcode,
+    lifeBars: lifeBars(years, hero.reachable || mode === 'bwd' ? hero.workYears : years.length),
     ticket,
     stampLabels: [`撑到 ${hero.endAge} 岁`, '还要上的周一', '点亮参数'],
   };
@@ -392,9 +393,25 @@ function renderSummary(spec, canvas) {
       put(mono(14), STUB_MUTED, k, codeX + i * cellW, hintY - 84);
       put(bold(22), STUB_INK, v, codeX + i * cellW, hintY - 58);
     });
-    ctx.fillStyle = STUB_INK;
-    barcodeBars(spec.barcode, codeW).forEach(([x, w]) => ctx.fillRect(codeX + x, hintY - 44, w, 34));
-    put(mono(16), STUB_MUTED, `${spec.code} · ${spec.ticket?.route ?? ''}`, right, hintY + 14, 'right');
+    const codeTop = hintY - 44, codeH = 34;
+    if (spec.lifeBars?.length) {
+      // A life barcode: one bar a year. Thin bars are work, thick bars holiday, the height is the median assets;
+      // the first holiday year stands full height in gold.
+      const pitch = codeW / spec.lifeBars.length;
+      spec.lifeBars.forEach((bar, i) => {
+        const w = bar.state === 'work' ? Math.max(pitch * 0.3, 1.5) : bar.state === 'holiday' ? Math.max(pitch * 0.62, 2.5) : 1;
+        const h = bar.start ? codeH : 8 + bar.h * (codeH - 8);
+        ctx.globalAlpha = bar.state === 'broke' ? 0.35 : 1;
+        ctx.fillStyle = bar.start ? SUN : STUB_INK;
+        ctx.fillRect(codeX + i * pitch, codeTop + codeH - h, w, h);
+      });
+      ctx.globalAlpha = 1;
+      put(mono(15), STUB_MUTED, `${spec.code} · ${spec.ticket?.route ?? ''} · 一道一年，高低是资产`, right, hintY + 14, 'right');
+    } else {
+      ctx.fillStyle = STUB_INK;
+      barcodeBars(spec.barcode, codeW).forEach(([x, w]) => ctx.fillRect(codeX + x, codeTop, w, codeH));
+      put(mono(16), STUB_MUTED, `${spec.code} · ${spec.ticket?.route ?? ''}`, right, hintY + 14, 'right');
+    }
   } else {
     put(plain(26), STUB_MUTED, spec.brand, right, hintY, 'right');
   }
@@ -462,6 +479,17 @@ function drawBoarding(ctx, { main, sub, code = '', shape = 'ticket', ink = '#ff8
   ctx.fillText(compact ? sub : sub.split('').join(' '), 0, compact ? 50 : 52);
   ctx.restore();
   ctx.textAlign = 'left';
+}
+
+// One bar per year of the plan: its state, and its height as a share of the largest assets on the way.
+export function lifeBars(years, workYears) {
+  const top = Math.max(...years, 0);
+  const firstHoliday = years.findIndex((a, t) => t >= workYears && a > 0);
+  return years.map((assets, t) => ({
+    state: t < workYears ? 'work' : assets > 0 ? 'holiday' : 'broke',
+    h: top > 0 ? Math.round(assets / top * 1000) / 1000 : 0,
+    ...(t === firstHoliday ? { start: true } : {}),
+  }));
 }
 
 // Bars from the pass number, so the same pass always draws the same code: [x, width] pairs.

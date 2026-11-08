@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { barcodeBars, summaryCardSpec, placeCardSpec, lifeCardSpec, typeCardSpec, fitFontSize, fitLines, noteLayout, wrapText } from '../site/js/card.js';
+import { barcodeBars, lifeBars, summaryCardSpec, placeCardSpec, lifeCardSpec, typeCardSpec, fitFontSize, fitLines, noteLayout, wrapText } from '../site/js/card.js';
 import { findBannedCopy } from '../scripts/lint-copy.mjs';
 
 const type = {
@@ -74,6 +74,19 @@ test('the foot of the card is a barcode with the pass number under it', () => {
   assert.notDeepEqual(barcodeBars('FIRE AGE · EHTS · 43', 300), barcodeBars('FIRE AGE · LAFG · 51', 300));
   const bars = barcodeBars('FIRE AGE · EHTS · 43', 300);
   assert.ok(bars.every(([x, w]) => x >= 0 && x + w <= 300 && w >= 2));
+});
+
+test('the barcode is the life itself: one bar a year, its height the assets, its weight work or holiday', () => {
+  const bars = lifeBars([100, 200, 400, 300, 0], 2);
+  assert.deepEqual(bars.map(b => b.state), ['work', 'work', 'holiday', 'holiday', 'broke']);
+  assert.deepEqual(bars.map(b => b.h), [0.25, 0.5, 1, 0.75, 0]);
+  assert.equal(bars[2].start, true, 'the first holiday year is marked');
+  assert.equal(bars.filter(b => b.start).length, 1);
+  assert.deepEqual(lifeBars([], 2), []);
+  assert.ok(lifeBars([0, 0], 1).every(b => Number.isFinite(b.h)));
+  const s = summaryCardSpec({ ...summary, years: [100, 200, 400] });
+  assert.equal(s.lifeBars.length, 3);
+  assert.equal(summaryCardSpec(summary).lifeBars.length, 0);
 });
 
 test('the summary card spells out the type as four ticket fields', () => {
