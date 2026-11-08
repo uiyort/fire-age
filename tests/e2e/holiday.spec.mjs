@@ -106,6 +106,17 @@ test('the simple list of parameters keeps only what writes the last life', async
   await expect(page.locator('#cards details')).toHaveCount(6);
 });
 
+test('a slider keeps its number and shows the change', async ({ page }) => {
+  await page.goto('/');
+  const details = page.locator('#cards details[data-id="retExp"]');
+  await details.locator('summary').click();
+  await expect(details.locator('output')).toContainText('现在');
+  await details.locator('input[type=range]').fill('60000');
+  await expect(details.locator('output')).toContainText('→');
+  await page.waitForTimeout(500);
+  await expect(details.locator('output')).toContainText('→');
+});
+
 test('a slider choice is carried into the professional view on request', async ({ page }) => {
   await page.goto('/');
   const details = page.locator('#cards details[data-id="life"]');

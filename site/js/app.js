@@ -445,7 +445,7 @@ function renderGoal(p) {
   $('goal-body').innerHTML = goalHtml(goal, compareVisit(goal, p, today()));
 }
 
-const fullCard = (param, p) => cardBody(param, impactOf(p, param.id), tryHtml(param.id, tryRange(p, param.id), labValues[param.id], { mode: S.mode }));
+const fullCard = (param, p) => cardBody(param, impactOf(p, param.id), tryHtml(param.id, tryRange(p, param.id), labValues[param.id], { mode: S.mode, p }));
 
 function renderCards(p) {
   for (const param of PARAMS) {
@@ -684,7 +684,7 @@ function onClick(ev) {
   if (ev.target.id === 'share-btn') {
     $('share-btn').closest('.goal-row').hidden = true;
     $('share-title').textContent = '你的放假卡';
-    $('share-sub').textContent = '专业模式已经打开：全部假设、敏感度表、分位数和 CSV / JSON 导出都在里面。';
+    $('share-sub').textContent = '专业模式已解锁。';
     track('card_generate');
     flushSimulation();
     showCard(summaryCardSpec(summaryInput()));

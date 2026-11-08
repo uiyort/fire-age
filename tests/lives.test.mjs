@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
 import { bwdSolve, fiNeed, fwdSolve, lifePath } from '../site/js/engine.js';
 import { defaultState, setField, toParams } from '../site/js/state.js';
-import { LIFE_CHOICES, labPlan, lifeChoices } from '../site/js/levers.js';
+import { LIFE_CHOICES, labPlan, lifeChoices, tryRange } from '../site/js/levers.js';
 import { tipRows } from '../site/js/chart.js';
 import { fifthBrief, fifthCompareHtml, fifthSentence, labChangesHtml, livesHtml, ribbonSvg, tryHtml, viewsBannerHtml } from '../site/js/views.js';
 import { hardestIndex, heroModel, holidayYearsOf, lifeName, lifeNames, lifeRibbon, lifeStory, peopleOf } from '../site/js/holiday.js';
@@ -174,6 +174,15 @@ test('a life that runs dry in its first holiday year still shows its holiday luc
 test('the chart tip lists only lives that reach that age', () => {
   const rows = tipRows([{ label: 'a', values: [1, 2, 3] }, { label: 'b', values: [1, 2] }], 2, v => String(v));
   assert.deepEqual(rows, [['a', '3']]);
+});
+
+test('a slider shows its current value before it is moved, and the change after', () => {
+  const p = person();
+  const range = tryRange(p, 'retExp');
+  const before = tryHtml('retExp', range, range.value, { mode: 'fwd', p });
+  assert.match(before, /<output>现在 .+：\d+ 岁放假<\/output>/);
+  const moved = tryHtml('retExp', range, range.value * 0.5, { mode: 'fwd', p });
+  assert.match(moved, /<output>.+ → .+：放假 \d+ → \d+ 岁/);
 });
 
 test('working backward, the saving sliders are only a trial and do not write the life', () => {

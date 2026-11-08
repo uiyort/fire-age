@@ -45,9 +45,9 @@ test('working backward, the type starts the holiday at the age asked for', () =>
 
 test('luggage compares the holiday lifestyle with today\'s, at local prices', () => {
   const pack = fields => typeOf(person(fields)).axes.find(a => a.key === 'pack');
-  assert.deepEqual([pack({}).letter, pack({}).value], ['T', '退休和现在过得差不多']);
-  assert.deepEqual([pack({ retExp: 180000 }).letter, pack({ retExp: 180000 }).value], ['F', '退休比现在宽裕 1.5 倍']);
-  assert.deepEqual([pack({ retExp: 60000 }).letter, pack({ retExp: 60000 }).value], ['T', '退休只花现在的 50%']);
+  assert.deepEqual([pack({}).letter, pack({}).value], ['T', '和现在差不多']);
+  assert.deepEqual([pack({ retExp: 180000 }).letter, pack({ retExp: 180000 }).value], ['F', '比现在宽裕 1.5 倍']);
+  assert.deepEqual([pack({ retExp: 60000 }).letter, pack({ retExp: 60000 }).value], ['T', '只花现在的 50%']);
 });
 
 test('the code has one letter from each of the four axes', () => {
@@ -108,13 +108,15 @@ test('progress is reported separately from the type', () => {
   assert.equal(typeOf(person({ assets: 50000, income: 200000, expense: 150000 })).status.id, 'onway');
 });
 
-test('realistic people land across the types rather than in one', () => {
+test('every one of the 16 types is reachable', () => {
   const seen = new Set();
-  for (const age of [25, 35, 45, 55]) for (const assets of [50000, 500000, 3000000]) for (const income of [120000, 300000, 800000]) for (const share of [0.4, 0.8]) for (const richer of [0.8, 1.3]) {
-    seen.add(typeOf(person({ age, assets, income, expense: income * share, retExp: income * share * richer })).code);
-    seen.add(typeOf(person({ age, assets, income, expense: income * share }, { retC: 'TH' })).code);
+  for (const age of [25, 40, 50]) for (const assets of [0, 3000000, 20000000]) for (const income of [100000, 1000000]) for (const share of [0.3, 0.7]) for (const richer of [0.7, 1.6]) for (const retC of ['CN', 'TH']) {
+    let S = setRetireCountry(defaultState(DATA), retC, DATA);
+    for (const [id, value] of Object.entries({ age, assets, income, expense: income * share })) S = setField(S, id, String(value), DATA);
+    S = setField(S, 'retExp', String(Math.round(S.retExp * richer)), DATA);
+    seen.add(holidayType(toParams(S, DATA), DATA, { workC: 'CN', retC }).code);
   }
-  assert.ok(seen.size >= 12, [...seen].join(' '));
+  assert.deepEqual([...seen].sort(), TYPES.map(t => t.code).sort());
 });
 
 test('place ranking covers every country, earliest first, and marks the current one', () => {

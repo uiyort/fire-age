@@ -14,19 +14,16 @@ export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, e
   let big, sentence;
   if (mode === 'bwd') {
     big = `${hero.holidayAge} 岁`;
-    sentence = enough ? `想 ${hero.holidayAge} 岁放假，现在的存款已经够了` : `想 ${hero.holidayAge} 岁放假，每月需存 ${monthlyText}`;
+    sentence = enough ? '现在的存款已经够了' : `每月存 ${monthlyText} 就能到`;
   } else if (!hero.reachable) {
     big = '还在路上';
-    sentence = '还没到放假那天，用杠杆一步步提前';
-  } else if (hero.workYears === 0) {
-    big = '现在';
-    sentence = '从今天起，余生皆假期';
+    sentence = '用杠杆一步步提前';
   } else {
-    big = `${hero.holidayAge} 岁`;
-    sentence = `从 ${hero.holidayAge} 岁起，余生皆假期`;
+    big = hero.workYears === 0 ? '现在' : `${hero.holidayAge} 岁`;
+    sentence = '余生皆假期';
   }
   let note = null;
-  if (fifth) note = { label: `最下面那行是你写的：按你的判断，重走「${fifth.baseName}」那段年景`, main: fifth.main, detail: fifth.detail };
+  if (fifth) note = { label: '你写的人生（最下一行）', main: fifth.main, detail: fifth.detail };
   else if (goal) note = { label: '小目标达成', main: goal, detail: '' };
   else if (lever) note = { label: '你的杠杆', main: lever.action, detail: lever.unlockAge ? `就能在 ${lever.unlockAge} 岁放假` : `早 ${trimYears(lever.gain)} 年放假` };
   else if (place) note = { label: '同样的钱', main: `去${place.name}放假`, detail: `早 ${trimYears(place.gain)} 年` };
@@ -41,6 +38,7 @@ export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, e
     lit,
     note,
     ribbons,
+    stampLabels: [`撑到 ${hero.endAge} 岁`, '还要上的周一', '点亮参数'],
   };
 }
 
@@ -197,7 +195,6 @@ function renderSummary(spec, canvas) {
 
   // Top: the pass itself, and who holds it.
   put(bold(30), CREAM_DIM, '放假通行证  HOLIDAY PASS', left, ty + 74);
-  put(bold(26), CREAM_DIM, '旅客类型', right, ty + 74, 'right');
   const namePx = fitFontSize(measureAt(display), spec.typeName, 300, 64, 40);
   put(display(namePx), CREAM, spec.typeName, right, ty + 156, 'right');
   ctx.font = `${Math.round(namePx * 0.9)}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
@@ -272,9 +269,9 @@ function renderSummary(spec, canvas) {
   // The stub: three stamps.
   const stubTop = tear + 44, colW = inner / 3;
   const label = (text, i) => put(plain(26), STUB_MUTED, text, left + colW * i, stubTop + 24);
-  label('平行的你', 0);
-  label('还有周一', 1);
-  label('点亮参数', 2);
+  label(spec.stampLabels[0], 0);
+  label(spec.stampLabels[1], 1);
+  label(spec.stampLabels[2], 2);
   const stampBase = stubTop + 92;
   if (spec.people === null) {
     put(bold(40), STUB_INK, '还在攒', left, stampBase);

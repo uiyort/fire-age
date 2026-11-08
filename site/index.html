@@ -54,7 +54,7 @@
       <section class="inputs" aria-label="输入">
         <div class="start-intro" id="start-intro" hidden>
           <h2>先填你的数字</h2>
-          <p class="sub">已经填了一组示例，改成你自己的，再算你的放假年龄。数字只在你的浏览器里计算。</p>
+          <p class="sub">改成你自己的数字，只在你的浏览器里算。</p>
         </div>
         <details id="inputs-box" open>
           <summary>改我的数字</summary>
@@ -71,7 +71,7 @@
           <p class="zone-lead" id="lead-faster"></p>
           <div class="card" id="solve-card" hidden>
             <h2>想按时放假，四条路任选其一</h2>
-            <p class="sub">每条路只改一个数字，其余保持你填写的数值。</p>
+            <p class="sub">每条路只改一个数字。</p>
             <div class="solves" id="solves"></div>
           </div>
           <div class="zone-grid">
@@ -81,7 +81,7 @@
             </div>
             <div class="card" id="places-card">
               <h2>同样的钱，在哪放假最早</h2>
-              <p class="sub">支出按当地物价折算，保持同样的生活水平。条越短，放假越早。没算签证、税和医疗，这些要自己查。</p>
+              <p class="sub">按当地物价折算，生活水平不变。不含签证、税和医疗。</p>
               <div id="places"></div>
             </div>
           </div>
@@ -93,7 +93,7 @@
 
           <div class="card simple-only" id="life-section">
             <h2>平行人生</h2>
-            <p class="sub">同一个计划，碰上不同的年景。前四条靠运气，最后一条等你来写。</p>
+            <p class="sub">同一个计划，不同的年景。最后一条由你来写。</p>
             <div class="legend" id="lives-chart-legend"></div>
             <div class="chart-box">
               <svg id="lives-chart" role="img" aria-label="选中的人生：资产变化、每年的状态和放假那一年"></svg>
@@ -109,7 +109,7 @@
               </div>
               <div>
                 <h3 class="lab-title">等你来写</h3>
-                <p class="sub" id="scenario-sub">每个判断都会写进这条人生。题目固定，换一批年景时答案保留，它会改走新一批里最难的那段。答完会匿名计入大家的统计，只记 6 个选项。</p>
+                <p class="sub" id="scenario-sub">你的判断会写进这条人生，换一批年景也保留。答完匿名计入统计，只记 6 个选项。</p>
                 <div id="scenario"></div>
               </div>
             </div>
@@ -142,7 +142,7 @@
           <h2 class="zone-title"><span class="simple-only">你能决定的参数</span><span class="pro-only" hidden>敏感度</span></h2>
 
           <div class="card simple-only">
-            <p class="sub">这些是你自己能决定的。点开拖一拖，会写进"等你来写"，不改你的计划。全部参数都在专业模式里。</p>
+            <p class="sub">拖一拖，结果写进"等你来写"。全部参数在专业模式。</p>
             <p class="lab-progress" id="lab-progress" role="status"></p>
             <div id="cards"></div>
           </div>
@@ -168,7 +168,7 @@
 
         <section class="card simple-only" id="share-section">
           <h2 id="share-title">生成我的放假卡</h2>
-          <p class="sub" id="share-sub">把这一页的结论收进一张放假通行证。生成后，专业模式也会打开：全部假设、敏感度表、分位数和 CSV / JSON 导出。公式和数据来源不用解锁，随时在页脚查看。</p>
+          <p class="sub" id="share-sub">一张图收下你的结论。生成后解锁专业模式。</p>
           <p class="pro-lock-note" id="pro-lock-note" role="status" hidden></p>
           <div class="goal-row"><button type="button" class="ghost" id="share-btn">生成放假卡</button></div>
           <div class="share" id="share-panel" hidden>
@@ -177,7 +177,7 @@
               <button type="button" class="ghost fill" id="share-save">保存图片</button>
               <button type="button" class="ghost" id="pro-enter" hidden>进入专业模式</button>
             </div>
-            <p class="fine" id="share-hint">改了上面的数字，卡片会跟着更新。手机上也可以长按图片保存。</p>
+            <p class="fine" id="share-hint">数字改了，卡片跟着变。手机可长按图片保存。</p>
           </div>
         </section>
       </div>

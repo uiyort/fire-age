@@ -64,8 +64,8 @@ function progress(p, t) {
 // Working backward, retireT is the asked-for holiday, and the plan arrives exactly at the money it needs.
 function packText(lifestyle) {
   if (!Number.isFinite(lifestyle)) return '现在没有填支出';
-  if (Math.abs(lifestyle - 1) <= SAME_BAND) return '退休和现在过得差不多';
-  return lifestyle > 1 ? `退休比现在宽裕 ${lifestyle.toFixed(1)} 倍` : `退休只花现在的 ${percent(lifestyle)}`;
+  if (Math.abs(lifestyle - 1) <= SAME_BAND) return '和现在差不多';
+  return lifestyle > 1 ? `比现在宽裕 ${lifestyle.toFixed(1)} 倍` : `只花现在的 ${percent(lifestyle)}`;
 }
 
 export function holidayType(p, data, { workC, retC, retireT }) {

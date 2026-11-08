@@ -14,13 +14,20 @@ test('the summary card carries the age, slogan, type, brand and search hint', ()
   const s = summaryCardSpec(summary);
   assert.equal(s.kind, 'summary');
   assert.equal(s.hero, '43 岁');
-  assert.equal(s.sentence, '从 43 岁起，余生皆假期');
+  assert.equal(s.sentence, '余生皆假期');
   assert.equal(s.code, 'EHTS');
   assert.equal(s.typeName, '采菊人');
   assert.equal(s.emoji, '🌼');
   assert.equal(s.brand, '放假年龄 / FIRE Age');
   assert.equal(s.searchHint, '搜：放假年龄');
   assert.deepEqual(s.size, [1080, 1440]);
+});
+
+test('the card keeps every label short', () => {
+  const s = summaryCardSpec({ ...summary, fifth: { main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完', baseName: '中途断粮' } });
+  assert.ok([...s.sentence].length <= 10, s.sentence);
+  assert.ok([...s.note.label].length <= 12, s.note.label);
+  assert.deepEqual(s.stampLabels, ['撑到 95 岁', '还要上的周一', '点亮参数']);
 });
 
 test('the summary card spells out the type as four ticket fields', () => {
@@ -46,7 +53,7 @@ test('the summary card carries one note at most, the most personal one, as a lab
   const lever = { action: '每月多存 ¥1,250', gain: 1.4 };
   const fifth = { main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完', baseName: '中途断粮' };
   const all = { ...summary, place: { name: '泰国', gain: 4.3 }, fifth, goal: '储蓄率到 45%', lever };
-  assert.deepEqual(summaryCardSpec(all).note, { label: '最下面那行是你写的：按你的判断，重走「中途断粮」那段年景', main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完' });
+  assert.deepEqual(summaryCardSpec(all).note, { label: '你写的人生（最下一行）', main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完' });
   assert.deepEqual(summaryCardSpec({ ...all, fifth: null }).note, { label: '小目标达成', main: '储蓄率到 45%', detail: '' });
   assert.deepEqual(summaryCardSpec({ ...all, fifth: null, goal: null }).note, { label: '你的杠杆', main: '每月多存 ¥1,250', detail: '早 1.4 年放假' });
   assert.deepEqual(summaryCardSpec({ ...all, fifth: null, goal: null, lever: null }).note, { label: '同样的钱', main: '去泰国放假', detail: '早 4.3 年' });
@@ -75,15 +82,15 @@ test('an unreachable result stays upbeat and shows no fake age', () => {
 test('someone who can stop now gets the today wording', () => {
   const s = summaryCardSpec({ mode: 'fwd', type, hero: { ...hero, holidayAge: 30, workYears: 0, holidayYears: 65, mondays: 0 }, ribbons: [] });
   assert.equal(s.hero, '现在');
-  assert.equal(s.sentence, '从今天起，余生皆假期');
+  assert.equal(s.sentence, '余生皆假期');
   assert.equal(s.mondays, 0);
 });
 
 test('a backward result uses the monthly amount', () => {
   const s = summaryCardSpec({ ...summary, mode: 'bwd', monthlyText: '8,600', enough: false });
-  assert.equal(s.sentence, '想 43 岁放假，每月需存 8,600');
+  assert.equal(s.sentence, '每月存 8,600 就能到');
   const done = summaryCardSpec({ ...summary, mode: 'bwd', monthlyText: '0', enough: true });
-  assert.equal(done.sentence, '想 43 岁放假，现在的存款已经够了');
+  assert.equal(done.sentence, '现在的存款已经够了');
 });
 
 test('long amounts shrink to fit and respect the minimum', () => {

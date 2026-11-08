@@ -156,19 +156,26 @@ export const tryValueText = (value, unit, p) => {
   return unit ? `${value} ${unit}` : String(value);
 };
 
-export function tryHtml(id, range, current = range.value, { mode = 'fwd' } = {}) {
+export function tryHtml(id, range, current = range.value, { mode = 'fwd', p = null } = {}) {
   const fixed = mode === 'bwd' && !lifeChoices('bwd').includes(id) && lifeChoices('fwd').includes(id);
-  const hint = fixed ? '按想几岁放假反推时，存多少由目标决定，这一项只是试算。'
-    : lifeChoices(mode).includes(id) ? '' : '这一项不由你决定，只是试算。';
+  const writes = lifeChoices(mode).includes(id);
+  let hint = fixed ? '按想几岁放假反推时，存多少由目标决定，这一项只是试算。' : writes ? '' : '这一项不由你决定，只是试算。';
+  // Sliders that write the last life always show a number: where it stands, or what moving it changed.
+  if (writes && p) hint = current === range.value ? tryNow(p, id, range) : trySentence(p, id, current, range);
   return `<div class="try"><label class="try-lab">拖一拖试试 <input type="range" data-try="${id}" min="${range.min}" max="${range.max}" step="${range.step}" value="${current}"></label><output>${hint}</output></div>`;
+}
+
+function tryNow(p, id, range) {
+  const { age } = tryParam(p, id, range.value);
+  return `现在 ${tryValueText(range.value, range.unit, p)}：${age === null ? '还到不了放假' : `${age} 岁放假`}`;
 }
 
 export function trySentence(p, id, value, range) {
   const before = tryParam(p, id, range.value), after = tryParam(p, id, value);
-  const age = a => (a === null ? '还到不了' : `${a} 岁`);
+  const age = a => (a === null ? '到不了' : String(a));
   const odds = after.success === null || before.success === null ? '' : `，成功率 ${pct(before.success, 0)} → ${pct(after.success, 0)}`;
   const held = id === 'expense' ? '（退休支出不变）' : '';
-  return `${tryValueText(value, range.unit, p)}${held}：放假年龄 ${age(before.age)} → ${age(after.age)}${odds}`;
+  return `${tryValueText(range.value, range.unit, p)} → ${tryValueText(value, range.unit, p)}${held}：放假 ${age(before.age)} → ${age(after.age)} 岁${odds}`;
 }
 
 const effectText = gain => {
