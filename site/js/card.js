@@ -33,6 +33,7 @@ export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, e
     kind: 'summary', size: [1080, 1440], brand: BRAND, searchHint: SEARCH_HINT,
     eyebrow: `${type.code} ${type.name}`, hero: big, sentence, stats: [],
     code: type.code, typeName: type.name, emoji: type.emoji, group: type.group,
+    fields: type.axes.map(a => ({ label: a.name, letter: a.letter, pole: a.pole, value: a.value })),
     route: { startAge: hero.startAge, holidayAge: hero.holidayAge, endAge: hero.endAge, work: hero.workYears, holiday: hero.holidayYears },
     people: hero.people,
     mondays: hero.reachable ? hero.mondays : null,
@@ -193,9 +194,16 @@ function renderSummary(spec, canvas) {
 
   const left = tx + 60, right = tx + tw - 60, inner = right - left;
 
-  // Top: the pass itself.
+  // Top: the pass itself, and who holds it.
   put(bold(30), CREAM_DIM, '放假通行证  HOLIDAY PASS', left, ty + 74);
-  put(bold(46), CREAM, spec.code.split('').join(' '), right, ty + 76, 'right');
+  put(bold(26), CREAM_DIM, '旅客类型', right, ty + 74, 'right');
+  const namePx = fitFontSize(measureAt(display), spec.typeName, 300, 64, 40);
+  put(display(namePx), CREAM, spec.typeName, right, ty + 156, 'right');
+  ctx.font = `${Math.round(namePx * 0.9)}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.fillText(spec.emoji, right - measureAt(display)(spec.typeName, namePx) - 14, ty + 152);
+  ctx.textAlign = 'left';
+  put(plain(28), CREAM_DIM, `${spec.group} · ${spec.code}`, right, ty + 200, 'right');
 
   // The age is the picture.
   const match = spec.hero.match(/^(\d+) 岁$/);
@@ -208,21 +216,23 @@ function renderSummary(spec, canvas) {
     put(display(fitFontSize(measureAt(display), spec.hero, inner - 240, 190, 80)), SUN, spec.hero, left, heroY - 40);
   }
 
-  // The type, like a stamp in the corner.
-  const stampX = right - 110, stampY = ty + 240;
-  ctx.strokeStyle = CREAM_DIM;
-  ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.arc(stampX, stampY, 104, 0, Math.PI * 2); ctx.stroke();
-  ctx.font = '96px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillStyle = CREAM;
-  ctx.fillText(spec.emoji, stampX, stampY + 34);
-  ctx.textAlign = 'left';
-  put(display(fitFontSize(measureAt(display), spec.typeName, 280, 46, 28)), CREAM, spec.typeName, stampX, stampY + 150, 'center');
-  put(plain(28), CREAM_DIM, spec.group, stampX, stampY + 190, 'center');
-
   const sentencePx = fitFontSize(measureAt(display), spec.sentence, inner, 58, 34);
   put(display(sentencePx), CREAM, spec.sentence, left, heroY + 96);
+
+  // The four letters of the type are the ticket's fields: departure, destination, luggage and fare.
+  const fieldTop = heroY + 150, fieldW = inner / spec.fields.length;
+  spec.fields.forEach((f, i) => {
+    const fx = left + i * fieldW;
+    if (i) {
+      ctx.strokeStyle = 'rgba(169, 196, 180, 0.35)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(fx - 14, fieldTop - 26); ctx.lineTo(fx - 14, fieldTop + 92); ctx.stroke();
+    }
+    put(plain(26), CREAM_DIM, f.label, fx, fieldTop);
+    put(display(52), SUN, f.letter, fx, fieldTop + 56);
+    put(bold(fitFontSize(measureAt(bold), f.pole, fieldW - 70, 34, 24)), CREAM, f.pole, fx + measureAt(display)(f.letter, 52) + 10, fieldTop + 54);
+    put(plain(fitFontSize(measureAt(plain), f.value, fieldW - 24, 24, 16)), CREAM_DIM, f.value, fx, fieldTop + 92);
+  });
 
   // The route: today, through work, to the holiday.
   const { startAge, holidayAge, endAge, work, holiday } = spec.route;

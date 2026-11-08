@@ -23,6 +23,16 @@ test('the summary card carries the age, slogan, type, brand and search hint', ()
   assert.deepEqual(s.size, [1080, 1440]);
 });
 
+test('the summary card spells out the type as four ticket fields', () => {
+  const s = summaryCardSpec(summary);
+  assert.deepEqual(s.fields, [
+    { label: '启程', letter: 'E', pole: '早', value: '43 岁' },
+    { label: '目的地', letter: 'H', pole: '在地', value: '中国大陆' },
+    { label: '行李', letter: 'T', pole: '轻装', value: '40%' },
+    { label: '路费', letter: 'S', pole: '靠存', value: '30%' },
+  ]);
+});
+
 test('the summary card is a ticket: route, people, Mondays, lit parameters and a barcode of lives', () => {
   const s = summaryCardSpec(summary);
   assert.deepEqual(s.route, { startAge: 30, holidayAge: 43, endAge: 95, work: 13, holiday: 52 });

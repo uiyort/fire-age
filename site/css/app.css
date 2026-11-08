@@ -151,8 +151,11 @@ footer p { margin: 0 0 4px; }
 .share { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .share img { width: 100%; max-width: 360px; border-radius: 8px; border: 1px solid var(--line); -webkit-touch-callout: default; }
 .share .fine { margin: 0; }
-.save { display: none; text-decoration: none; }
-@media (hover: hover) and (pointer: fine) { .save { display: inline-block; } }
+#share-hint.emph { color: var(--accent); font-weight: 700; font-size: 15px; }
+body.intro .headline, body.intro .results, body.intro #sticky-bar { display: none; }
+body.intro #inputs-box > summary { display: none; }
+.start-intro h2 { margin: 0 0 4px; }
+.start-row:has(#start-calc[hidden]) { display: none; }
 
 .doc main { max-width: 760px; margin-top: 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .doc h2 { margin-top: 14px; }

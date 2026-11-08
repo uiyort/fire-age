@@ -70,20 +70,29 @@ test('only one card button exists, at the end of the page', async ({ page }) => 
   expect(last).toBe('share-section');
 });
 
-test('the one card opens beside its button and closes when the numbers change', async ({ page }) => {
+test('the one card opens beside its button, stays open and follows the numbers', async ({ page }) => {
   await page.goto('/');
   await page.click('#share-btn');
   await expect(page.locator('#share-section #share-panel')).toBeVisible();
   await expect(page.locator('#share-panel')).toBeInViewport();
+  await expect(page.locator('#share-close')).toHaveCount(0);
+  const before = await page.locator('#share-img').getAttribute('src');
   await page.fill('#s-assets', '900000');
-  await expect(page.locator('#share-panel')).toBeHidden();
+  await expect(page.locator('#share-panel')).toBeVisible();
+  await expect.poll(() => page.locator('#share-img').getAttribute('src')).not.toBe(before);
 });
 
-test('a card can be closed', async ({ page }) => {
+test('on a phone the card has a save button that hands the picture to the phone', async ({ page }) => {
+  await page.addInitScript(() => {
+    navigator.canShare = () => true;
+    navigator.share = async ({ files }) => { window.__saved = files[0].name; };
+  });
   await page.goto('/');
   await page.click('#share-btn');
-  await page.click('#share-close');
-  await expect(page.locator('#share-panel')).toBeHidden();
+  await expect(page.locator('#share-save')).toBeVisible();
+  await expect(page.locator('#share-save')).toHaveText('保存图片');
+  await page.click('#share-save');
+  await expect.poll(() => page.evaluate(() => window.__saved)).toBe('fire-age.png');
 });
 
 test('four lives are there from the start, each with a name, a ribbon and an ending', async ({ page }) => {

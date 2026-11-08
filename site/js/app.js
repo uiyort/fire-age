@@ -28,6 +28,14 @@ const returning = (() => {
     return false;
   }
 })();
+const STARTED_KEY = 'fire-age-started-v1';
+const started = (() => {
+  try {
+    return storage?.getItem(STARTED_KEY) === '1';
+  } catch {
+    return false;
+  }
+})();
 let proUnlocked = isProUnlocked(storage);
 let S = loadState(DATA, storage);
 if (!proUnlocked && S.view === 'pro') S = { ...S, view: 'simple' };
@@ -453,7 +461,7 @@ function countCalculation() {
 }
 
 function refresh() {
-  hideCard();
+  updateCard();
   cancelAnimationFrame(frame);
   frame = requestAnimationFrame(() => {
     renderFast();
@@ -481,7 +489,7 @@ function onInput(ev) {
     markPlayed(id);
     if (lifeChoices(S.mode).includes(id)) {
       labValues = { ...labValues, [id]: Number(el.value) };
-      hideCard();
+      updateCard();
       renderLives();
       focusFifth();
     }
@@ -534,8 +542,49 @@ function onSelect(ev) {
   }
 }
 
-function hideCard() {
-  $('share-panel').hidden = true;
+// Once made, the card stays open and is redrawn shortly after the numbers change.
+let cardTimer;
+let cardPng = '';
+let cardCanvas = null;
+function updateCard() {
+  if ($('share-panel').hidden) return;
+  clearTimeout(cardTimer);
+  cardTimer = setTimeout(() => {
+    flushSimulation();
+    showCard(summaryCardSpec(summaryInput()), { scroll: false });
+  }, 400);
+}
+
+// Phones hand the picture to the system sheet, which can save it to the photos. WeChat's browser cannot, so it
+// points at the long press. Computers download the file.
+async function saveCard() {
+  const touch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+  if (/MicroMessenger/i.test(navigator.userAgent)) {
+    const hint = $('share-hint');
+    hint.textContent = '微信里请长按上面的图片，选择保存。';
+    hint.classList.add('emph');
+    $('share-img').scrollIntoView({ block: 'center' });
+    return;
+  }
+  if (touch) {
+    try {
+      // The page may not fetch data: URLs (connect-src 'self'), so the picture comes straight from the canvas.
+      const blob = await new Promise(resolve => cardCanvas.toBlob(resolve, 'image/png'));
+      const file = new File([blob], 'fire-age.png', { type: 'image/png' });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file] });
+        return;
+      }
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+    }
+  }
+  const link = document.createElement('a');
+  link.href = cardPng;
+  link.download = 'fire-age.png';
+  document.body.append(link);
+  link.click();
+  link.remove();
 }
 
 function summaryInput() {
@@ -556,15 +605,15 @@ function summaryInput() {
   };
 }
 
-function showCard(spec) {
+function showCard(spec, { scroll = true } = {}) {
   const canvas = document.createElement('canvas');
   renderCard(spec, canvas);
-  const png = canvas.toDataURL('image/png');
-  $('share-img').src = png;
-  $('share-download').href = png;
+  cardCanvas = canvas;
+  cardPng = canvas.toDataURL('image/png');
+  $('share-img').src = cardPng;
   $('share-img').alt = [spec.eyebrow, spec.hero, spec.sentence].filter(Boolean).join('，');
   $('share-panel').hidden = false;
-  $('share-panel').scrollIntoView({ block: 'nearest' });
+  if (scroll) $('share-panel').scrollIntoView({ block: 'nearest' });
 }
 
 // A pending simulation would put a stale success rate on the card, so finish it first.
@@ -623,8 +672,16 @@ function onClick(ev) {
     openPro();
     return;
   }
-  if (ev.target.id === 'share-close') {
-    hideCard();
+  if (ev.target.id === 'share-save') {
+    saveCard();
+    return;
+  }
+  if (ev.target.id === 'start-calc') {
+    endIntro();
+    try { storage.setItem(STARTED_KEY, '1'); } catch { /* the start screen shows again next time at worst */ }
+    $('inputs-box').open = false;
+    refresh();
+    requestAnimationFrame(() => $('headline').scrollIntoView({ block: 'start' }));
     return;
   }
   if (ev.target.id === 'crowd-join') {
@@ -658,7 +715,7 @@ function onClick(ev) {
     scnAnswers = { ...scnAnswers, [scenario.id]: Number(scnOption.dataset.scn) };
     saveAnswers();
     markPlayed(scenario.param);
-    hideCard();
+    updateCard();
     renderLives();
     focusFifth();
     return;
@@ -667,14 +724,14 @@ function onClick(ev) {
     track('life_draw');
     lifeSeed = lifeSeed === null ? DEFAULT_SEED : Math.floor(Math.random() * 2 ** 31);
     lifeIndex = 0;
-    hideCard();
+    updateCard();
     flushSimulation();
     return;
   }
   const lifeButton = ev.target.closest('[data-life]');
   if (lifeButton) {
     lifeIndex = Number(lifeButton.dataset.life);
-    hideCard();
+    updateCard();
     renderLives();
     return;
   }
@@ -706,6 +763,18 @@ function onClick(ev) {
   }
 }
 
+function startIntro() {
+  document.body.classList.add('intro');
+  $('start-intro').hidden = false;
+  $('start-calc').hidden = false;
+}
+
+function endIntro() {
+  document.body.classList.remove('intro');
+  $('start-intro').hidden = true;
+  $('start-calc').hidden = true;
+}
+
 function init() {
   buildForm($('simple-form'), 's', SIMPLE_FIELDS);
   buildForm($('pro-form'), 'p', PRO_FIELDS);
@@ -713,7 +782,13 @@ function init() {
   $('data-version').textContent = DATA.version;
   const wide = window.matchMedia('(min-width: 900px)');
   if (returning && !wide.matches) $('inputs-box').open = false;
-  wide.addEventListener('change', ev => { if (ev.matches) $('inputs-box').open = true; });
+  // A first visit on a phone starts with the numbers; a computer shows them beside the result.
+  if (!started && !returning && !wide.matches) startIntro();
+  wide.addEventListener('change', ev => {
+    if (!ev.matches) return;
+    $('inputs-box').open = true;
+    endIntro();
+  });
   $('type-all').innerHTML = allTypesHtml();
   document.addEventListener('input', onInput);
   document.addEventListener('change', ev => {
