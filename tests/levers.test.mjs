@@ -2,7 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
 import { defaultState, toParams, setField } from '../site/js/state.js';
-import { rankLevers, impactOf } from '../site/js/levers.js';
+import { rankLevers, impactOf, personalLever } from '../site/js/levers.js';
+
+test('the personal lever skips the place move everyone shares, and speaks in the person\'s own money', () => {
+  const p = toParams(defaultState(DATA), DATA);
+  const D = v => `¥${Math.round(v).toLocaleString('en-US')}`;
+  const levers = rankLevers(p, DATA, { retC: 'CN' });
+  assert.equal(levers[0].id, 'place', 'the cheapest place usually wins, which is why the card leaves it out');
+  const lever = personalLever(levers, p, D);
+  assert.equal(lever.action, '每月少花 10%（约 ¥1,000）');
+  assert.ok(lever.gain > 0);
+  const save = personalLever([{ id: 'saveRate', gainYears: 0.5, unlocks: false }], p, D);
+  assert.equal(save.action, '每月多存 ¥1,250');
+  assert.equal(personalLever([{ id: 'place', gainYears: 4 }], p, D), null);
+  const unlock = personalLever([{ id: 'growth', unlocks: true, afterYears: 20 }], p, D);
+  assert.deepEqual(unlock, { action: '收入每年多涨 1 个百分点', unlockAge: p.age + 20 });
+});
 import { PARAMS } from '../site/js/params.js';
 import { findBannedCopy } from '../scripts/lint-copy.mjs';
 

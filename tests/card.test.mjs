@@ -43,11 +43,17 @@ test('the summary card is a ticket: route, people, Mondays, lit parameters and a
 });
 
 test('the summary card carries one extra line at most, the most personal one', () => {
-  const all = { ...summary, place: { name: '泰国', gain: 4.3 }, fifth: '同样的年景，从 71 岁花完变成撑到 95 岁', goal: '储蓄率到 45%' };
+  const lever = { action: '每月多存 ¥1,250', gain: 1.4 };
+  const all = { ...summary, place: { name: '泰国', gain: 4.3 }, fifth: '同样的年景，从 71 岁花完变成撑到 95 岁', goal: '储蓄率到 45%', lever };
   assert.equal(summaryCardSpec(all).note, '等你来写：同样的年景，从 71 岁花完变成撑到 95 岁');
-  assert.match(summaryCardSpec({ ...all, fifth: null }).note, /泰国.*4\.3 年/);
-  assert.match(summaryCardSpec({ ...all, fifth: null, place: null }).note, /储蓄率到 45%/);
+  assert.match(summaryCardSpec({ ...all, fifth: null }).note, /储蓄率到 45%/);
+  assert.equal(summaryCardSpec({ ...all, fifth: null, goal: null }).note, '你的杠杆：每月多存 ¥1,250，早 1.4 年');
+  assert.match(summaryCardSpec({ ...all, fifth: null, goal: null, lever: null }).note, /泰国.*4\.3 年/);
   assert.equal(summaryCardSpec(summary).note, '');
+});
+
+test('a lever that makes the holiday reachable says the age', () => {
+  assert.equal(summaryCardSpec({ ...summary, lever: { action: '每月多存 ¥1,250', unlockAge: 58 } }).note, '你的杠杆：每月多存 ¥1,250，就能在 58 岁放假');
 });
 
 test('the summary card has no links or QR codes and passes the compliance lint', () => {

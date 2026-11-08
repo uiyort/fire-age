@@ -10,7 +10,7 @@ const INK = '#14201b', INK_2 = '#48564f', PAPER = '#f4f8f5', ACCENT = '#136f52',
 const trimYears = y => String(Math.round(y * 10) / 10);
 
 // One image, shaped like a boarding pass to the holiday. At most one extra line, the most personal available.
-export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, enough, place, fifth, goal, lit = { done: 0, total: 0 } }) {
+export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, enough, place, fifth, goal, lever, lit = { done: 0, total: 0 } }) {
   let big, sentence;
   if (mode === 'bwd') {
     big = `${hero.holidayAge} 岁`;
@@ -27,8 +27,9 @@ export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, e
   }
   let note = '';
   if (fifth) note = `等你来写：${fifth}`;
-  else if (place) note = `同样的钱去${place.name}，早 ${trimYears(place.gain)} 年`;
   else if (goal) note = `小目标达成：${goal}`;
+  else if (lever) note = lever.unlockAge ? `你的杠杆：${lever.action}，就能在 ${lever.unlockAge} 岁放假` : `你的杠杆：${lever.action}，早 ${trimYears(lever.gain)} 年`;
+  else if (place) note = `同样的钱去${place.name}，早 ${trimYears(place.gain)} 年`;
   return {
     kind: 'summary', size: [1080, 1440], brand: BRAND, searchHint: SEARCH_HINT,
     eyebrow: `${type.code} ${type.name}`, hero: big, sentence, stats: [],

@@ -167,15 +167,15 @@
         </section>
 
         <section class="card simple-only" id="share-section">
-          <h2>生成我的放假卡</h2>
-          <p class="sub">把这一页的结论收进一张放假通行证。生成后，专业模式也会打开：全部假设、敏感度表、分位数和 CSV / JSON 导出。公式和数据来源不用解锁，随时在页脚查看。</p>
+          <h2 id="share-title">生成我的放假卡</h2>
+          <p class="sub" id="share-sub">把这一页的结论收进一张放假通行证。生成后，专业模式也会打开：全部假设、敏感度表、分位数和 CSV / JSON 导出。公式和数据来源不用解锁，随时在页脚查看。</p>
           <p class="pro-lock-note" id="pro-lock-note" role="status" hidden></p>
           <div class="goal-row"><button type="button" class="primary" id="share-btn">生成放假卡</button></div>
           <div class="share" id="share-panel" hidden>
             <img id="share-img" alt="">
-            <div class="goal-row">
+            <div class="share-actions">
               <button type="button" class="primary" id="share-save">保存图片</button>
-              <button type="button" class="ghost" id="pro-enter" hidden>进入专业模式</button>
+              <button type="button" class="secondary" id="pro-enter" hidden>进入专业模式</button>
             </div>
             <p class="fine" id="share-hint">改了上面的数字，卡片会跟着更新。手机上也可以长按图片保存。</p>
           </div>

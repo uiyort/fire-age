@@ -82,6 +82,17 @@ test('the one card opens beside its button, stays open and follows the numbers',
   await expect.poll(() => page.locator('#share-img').getAttribute('src')).not.toBe(before);
 });
 
+test('once the card is made, its button gives way to two matching next steps', async ({ page }) => {
+  await page.goto('/');
+  await page.click('#share-btn');
+  await expect(page.locator('#share-btn')).toBeHidden();
+  const save = await page.locator('#share-save').boundingBox();
+  const pro = await page.locator('#pro-enter').boundingBox();
+  expect(Math.abs(save.height - pro.height)).toBeLessThan(1);
+  expect(Math.abs(save.width - pro.width)).toBeLessThan(2);
+  await expect(page.locator('#share-section h2')).toHaveText('你的放假卡');
+});
+
 test('on a phone the card has a save button that hands the picture to the phone', async ({ page }) => {
   await page.addInitScript(() => {
     navigator.canShare = () => true;

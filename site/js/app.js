@@ -3,7 +3,7 @@ import DATA from './data-latest.js';
 import { DEFAULT_SEED, bwdSolve, dualAges, fiNeed, fiYears, fwdSolve, lifePath, monteCarlo } from './engine.js';
 import { drawLives, hardestIndex, heroModel, holidayType, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking } from './holiday.js';
 import { commitField, isProUnlocked, loadState, saveState, safeStorage, setField, unlockPro, setRetireCountry, setWorkCountry, toParams } from './state.js';
-import { labPlan, lifeChoices, rankLevers, impactOf, tryRange } from './levers.js';
+import { labPlan, lifeChoices, personalLever, rankLevers, impactOf, tryRange } from './levers.js';
 import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody } from './scenario.js';
 import { PARAMS, PARAM_GROUPS } from './params.js';
 import { makeGoal, compareVisit, goalApplies, loadGoal, saveGoal, clearGoal } from './goals.js';
@@ -602,6 +602,7 @@ function summaryInput() {
     fifth: fifth ? fifthSentence(fifth.base, fifth.story, latestMoney()) : null,
     lit: { done: played.size, total: PARAMS.length },
     goal: achieved ? goal.label : null,
+    lever: personalLever(rankLevers(p, DATA, { retC: S.retC, top: 6 }), p, v => money(Math.round(toDisplay(v, p, cur)), cur)),
   };
 }
 
@@ -666,6 +667,9 @@ function onClick(ev) {
     return;
   }
   if (ev.target.id === 'share-btn') {
+    $('share-btn').closest('.goal-row').hidden = true;
+    $('share-title').textContent = '你的放假卡';
+    $('share-sub').textContent = '专业模式已经打开：全部假设、敏感度表、分位数和 CSV / JSON 导出都在里面。';
     track('card_generate');
     flushSimulation();
     showCard(summaryCardSpec(summaryInput()));

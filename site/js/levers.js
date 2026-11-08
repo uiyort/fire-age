@@ -34,6 +34,22 @@ export function rankLevers(p, data, { retC, top = 3 }) {
   return scored.slice(0, top);
 }
 
+// The lever in the person's own money. Moving to the cheapest place is left out: it tops almost everyone's list,
+// so it says nothing about this person.
+const ACTIONS = {
+  spend: (p, D) => `每月少花 10%（约 ${D(p.expense * 0.1 / 12)}）`,
+  saveRate: (p, D) => `每月多存 ${D(p.income * 0.05 / 12)}`,
+  growth: () => '收入每年多涨 1 个百分点',
+  fee: () => '投资费率降 0.5 个百分点',
+};
+
+export function personalLever(levers, p, D) {
+  const lever = levers.find(l => ACTIONS[l.id]);
+  if (!lever) return null;
+  const action = ACTIONS[lever.id](p, D);
+  return lever.unlocks ? { action, unlockAge: Math.round(p.age + lever.afterYears) } : { action, gain: lever.gainYears };
+}
+
 function currentSwrPercent(p) {
   const t = fwdSolve(p) ?? 0;
   return swrFor(p, p.life - p.age - t) * 100;
