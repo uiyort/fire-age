@@ -65,6 +65,7 @@ function progress(p, t) {
 function packText(lifestyle) {
   if (!Number.isFinite(lifestyle)) return '现在没有填支出';
   if (Math.abs(lifestyle - 1) <= SAME_BAND) return '和现在差不多';
+  if (lifestyle > 10) return '比现在宽裕 10 倍以上';
   return lifestyle > 1 ? `比现在宽裕 ${lifestyle.toFixed(1)} 倍` : `只花现在的 ${percent(lifestyle)}`;
 }
 

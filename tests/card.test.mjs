@@ -14,7 +14,7 @@ test('the summary card carries the age, slogan, type, brand and search hint', ()
   const s = summaryCardSpec(summary);
   assert.equal(s.kind, 'summary');
   assert.equal(s.hero, '43 岁');
-  assert.equal(s.sentence, '余生皆假期');
+  assert.equal(s.sentence, type.blurb, 'the line under the age is the type\'s own, not a fixed slogan');
   assert.equal(s.code, 'EHTS');
   assert.equal(s.typeName, '采菊人');
   assert.equal(s.emoji, '🌼');
@@ -25,7 +25,7 @@ test('the summary card carries the age, slogan, type, brand and search hint', ()
 
 test('the card keeps every label short', () => {
   const s = summaryCardSpec({ ...summary, fifth: { main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完', baseName: '中途断粮' } });
-  assert.ok([...s.sentence].length <= 10, s.sentence);
+  assert.ok([...s.sentence].length <= 20, s.sentence);
   assert.ok([...s.note.label].length <= 12, s.note.label);
   assert.deepEqual(s.stampLabels, ['撑到 95 岁', '还要上的周一', '点亮参数']);
 });
@@ -46,16 +46,30 @@ test('a written life reads like a changed ticket: the old value struck out, the 
 });
 
 test('the age wears a boarding stamp that tells how far the trip has got', () => {
-  assert.deepEqual(summaryCardSpec(summary).boarding, { main: '已登机', sub: 'BOARDED' });
-  assert.deepEqual(summaryCardSpec({ ...summary, hero: { ...hero, workYears: 0 } }).boarding, { main: '已起飞', sub: 'DEPARTED' });
-  assert.deepEqual(summaryCardSpec({ ...summary, hero: { ...hero, reachable: false } }).boarding, { main: '候补中', sub: 'STANDBY' });
-  assert.deepEqual(summaryCardSpec({ ...summary, mode: 'bwd', monthlyText: '8,600', enough: false }).boarding, { main: '待登机', sub: 'BOARDING' });
-  assert.deepEqual(summaryCardSpec({ ...summary, mode: 'bwd', enough: true }).boarding, { main: '已登机', sub: 'BOARDED' });
+  const words = s => ({ main: s.boarding.main, sub: s.boarding.sub });
+  assert.deepEqual(words(summaryCardSpec(summary)), { main: '已登机', sub: 'BOARDED' });
+  assert.deepEqual(words(summaryCardSpec({ ...summary, hero: { ...hero, workYears: 0 } })), { main: '已起飞', sub: 'DEPARTED' });
+  assert.deepEqual(words(summaryCardSpec({ ...summary, hero: { ...hero, reachable: false } })), { main: '候补中', sub: 'STANDBY' });
+  assert.deepEqual(words(summaryCardSpec({ ...summary, mode: 'bwd', monthlyText: '8,600', enough: false })), { main: '待登机', sub: 'BOARDING' });
+  assert.deepEqual(words(summaryCardSpec({ ...summary, mode: 'bwd', enough: true })), { main: '已登机', sub: 'BOARDED' });
+});
+
+test('each type group has its own stamp, in its own shape and ink, carrying the type code', () => {
+  const stamp = group => summaryCardSpec({ ...summary, type: { ...type, group } }).boarding;
+  const groups = ['归园派', '主场派', '漫游派', '环球派'].map(stamp);
+  assert.equal(new Set(groups.map(g => g.shape)).size, 4);
+  assert.equal(new Set(groups.map(g => g.ink)).size, 4);
+  assert.equal(stamp('归园派').code, 'EHTS');
 });
 
 test('the foot of the card is a barcode with the pass number under it', () => {
   const s = summaryCardSpec(summary);
   assert.equal(s.barcode, 'FIRE AGE · ' + s.code + ' · 43');
+  assert.deepEqual(s.ticket, { flight: 'FA043', cabin: '经济舱', issued: '', route: '30 → 43 → 95' });
+  const rich = summaryCardSpec({ ...summary, issued: '2026-11', type: { ...type, axes: type.axes.map((a, i) => (i === 2 ? { ...a, letter: 'F', pole: '宽裕' } : a)) } });
+  assert.equal(rich.ticket.cabin, '商务舱');
+  assert.equal(rich.ticket.issued, '2026.11');
+  assert.equal(summaryCardSpec({ ...summary, hero: { ...hero, reachable: false } }).ticket.flight, 'FA---');
   assert.deepEqual(barcodeBars('FIRE AGE · EHTS · 43', 300), barcodeBars('FIRE AGE · EHTS · 43', 300), 'the same pass draws the same bars');
   assert.notDeepEqual(barcodeBars('FIRE AGE · EHTS · 43', 300), barcodeBars('FIRE AGE · LAFG · 51', 300));
   const bars = barcodeBars('FIRE AGE · EHTS · 43', 300);
@@ -65,7 +79,7 @@ test('the foot of the card is a barcode with the pass number under it', () => {
 test('the summary card spells out the type as four ticket fields', () => {
   const s = summaryCardSpec(summary);
   assert.deepEqual(s.fields, [
-    { label: '启程', letter: 'E', pole: '早', value: '43 岁' },
+    { label: '启程', letter: 'E', pole: '早', value: '再上 13 年班' },
     { label: '目的地', letter: 'H', pole: '在地', value: '中国大陆' },
     { label: '行李', letter: 'T', pole: '轻装', value: '40%' },
     { label: '路费', letter: 'S', pole: '靠存', value: '30%' },
@@ -117,7 +131,8 @@ test('an unreachable result stays upbeat and shows no fake age', () => {
 test('someone who can stop now gets the today wording', () => {
   const s = summaryCardSpec({ mode: 'fwd', type, hero: { ...hero, holidayAge: 30, workYears: 0, holidayYears: 65, mondays: 0 }, ribbons: [] });
   assert.equal(s.hero, '现在');
-  assert.equal(s.sentence, '余生皆假期');
+  assert.equal(s.sentence, type.blurb);
+  assert.equal(s.fields[0].value, '现在就走');
   assert.equal(s.mondays, 0);
 });
 

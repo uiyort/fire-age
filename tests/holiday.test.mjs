@@ -48,6 +48,7 @@ test('luggage compares the holiday lifestyle with today\'s, at local prices', ()
   assert.deepEqual([pack({}).letter, pack({}).value], ['T', '和现在差不多']);
   assert.deepEqual([pack({ retExp: 180000 }).letter, pack({ retExp: 180000 }).value], ['F', '比现在宽裕 1.5 倍']);
   assert.deepEqual([pack({ retExp: 60000 }).letter, pack({ retExp: 60000 }).value], ['T', '只花现在的 50%']);
+  assert.equal(pack({ expense: 1000, retExp: 120000 }).value, '比现在宽裕 10 倍以上', 'a tiny spending entry gives no silly ratio');
 });
 
 test('the code has one letter from each of the four axes', () => {

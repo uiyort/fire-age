@@ -9,8 +9,16 @@ const INK = '#14201b', INK_2 = '#48564f', PAPER = '#f4f8f5', ACCENT = '#136f52',
 
 const trimYears = y => String(Math.round(y * 10) / 10);
 
+// Each type group stamps its passes its own way: a round seal, a square seal, a passport oval, a ticket punch.
+const GROUP_STAMPS = {
+  归园派: { shape: 'circle', ink: '#ff9a7a' },
+  主场派: { shape: 'square', ink: '#f3e6c4' },
+  漫游派: { shape: 'oval', ink: '#8fd0ff' },
+  环球派: { shape: 'ticket', ink: '#d9a8ff' },
+};
+
 // One image, shaped like a boarding pass to the holiday. At most one extra line, the most personal available.
-export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, enough, place, fifth, goal, lever, lit = { done: 0, total: 0 } }) {
+export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, enough, place, fifth, goal, lever, lit = { done: 0, total: 0 }, issued = '' }) {
   let big, sentence;
   if (mode === 'bwd') {
     big = `${hero.holidayAge} 岁`;
@@ -20,14 +28,26 @@ export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, e
     sentence = '用杠杆一步步提前';
   } else {
     big = hero.workYears === 0 ? '现在' : `${hero.holidayAge} 岁`;
-    sentence = '余生皆假期';
+    // The line under the age belongs to the type, so two people's cards read differently.
+    sentence = type.blurb;
   }
   // The stamp over the age, as at a gate: boarded, departed, waiting for a seat, or still boarding.
   let boarding = { main: '已登机', sub: 'BOARDED' };
   if (mode === 'bwd') { if (!enough) boarding = { main: '待登机', sub: 'BOARDING' }; }
   else if (!hero.reachable) boarding = { main: '候补中', sub: 'STANDBY' };
   else if (hero.workYears === 0) boarding = { main: '已起飞', sub: 'DEPARTED' };
-  const barcode = ['FIRE AGE', type.code, ...(hero.reachable || mode === 'bwd' ? [hero.holidayAge] : [])].join(' · ');
+  boarding = { ...boarding, code: type.code, ...(GROUP_STAMPS[type.group] ?? GROUP_STAMPS.归园派) };
+  const dated = hero.reachable || mode === 'bwd';
+  const barcode = ['FIRE AGE', type.code, ...(dated ? [hero.holidayAge] : [])].join(' · ');
+  // The small print of a boarding pass, made from what the card already knows.
+  const ticket = {
+    flight: dated ? `FA${String(hero.holidayAge).padStart(3, '0')}` : 'FA---',
+    cabin: type.axes[2]?.letter === 'F' ? '商务舱' : '经济舱',
+    issued: issued ? issued.replace('-', '.') : '',
+    route: dated ? `${hero.startAge} → ${hero.holidayAge} → ${hero.endAge}` : `${hero.startAge} → ? → ${hero.endAge}`,
+  };
+  // The departure field would repeat the big age, so it says how long the wait is instead.
+  const departs = !dated ? null : hero.workYears === 0 ? '现在就走' : `再上 ${hero.workYears} 年班`;
   let note = null;
   if (fifth) {
     // A rewritten life is a changed ticket: the old value is struck out and the new one printed beside it.
@@ -41,7 +61,7 @@ export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, e
     kind: 'summary', size: [1080, 1440], brand: BRAND, searchHint: SEARCH_HINT,
     eyebrow: `${type.code} ${type.name}`, hero: big, sentence, stats: [],
     code: type.code, typeName: type.name, emoji: type.emoji, group: type.group,
-    fields: type.axes.map(a => ({ label: a.name, letter: a.letter, pole: a.pole, value: a.value })),
+    fields: type.axes.map((a, i) => ({ label: a.name, letter: a.letter, pole: a.pole, value: i === 0 && departs ? departs : a.value })),
     route: { startAge: hero.startAge, holidayAge: hero.holidayAge, endAge: hero.endAge, work: hero.workYears, holiday: hero.holidayYears },
     people: hero.people,
     mondays: hero.reachable ? hero.mondays : null,
@@ -51,6 +71,7 @@ export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, e
     lit,
     boarding,
     barcode,
+    ticket,
     stampLabels: [`撑到 ${hero.endAge} 岁`, '还要上的周一', '点亮参数'],
   };
 }
@@ -229,8 +250,8 @@ function renderSummary(spec, canvas) {
   }
   if (spec.boarding) drawBoarding(ctx, spec.boarding, right - 170, heroY - 55);
 
-  const sentencePx = fitFontSize(measureAt(display), spec.sentence, inner, 58, 34);
-  put(display(sentencePx), CREAM, spec.sentence, left, heroY + 96);
+  const sentencePx = fitFontSize(measureAt(display), spec.sentence, inner, 50, 32);
+  put(display(sentencePx), CREAM, spec.sentence, left, heroY + 92);
 
   // The four letters of the type are the ticket's fields: departure, destination, luggage and fare.
   const fieldTop = heroY + 150, fieldW = inner / spec.fields.length;
@@ -241,10 +262,10 @@ function renderSummary(spec, canvas) {
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(fx - 14, fieldTop - 26); ctx.lineTo(fx - 14, fieldTop + 92); ctx.stroke();
     }
-    put(plain(26), CREAM_DIM, f.label, fx, fieldTop);
-    put(display(52), SUN, f.letter, fx, fieldTop + 56);
-    put(bold(fitFontSize(measureAt(bold), f.pole, fieldW - 70, 34, 24)), CREAM, f.pole, fx + measureAt(display)(f.letter, 52) + 10, fieldTop + 54);
-    put(plain(fitFontSize(measureAt(plain), f.value, fieldW - 24, 24, 16)), CREAM_DIM, f.value, fx, fieldTop + 92);
+    put(plain(22), CREAM_DIM, f.label, fx, fieldTop);
+    put(display(48), SUN, f.letter, fx, fieldTop + 54);
+    put(bold(fitFontSize(measureAt(bold), f.pole, fieldW - 70, 32, 24)), CREAM, f.pole, fx + measureAt(display)(f.letter, 48) + 10, fieldTop + 52);
+    put(plain(fitFontSize(measureAt(plain), f.value, fieldW - 24, 22, 16)), CREAM_DIM, f.value, fx, fieldTop + 88);
   });
 
   // The route: today, through work, to the holiday.
@@ -269,42 +290,37 @@ function renderSummary(spec, canvas) {
   stop(left, CREAM);
   if (holiday && work) stop(stopX, SUN);
   stop(right, holiday ? SUN : CREAM_DIM);
-  const labelY = routeY + 58;
-  put(bold(32), CREAM, `${startAge} 岁`, left, labelY);
-  put(bold(32), CREAM, `${endAge} 岁`, right, labelY, 'right');
-  if (holiday && work) {
-    const midX = Math.min(Math.max(stopX, left + 170), right - 190);
-    put(bold(32), SUN, `${holidayAge} 岁`, midX, labelY, 'center');
-  }
-  const legX = work ? left : stopX;
-  if (work && stopX - left > 150) put(plain(28), CREAM_DIM, `上班 ${work} 年`, left + (stopX - left) / 2, routeY - 28, 'center');
+  // The big age already names the stop, and the departure field the work years: the route only adds the holiday's length.
+  const labelY = routeY + 54;
+  put(plain(26), CREAM_DIM, `${startAge} 岁`, left, labelY);
+  put(plain(26), CREAM_DIM, `${endAge} 岁`, right, labelY, 'right');
+  void holidayAge;
   if (holiday) put(bold(30), SUN, `放假 ${holiday} 年`, (stopX + right) / 2, routeY - 30, 'center');
-  void legX;
 
   // The stub: three stamps.
   const stubTop = tear + 44, colW = inner / 3;
-  spec.stampLabels.forEach((text, i) => put(plain(26), STUB_MUTED, text, left + colW * i, stubTop + 24));
-  const stampBase = stubTop + 92;
+  spec.stampLabels.forEach((text, i) => put(plain(22), STUB_MUTED, text, left + colW * i, stubTop + 20));
+  const stampBase = stubTop + 74;
   if (spec.people === null) {
-    put(bold(40), STUB_INK, '还在攒', left, stampBase);
+    put(bold(34), STUB_INK, '还在攒', left, stampBase);
   } else {
-    put(display(64), STUB_INK, `${spec.people}/10`, left, stampBase);
-    for (let i = 0; i < 10; i++) drawPerson(ctx, left + i * 25, stampBase + 16, 34, i < spec.people ? DEEP : STUB_RULE);
+    put(display(48), STUB_INK, `${spec.people}/10`, left, stampBase);
+    for (let i = 0; i < 10; i++) drawPerson(ctx, left + i * 20, stampBase + 12, 26, i < spec.people ? DEEP : STUB_RULE);
   }
   if (spec.mondays === null) {
-    put(bold(40), STUB_INK, '还没开始数', left + colW, stampBase);
+    put(bold(34), STUB_INK, '还没开始数', left + colW, stampBase);
   } else if (spec.mondays) {
-    put(display(64), STUB_INK, spec.mondays.toLocaleString('zh-CN'), left + colW, stampBase);
-    put(plain(26), STUB_MUTED, '个', left + colW + measureAt(display)(spec.mondays.toLocaleString('zh-CN'), 64) + 10, stampBase);
+    put(display(48), STUB_INK, spec.mondays.toLocaleString('zh-CN'), left + colW, stampBase);
+    put(plain(22), STUB_MUTED, '个', left + colW + measureAt(display)(spec.mondays.toLocaleString('zh-CN'), 48) + 8, stampBase);
   } else {
-    put(bold(40), STUB_INK, '不用再等', left + colW, stampBase);
+    put(bold(34), STUB_INK, '不用再等', left + colW, stampBase);
   }
-  put(display(64), STUB_INK, `${spec.lit.done}/${spec.lit.total}`, left + colW * 2, stampBase);
-  const dots = Math.max(spec.lit.total, 1), dotGap = Math.min((colW - 14) / dots, 26);
+  put(display(48), STUB_INK, `${spec.lit.done}/${spec.lit.total}`, left + colW * 2, stampBase);
+  const dots = Math.max(spec.lit.total, 1), dotGap = Math.min((colW - 14) / dots, 20);
   for (let i = 0; i < spec.lit.total; i++) {
     ctx.fillStyle = i < spec.lit.done ? SUN : STUB_RULE;
     ctx.beginPath();
-    ctx.arc(left + colW * 2 + 8 + i * dotGap, stampBase + 32, Math.min(dotGap / 2 - 1, 8), 0, Math.PI * 2);
+    ctx.arc(left + colW * 2 + 6 + i * dotGap, stampBase + 26, Math.min(dotGap / 2 - 1, 6), 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -346,7 +362,7 @@ function renderSummary(spec, canvas) {
   }
   // The lives as thin lines on one age scale: one run per stretch, the person's own row in full colour.
   const hintY = ty + th - 44;
-  const barsBottom = hintY - 84;
+  const barsBottom = hintY - 116;
   const rows = spec.ribbons.length;
   // Each row gets the same pitch; the line and its name both fit inside it.
   const pitch = rows ? Math.min((barsBottom - noteY - 30) / rows, 40) : 0;
@@ -365,13 +381,20 @@ function renderSummary(spec, canvas) {
     });
     ctx.globalAlpha = 1;
   });
-  put(bold(36), DEEP, spec.searchHint, left, hintY);
-  // The foot of a boarding pass: a barcode, and the pass number under it.
+  put(bold(34), DEEP, spec.searchHint, left, hintY);
+  // The foot of a boarding pass: flight, cabin and date in small print, the barcode, and the route under it.
   if (spec.barcode) {
-    const codeW = 320, codeX = right - codeW;
+    const mono = px => `600 ${px}px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+    const codeW = 420, codeX = right - codeW;
+    const small = [['航班 FLIGHT', spec.ticket?.flight], ['舱位 CLASS', spec.ticket?.cabin], ['日期 DATE', spec.ticket?.issued]].filter(([, v]) => v);
+    const cellW = codeW / Math.max(small.length, 1);
+    small.forEach(([k, v], i) => {
+      put(mono(14), STUB_MUTED, k, codeX + i * cellW, hintY - 84);
+      put(bold(22), STUB_INK, v, codeX + i * cellW, hintY - 58);
+    });
     ctx.fillStyle = STUB_INK;
-    barcodeBars(spec.barcode, codeW).forEach(([x, w]) => ctx.fillRect(codeX + x, hintY - 50, w, 38));
-    put(`500 18px ui-monospace, "SF Mono", Menlo, Consolas, monospace`, STUB_MUTED, spec.barcode, right, hintY + 14, 'right');
+    barcodeBars(spec.barcode, codeW).forEach(([x, w]) => ctx.fillRect(codeX + x, hintY - 44, w, 34));
+    put(mono(16), STUB_MUTED, `${spec.code} · ${spec.ticket?.route ?? ''}`, right, hintY + 14, 'right');
   } else {
     put(plain(26), STUB_MUTED, spec.brand, right, hintY, 'right');
   }
@@ -392,28 +415,51 @@ function drawTag(ctx, text, x, y) {
   return w;
 }
 
-// A rubber stamp: two rounded frames, tilted, with the word and its English under it.
-function drawBoarding(ctx, { main, sub }, cx, cy) {
-  const w = 300, h = 150, ink = '#ff8a6b';
+// The outline of a stamp, centred on 0,0: a round seal, a square seal, a passport oval or a punched ticket.
+function stampPath(ctx, shape, inset) {
+  ctx.beginPath();
+  if (shape === 'circle') { ctx.arc(0, 0, 100 - inset, 0, Math.PI * 2); return; }
+  if (shape === 'oval') { ctx.ellipse(0, 0, 160 - inset, 92 - inset, 0, 0, Math.PI * 2); return; }
+  const w = (shape === 'square' ? 196 : 300) - inset * 2, h = (shape === 'square' ? 196 : 150) - inset * 2;
+  if (shape === 'square') { ctx.rect(-w / 2, -h / 2, w, h); return; }
+  // A ticket: rectangle with a bite out of each corner.
+  const r = 18 - inset / 2, x = -w / 2, y = -h / 2;
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y); ctx.arc(x + w, y, r, Math.PI, Math.PI / 2, true);
+  ctx.lineTo(x + w, y + h - r); ctx.arc(x + w, y + h, r, -Math.PI / 2, Math.PI, true);
+  ctx.lineTo(x + r, y + h); ctx.arc(x, y + h, r, 0, -Math.PI / 2, true);
+  ctx.lineTo(x, y + r); ctx.arc(x, y, r, Math.PI / 2, 0, true);
+  ctx.closePath();
+}
+
+const STAMP_TILT = { circle: -0.12, square: 0.08, oval: -0.2, ticket: -0.15 };
+
+// A rubber stamp in the type group's shape and ink: the type code on top, the word, and its English under it.
+function drawBoarding(ctx, { main, sub, code = '', shape = 'ticket', ink = '#ff8a6b' }, cx, cy) {
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(-0.17);
-  ctx.globalAlpha = 0.9;
+  ctx.rotate(STAMP_TILT[shape] ?? -0.15);
+  ctx.globalAlpha = 0.92;
   ctx.strokeStyle = ink;
   ctx.lineWidth = 6;
-  ctx.beginPath();
-  if (typeof ctx.roundRect === 'function') ctx.roundRect(-w / 2, -h / 2, w, h, 18); else ctx.rect(-w / 2, -h / 2, w, h);
+  stampPath(ctx, shape, 0);
   ctx.stroke();
   ctx.lineWidth = 2;
-  ctx.beginPath();
-  if (typeof ctx.roundRect === 'function') ctx.roundRect(-w / 2 + 10, -h / 2 + 10, w - 20, h - 20, 12); else ctx.rect(-w / 2 + 10, -h / 2 + 10, w - 20, h - 20);
+  stampPath(ctx, shape, 11);
   ctx.stroke();
+  if (code) {
+    ctx.fillStyle = ink;
+    ctx.textAlign = 'center';
+    ctx.font = `800 20px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+    ctx.fillText(code.split('').join(' '), 0, shape === 'circle' || shape === 'square' ? -42 : -46);
+  }
+  const compact = shape === 'circle' || shape === 'square';
   ctx.fillStyle = ink;
   ctx.textAlign = 'center';
-  ctx.font = `900 68px ${SERIF}`;
-  ctx.fillText(main, 0, 14);
-  ctx.font = `800 24px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
-  ctx.fillText(sub.split('').join(' '), 0, 50);
+  ctx.font = `900 ${compact ? 50 : 56}px ${SERIF}`;
+  ctx.fillText(main, 0, compact ? 22 : 20);
+  ctx.font = `800 ${compact ? 17 : 22}px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+  ctx.fillText(compact ? sub : sub.split('').join(' '), 0, compact ? 50 : 52);
   ctx.restore();
   ctx.textAlign = 'left';
 }
