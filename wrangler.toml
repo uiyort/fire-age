@@ -2,11 +2,11 @@ name = "fire-age"
 compatibility_date = "2026-10-01"
 pages_build_output_dir = "site"
 
-# Anonymous totals of the views on the years ahead. Create the database, paste its id here, then run db/views.sql.
-# [[d1_databases]]
-# binding = "VIEWS"
-# database_name = "fire-age-views"
-# database_id = "<from npx wrangler d1 create fire-age-views>"
+# Anonymous totals of the views on the years ahead (table: db/views.sql).
+[[d1_databases]]
+binding = "VIEWS"
+database_name = "fire-age-views"
+database_id = "3344c355-e615-4714-bd17-8181d1239f5a"
 
 [[analytics_engine_datasets]]
 binding = "EVENTS"
