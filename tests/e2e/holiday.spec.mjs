@@ -111,8 +111,10 @@ test('a slider keeps its number and shows the change', async ({ page }) => {
   const details = page.locator('#cards details[data-id="retExp"]');
   await details.locator('summary').click();
   await expect(details.locator('output')).toContainText('现在');
+  await expect(details.locator('.try-track')).not.toHaveClass(/moved/);
   await details.locator('input[type=range]').fill('60000');
   await expect(details.locator('output')).toContainText('→');
+  await expect(details.locator('.try-track')).toHaveClass(/moved/);
   await page.waitForTimeout(500);
   await expect(details.locator('output')).toContainText('→');
 });

@@ -45,11 +45,19 @@ export function headlineText({ mode, p, t, bwd, dual, dispCur, view = 'simple' }
   } else {
     say = '按现在的节奏还到不了放假那天。先试试下面的杠杆，一步步来。';
   }
-  const ageText = a => (a === null ? '还到不了' : `${a} 岁`);
-  const note = p.pension > 0
-    ? `算上养老金 ${ageText(dual.withPension)} / 不算养老金 ${ageText(dual.withoutPension)}`
-    : '填上养老金，看看能提前多少。';
-  return { say, note };
+  return { say, note: pensionNote(p, dual) };
+}
+
+// A pension starts late, so for an early holiday it often moves the date by months, not years.
+function pensionNote(p, { withPension: w, withoutPension: wo, gain }) {
+  if (!(p.pension > 0)) return '填上养老金，看看能提前多少。';
+  if (w === null) return '算上养老金也还到不了放假。';
+  if (wo === null) return `算上养老金 ${w} 岁放假；不算养老金还到不了。`;
+  if (w === p.age && wo === p.age) return '现在就能放假，养老金是额外的保障。';
+  const months = Math.round((gain ?? 0) * 12);
+  if (months >= 12) return `算上养老金 ${w} 岁 / 不算养老金 ${wo} 岁`;
+  if (months < 1) return `养老金 ${p.pAge} 岁才开始领，对 ${w} 岁放假几乎没有影响。`;
+  return `养老金 ${p.pAge} 岁才开始领，只让放假提前 ${months} 个月。`;
 }
 
 export function statusPill(success) {
@@ -162,7 +170,17 @@ export function tryHtml(id, range, current = range.value, { mode = 'fwd', p = nu
   let hint = fixed ? '按想几岁放假反推时，存多少由目标决定，这一项只是试算。' : writes ? '' : '这一项不由你决定，只是试算。';
   // Sliders that write the last life always show a number: where it stands, or what moving it changed.
   if (writes && p) hint = current === range.value ? tryNow(p, id, range) : trySentence(p, id, current, range);
-  return `<div class="try"><label class="try-lab">拖一拖试试 <input type="range" data-try="${id}" min="${range.min}" max="${range.max}" step="${range.step}" value="${current}"></label><output>${hint}</output></div>`;
+  const moved = Number(current) !== Number(range.value);
+  return `<div class="try"><label class="try-lab">拖一拖试试 <span class="try-track${moved ? ' moved' : ''}" style="${trackStyle(range, current)}"><input type="range" data-try="${id}" min="${range.min}" max="${range.max}" step="${range.step}" value="${current}"><i class="try-span" aria-hidden="true"></i><i class="try-was" aria-hidden="true"></i></span></label><output>${hint}</output></div>`;
+}
+
+// Track positions as fractions: the starting value, and the stretch between it and the current one.
+export function trackStyle(range, value) {
+  const span = range.max - range.min || 1;
+  const at = v => Math.min(Math.max((Number(v) - range.min) / span, 0), 1);
+  const round = x => Number(x.toFixed(4));
+  const was = at(range.value), now = at(value);
+  return `--was:${round(was)};--lo:${round(Math.min(was, now))};--len:${round(Math.abs(now - was))}`;
 }
 
 function tryNow(p, id, range) {

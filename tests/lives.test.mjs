@@ -176,6 +176,27 @@ test('the chart tip lists only lives that reach that age', () => {
   assert.deepEqual(rows, [['a', '3']]);
 });
 
+test('the pension line says how far a pension moves the holiday, in months when under a year', async () => {
+  const { headlineText } = await import('../site/js/views.js');
+  const { dualAges } = await import('../site/js/engine.js');
+  const note = q => headlineText({ mode: 'fwd', p: q, t: fwdSolve(q), bwd: bwdSolve(q), dual: dualAges(q), dispCur: 'CNY' }).note;
+  assert.match(note(person({ pension: 12000 })), /^养老金 \d+ 岁才开始领，(只让放假提前 \d+ 个月|对 \d+ 岁放假几乎没有影响)。$/);
+  assert.match(note(person({ pension: 120000 })), /^算上养老金 \d+ 岁 \/ 不算养老金 \d+ 岁$/);
+  assert.equal(note(person({ pension: 12000, assets: 50000000 })), '现在就能放假，养老金是额外的保障。');
+  assert.equal(note(person()), '填上养老金，看看能提前多少。');
+});
+
+test('the slider track marks where it started and the stretch it moved', async () => {
+  const { trackStyle } = await import('../site/js/views.js');
+  const range = { min: 0, max: 200, value: 50, step: 1 };
+  assert.equal(trackStyle(range, 50), '--was:0.25;--lo:0.25;--len:0');
+  assert.equal(trackStyle(range, 150), '--was:0.25;--lo:0.25;--len:0.5');
+  assert.equal(trackStyle(range, 0), '--was:0.25;--lo:0;--len:0.25');
+  const p = person();
+  const r = tryRange(p, 'retExp');
+  assert.match(tryHtml('retExp', r, r.value * 0.5, { mode: 'fwd', p }), /class="try-track moved" style="--was:[\d.]+;--lo:[\d.]+;--len:[\d.]+"/);
+});
+
 test('a slider shows its current value before it is moved, and the change after', () => {
   const p = person();
   const range = tryRange(p, 'retExp');

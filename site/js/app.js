@@ -12,7 +12,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { renderCard, summaryCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, fasterLead, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
+  allTypesHtml, cardBody, fasterLead, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -500,7 +500,11 @@ function onInput(ev) {
   if (el.dataset.try) {
     const id = el.dataset.try;
     const p = toParams(S, DATA);
-    el.closest('.try').querySelector('output').textContent = trySentence(p, id, Number(el.value), tryRange(p, id));
+    const range = tryRange(p, id);
+    el.closest('.try').querySelector('output').textContent = trySentence(p, id, Number(el.value), range);
+    const track = el.closest('.try-track');
+    track?.setAttribute('style', trackStyle(range, el.value));
+    track?.classList.toggle('moved', Number(el.value) !== Number(range.value));
     markPlayed(id);
     if (lifeChoices(S.mode).includes(id)) {
       labValues = { ...labValues, [id]: Number(el.value) };
@@ -607,7 +611,7 @@ function summaryInput() {
   const best = places[0], here = places.find(r => r.current);
   const gain = best.years !== null && here?.years != null ? here.years - best.years : 0;
   const achieved = goal && goalApplies(goal, p) && compareVisit(goal, p, today()).achieved;
-  const ribbons = lives.map((life, i) => ({ label: (latest.names ?? lifeNames(stories))[i], cells: lifeRibbon(life).map(c => c.state) }));
+  const ribbons = lives.map((life, i) => ({ label: (latest.names ?? lifeNames(stories))[i], base: fifth?.baseIndex === i, cells: lifeRibbon(life).map(c => c.state) }));
   if (fifth) ribbons.push({ label: '你写的', fifth: true, cells: lifeRibbon(fifth.path).map(c => c.state) });
   return {
     mode, type, hero, ribbons,
@@ -615,7 +619,6 @@ function summaryInput() {
     monthlyText: wholeMoney(toDisplay(Math.max(bwd.s0, 0) / 12, p, cur), cur),
     place: gain >= 0.05 ? { name: best.name, gain } : null,
     fifth: fifth && fifthBrief(fifth.base, fifth.story, latestMoney()) ? { ...fifthBrief(fifth.base, fifth.story, latestMoney()), baseName: (latest.names ?? lifeNames(stories))[fifth.baseIndex] } : null,
-    lit: litCount(),
     goal: achieved ? goal.label : null,
     lever: personalLever(rankLevers(p, DATA, { retC: S.retC, top: 6 }), p, v => money(Math.round(toDisplay(v, p, cur)), cur)),
   };

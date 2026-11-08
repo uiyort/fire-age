@@ -221,6 +221,11 @@ h3 { font-family: var(--f-display); font-weight: 900; font-size: 16px; margin: 1
 .try { margin: 6px 0 8px; display: flex; flex-direction: column; gap: 4px; }
 .try-lab { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--ink-2); }
 .try input[type=range] { width: 100%; accent-color: var(--accent); margin: 4px 0; height: 28px; }
+/* Under the track: a tick where the value started, and a bar over the stretch it was moved. */
+.try-track { --thumb: 16px; position: relative; display: block; padding-bottom: 6px; }
+.try-track .try-was, .try-track .try-span { position: absolute; pointer-events: none; }
+.try-was { bottom: 0; width: 2px; height: 10px; border-radius: 1px; background: var(--ink-2); left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--was) - 1px); }
+.try-span { bottom: 2px; height: 4px; border-radius: 2px; background: var(--accent); opacity: .55; left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--lo)); width: calc((100% - var(--thumb)) * var(--len)); }
 .try output { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .lever .gain { white-space: normal; }
 

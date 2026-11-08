@@ -34,9 +34,11 @@ test('spending above income explains itself', async ({ page }) => {
 
 test('pension shows both ages', async ({ page }) => {
   await page.goto('/');
-  await page.fill('#s-pension', '3000');
+  await page.fill('#s-pension', '20000');
   await expect(page.locator('#headline')).toContainText('算上养老金');
   await expect(page.locator('#headline')).toContainText('不算养老金');
+  await page.fill('#s-pension', '500');
+  await expect(page.locator('#headline')).toContainText('才开始领');
 });
 
 test('tapping a parameter opens its learning card with a personal impact', async ({ page }) => {

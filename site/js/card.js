@@ -10,7 +10,7 @@ const INK = '#14201b', INK_2 = '#48564f', PAPER = '#f4f8f5', ACCENT = '#136f52',
 const trimYears = y => String(Math.round(y * 10) / 10);
 
 // One image, shaped like a boarding pass to the holiday. At most one extra line, the most personal available.
-export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, enough, place, fifth, goal, lever, lit = { done: 0, total: 0 } }) {
+export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, enough, place, fifth, goal, lever }) {
   let big, sentence;
   if (mode === 'bwd') {
     big = `${hero.holidayAge} 岁`;
@@ -35,10 +35,10 @@ export function summaryCardSpec({ mode, type, hero, ribbons = [], monthlyText, e
     route: { startAge: hero.startAge, holidayAge: hero.holidayAge, endAge: hero.endAge, work: hero.workYears, holiday: hero.holidayYears },
     people: hero.people,
     mondays: hero.reachable ? hero.mondays : null,
-    lit,
     note,
-    ribbons,
-    stampLabels: [`撑到 ${hero.endAge} 岁`, '还要上的周一', '点亮参数'],
+    // A written life is shown beside only the life it rewrote: one before, one after.
+    ribbons: ribbons.some(r => r.fifth) ? ribbons.filter(r => r.base || r.fifth) : ribbons,
+    stampLabels: [`撑到 ${hero.endAge} 岁`, '还要上的周一'],
   };
 }
 
@@ -266,12 +266,9 @@ function renderSummary(spec, canvas) {
   if (holiday) put(bold(30), SUN, `放假 ${holiday} 年`, (stopX + right) / 2, routeY - 30, 'center');
   void legX;
 
-  // The stub: three stamps.
-  const stubTop = tear + 44, colW = inner / 3;
-  const label = (text, i) => put(plain(26), STUB_MUTED, text, left + colW * i, stubTop + 24);
-  label(spec.stampLabels[0], 0);
-  label(spec.stampLabels[1], 1);
-  label(spec.stampLabels[2], 2);
+  // The stub: two stamps.
+  const stubTop = tear + 44, colW = inner / 2;
+  spec.stampLabels.forEach((text, i) => put(plain(26), STUB_MUTED, text, left + colW * i, stubTop + 24));
   const stampBase = stubTop + 92;
   if (spec.people === null) {
     put(bold(40), STUB_INK, '还在攒', left, stampBase);
@@ -286,14 +283,6 @@ function renderSummary(spec, canvas) {
     put(plain(26), STUB_MUTED, '个', left + colW + measureAt(display)(spec.mondays.toLocaleString('zh-CN'), 64) + 10, stampBase);
   } else {
     put(bold(40), STUB_INK, '不用再等', left + colW, stampBase);
-  }
-  put(display(64), STUB_INK, `${spec.lit.done}/${spec.lit.total}`, left + colW * 2, stampBase);
-  const dots = Math.max(spec.lit.total, 1), dotGap = Math.min((colW - 14) / dots, 26);
-  for (let i = 0; i < spec.lit.total; i++) {
-    ctx.fillStyle = i < spec.lit.done ? SUN : STUB_RULE;
-    ctx.beginPath();
-    ctx.arc(left + colW * 2 + 8 + i * dotGap, stampBase + 32, Math.min(dotGap / 2 - 1, 8), 0, Math.PI * 2);
-    ctx.fill();
   }
 
   // One line at most, then the lives as a barcode.
@@ -312,27 +301,26 @@ function renderSummary(spec, canvas) {
       else { noteY += 38; put(plain(26), STUB_MUTED, spec.note.detail, left, noteY); }
     }
   }
-  // The lives, one named row each on one age scale; the row the person wrote is picked out.
+  // The lives as thin lines on one age scale: one run per stretch, the person's own row in full colour.
   const hintY = ty + th - 44;
   const barsBottom = hintY - 78;
   const rows = spec.ribbons.length;
-  const gap = 5, barH = rows ? Math.min((barsBottom - noteY - 22 - gap * (rows - 1)) / rows, 22) : 0;
+  // Each row gets the same pitch; the line and its name both fit inside it.
+  const pitch = rows ? Math.min((barsBottom - noteY - 30) / rows, 40) : 0;
+  const barH = Math.min(Math.max(pitch * 0.32, 5), 12), gap = pitch - barH;
   const maxCells = Math.max(1, ...spec.ribbons.map(r => r.cells.length));
   const labelW = 128, barLeft = left + labelW;
   const cellW = (inner - labelW) / maxCells;
-  const labelPx = Math.max(Math.min(barH + 4, 22), 15);
+  const labelPx = Math.min(Math.max(Math.floor(pitch - 6), 14), 22);
+  const picked = spec.ribbons.some(r => r.fifth);
   spec.ribbons.forEach((ribbon, row) => {
     const y = barsBottom - (rows - row) * (barH + gap) + gap;
     put(ribbon.fifth ? bold(labelPx) : plain(labelPx), ribbon.fifth ? DEEP : STUB_MUTED, ribbon.label, left, y + barH / 2 + labelPx * 0.36);
-    if (ribbon.fifth) {
-      ctx.strokeStyle = SUN;
-      ctx.lineWidth = 3;
-      ctx.strokeRect(barLeft - 4, y - 3, inner - labelW + 6, barH + 6);
-    }
-    ribbon.cells.forEach((state, i) => {
-      ctx.fillStyle = CELL_COLORS[state];
-      ctx.fillRect(barLeft + i * cellW, y, Math.max(cellW - 2, 1), barH);
+    ctx.globalAlpha = picked && !ribbon.fifth ? 0.5 : 1;
+    runsOf(ribbon.cells).forEach(({ state, from, to }) => {
+      pill(ctx, barLeft + from * cellW, y, Math.max((to - from) * cellW - 4, 2), barH, CELL_COLORS[state]);
     });
+    ctx.globalAlpha = 1;
   });
   if (rows) {
     put(plain(22), STUB_MUTED, `${spec.route.startAge} 岁`, barLeft, barsBottom + 30);
@@ -340,6 +328,25 @@ function renderSummary(spec, canvas) {
   }
   put(bold(36), DEEP, spec.searchHint, left, hintY);
   put(plain(26), STUB_MUTED, spec.brand, right, hintY, 'right');
+}
+
+// Consecutive cells of one state, as one stretch each.
+function runsOf(cells) {
+  const runs = [];
+  cells.forEach((state, i) => {
+    const last = runs[runs.length - 1];
+    if (last && last.state === state) last.to = i + 1;
+    else runs.push({ state, from: i, to: i + 1 });
+  });
+  return runs;
+}
+
+function pill(ctx, x, y, w, h, color) {
+  ctx.fillStyle = color;
+  if (typeof ctx.roundRect !== 'function') { ctx.fillRect(x, y, w, h); return; }
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, Math.min(h / 2, w / 2));
+  ctx.fill();
 }
 
 export function renderCard(spec, canvas) {

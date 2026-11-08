@@ -222,8 +222,12 @@ export function coastNeed(p) {
 }
 
 export function dualAges(p) {
+  const bare = { ...p, pension: 0 };
   const age = q => { const t = fwdSolve(q); return t === null ? null : q.age + t; };
-  return { withPension: age(p), withoutPension: age({ ...p, pension: 0 }) };
+  const withPension = age(p), withoutPension = age(bare);
+  // How much earlier the pension makes the holiday, in fractional years.
+  const gain = withPension === null || withoutPension === null ? null : fiYears(bare) - fiYears(p);
+  return { withPension, withoutPension, gain };
 }
 
 export const savingsRate = p => (p.income > 0 ? (p.income - p.expense) / p.income : null);

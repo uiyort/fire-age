@@ -27,7 +27,15 @@ test('the card keeps every label short', () => {
   const s = summaryCardSpec({ ...summary, fifth: { main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完', baseName: '中途断粮' } });
   assert.ok([...s.sentence].length <= 10, s.sentence);
   assert.ok([...s.note.label].length <= 12, s.note.label);
-  assert.deepEqual(s.stampLabels, ['撑到 95 岁', '还要上的周一', '点亮参数']);
+  assert.deepEqual(s.stampLabels, ['撑到 95 岁', '还要上的周一']);
+});
+
+test('with a written life, the card shows only that life and the one it rewrote', () => {
+  const row = (label, extra = {}) => ({ label, cells: ['work', 'holiday'], ...extra });
+  const ribbons = [row('顺风局'), row('中途断粮', { base: true }), row('起步就难'), row('你写的', { fifth: true })];
+  const fifth = { main: '有钱花的假期 25 → 22 年', detail: '', baseName: '中途断粮' };
+  assert.deepEqual(summaryCardSpec({ ...summary, ribbons, fifth }).ribbons.map(r => r.label), ['中途断粮', '你写的']);
+  assert.equal(summaryCardSpec({ ...summary, ribbons: ribbons.slice(0, 3) }).ribbons.length, 3);
 });
 
 test('the summary card spells out the type as four ticket fields', () => {
@@ -40,12 +48,12 @@ test('the summary card spells out the type as four ticket fields', () => {
   ]);
 });
 
-test('the summary card is a ticket: route, people, Mondays, lit parameters and a barcode of lives', () => {
+test('the summary card is a ticket: route, people, Mondays and a barcode of lives', () => {
   const s = summaryCardSpec(summary);
   assert.deepEqual(s.route, { startAge: 30, holidayAge: 43, endAge: 95, work: 13, holiday: 52 });
   assert.equal(s.people, 7);
   assert.equal(s.mondays, 678);
-  assert.deepEqual(s.lit, { done: 3, total: 20 });
+  assert.equal('lit' in s, false, 'the stub keeps two stamps');
   assert.equal(s.ribbons.length, 1);
 });
 
