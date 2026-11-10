@@ -2,6 +2,8 @@ import test from 'node:test';
 import { oddsSolve, oddsYears } from '../site/js/odds.js';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
+import { townPlan, cardPlace } from '../site/js/holiday.js';
+import { townHtml } from '../site/js/views.js';
 import { fiNeed, fiYears, fwdSolve, lifePath, monteCarlo } from '../site/js/engine.js';
 import { defaultState, setField, setRetireCountry, setWorkCountry, toParams } from '../site/js/state.js';
 import { rankLevers } from '../site/js/levers.js';
@@ -321,4 +323,33 @@ test('all 16 types have a non-empty weakness without a digit, and the page shows
   const type = typeOf(person());
   assert.ok(type.weakness);
   assert.match(typeHtml(type), new RegExp(`软肋：${type.weakness}`));
+});
+
+test('a cheaper town moves the holiday age earlier, a dearer one later, and no spend gives nothing', () => {
+  const { p } = person();
+  const half = townPlan(p, p.retExp / 12 / 2), twice = townPlan(p, p.retExp / 12 * 2);
+  assert.ok(half.gain > 0, String(half.gain));
+  assert.ok(twice.gain === null || twice.gain < 0);
+  for (const m of [0, null, undefined, NaN]) assert.deepEqual(townPlan(p, m), { age: null, years: null, gain: null });
+});
+
+test('a typed town name is escaped and its sentence names the age and the direction', () => {
+  const { p } = person();
+  const plan = townPlan(p, p.retExp / 12 / 2);
+  const html = townHtml({ name: '<b>清迈</b>', monthly: p.retExp / 24 }, plan, p);
+  assert.ok(!html.includes('<b>'), html);
+  assert.match(html, /&lt;b&gt;清迈/);
+  assert.match(html, /岁放假，早 \d+(\.\d)? 年（八成把握）/);
+  assert.equal(townHtml({ name: '', monthly: null }, { age: null, years: null, gain: null }, p), '');
+  assert.match(townHtml({ name: '大理', monthly: 1e9 }, { age: null, years: null, gain: null }, p), /还到不了/);
+  const later = townHtml({ name: '大理', monthly: 1 }, { age: 50, years: 20, gain: -2.4 }, p);
+  assert.match(later, /晚 2\.4 年/);
+});
+
+test('a town the person typed wins the card slot only when it gains something', () => {
+  const rows = [{ name: '泰国', years: 5, current: false }, { name: '中国大陆', years: 9, current: true }];
+  assert.deepEqual(cardPlace(rows, { name: '大理', monthly: 3000 }, { gain: 2 }), { name: '大理', gain: 2 });
+  assert.deepEqual(cardPlace(rows, { name: '大理', monthly: 3000 }, { gain: 0.01 }), { name: '泰国', gain: 4 });
+  assert.deepEqual(cardPlace(rows, { name: '', monthly: 3000 }, { gain: 2 }), { name: '泰国', gain: 4 });
+  assert.equal(cardPlace([{ name: 'A', years: 3, current: true }], { name: '', monthly: null }, null), null);
 });

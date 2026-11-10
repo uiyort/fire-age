@@ -336,3 +336,9 @@ test('a worked example says so on the card', () => {
   assert.equal(summaryCardSpec({ ...summary, example: true }).example, true);
   assert.equal(summaryCardSpec(summary).example, false);
 });
+
+test('a six-character typed town still fits on the share card', () => {
+  const s = summaryCardSpec({ ...summary, place: { name: '一二三四五六', gain: 12.5 } });
+  const line = JSON.stringify(s);
+  assert.ok(line.includes('一二三四五六'));
+});

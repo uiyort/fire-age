@@ -523,3 +523,21 @@ test('the written life tells its own odds and the price of the mix, and does not
   await expect(page.locator('#life-story .fifth-odds')).toContainText('坏年份，这个配置约跌');
   await expect(page.locator('#levers')).not.toContainText('股票');
 });
+
+test('a typed town shows the age it gives and goes away when the spend is cleared', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  await page.goto('/');
+  await page.locator('#places-fold > summary').click();
+  await page.fill('#town-name', '大理');
+  await page.fill('#town-monthly', '4000');
+  await expect(page.locator('#town-result')).toContainText('大理');
+  await expect(page.locator('#town-result')).toContainText('岁放假');
+  await expect(page.locator('#places-fold')).toContainText('本工具不提供各城市的参考值');
+  await page.fill('#town-monthly', '');
+  await expect(page.locator('#town-result')).toHaveText('');
+  await page.fill('#town-monthly', '4000');
+  await expect(page.locator('#town-result')).toContainText('岁放假');
+  await page.getByRole('button', { name: /卡片|放假卡/ }).click();
+  expect(errors).toEqual([]);
+});

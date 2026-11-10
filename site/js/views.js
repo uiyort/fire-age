@@ -383,6 +383,18 @@ export function allTypesHtml() {
 
 const PLACES_SHOWN = 5;
 
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+// One sentence for the town the person typed; empty until both the name and the spend are there.
+export function townHtml(town, plan, p) {
+  if (!town?.name || !(town.monthly > 0)) return '';
+  const where = `在${escapeHtml(town.name)}每月花 ${wholeMoney(town.monthly, p.rCur)}`;
+  if (plan.age === null) return `<p class="town-line">${where}：按这个花销还到不了。</p>`;
+  const years = Math.round(Math.abs(plan.gain) * 10) / 10;
+  const move = plan.gain === null || years === 0 ? '' : plan.gain > 0 ? `，早 ${years} 年` : `，晚 ${years} 年`;
+  return `<p class="town-line">${where}：${plan.age} 岁放假${move}（八成把握）。</p>`;
+}
+
 // The title of the folded section carries its number: how much earlier the earliest place is than the current one.
 export function placesTitle(rows) {
   const best = rows[0], here = rows.find(r => r.current);

@@ -31,7 +31,7 @@ export function defaultState(data) {
   };
   return {
     view: 'simple', mode: 'fwd', workC: 'CN', retC: 'CN', dispCur: 'CNY',
-    autoSwr: true, touched: {}, notice: '',
+    autoSwr: true, touched: {}, notice: '', town: { name: '', monthly: null },
     ...values,
     lastValid: Object.fromEntries(Object.entries(values).filter(([, v]) => v !== null)),
   };
@@ -104,6 +104,21 @@ export function toParams(S, data) {
   return buildParams(raw, fx);
 }
 
+export const TOWN_NAME_MAX = 6;
+const cleanTown = t => {
+  const raw = t && typeof t === 'object' && !Array.isArray(t) ? t : {};
+  const monthly = Number(raw.monthly);
+  return {
+    name: typeof raw.name === 'string' ? [...raw.name].slice(0, TOWN_NAME_MAX).join('') : '',
+    monthly: raw.monthly !== null && raw.monthly !== '' && Number.isFinite(monthly) && monthly > 0 ? monthly : null,
+  };
+};
+
+// A town the person types: a name of at most six characters and a monthly spend in the retirement currency.
+export function setTown(S, change) {
+  return { ...S, town: cleanTown({ ...S.town, ...change }) };
+}
+
 export function safeStorage() {
   try {
     return globalThis.localStorage ?? null;
@@ -122,7 +137,7 @@ export function loadState(data, storage) {
     // Assumptions nobody edited follow the current month's data rather than the saved copy.
     const local = localAssumptions(data.countries[saved.workC]);
     const fresh = Object.fromEntries(ASSUMPTION_FIELDS.filter(id => !touched[id]).map(id => [id, local[id]]));
-    return { ...base, ...saved, ...fresh, dispCur: dispOk ? saved.dispCur : base.dispCur, lastValid: { ...base.lastValid, ...saved.lastValid, ...fresh }, touched };
+    return { ...base, ...saved, ...fresh, town: cleanTown(saved.town), dispCur: dispOk ? saved.dispCur : base.dispCur, lastValid: { ...base.lastValid, ...saved.lastValid, ...fresh }, touched };
   } catch {
     return base;
   }

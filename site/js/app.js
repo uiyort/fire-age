@@ -2,8 +2,8 @@
 import DATA from './data-latest.js';
 import { DEFAULT_SEED, bwdSolve, monteCarlo, walkPath } from './engine.js';
 import { bwdOdds, decilePaths, dualOdds, extendRow, needLine, oddsRuler, oddsSolve, oddsYears, successAt } from './odds.js';
-import { hardestIndex, heroModel, holidayType, oddsText, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking } from './holiday.js';
-import { commitField, defaultState, loadState, missingFields, saveState, safeStorage, setField, setRetireCountry, setWorkCountry, toParams } from './state.js';
+import { hardestIndex, heroModel, holidayType, oddsText, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking, townPlan, cardPlace } from './holiday.js';
+import { commitField, defaultState, loadState, missingFields, saveState, safeStorage, setField, setRetireCountry, setTown, setWorkCountry, toParams } from './state.js';
 import { labPlan, lifeChoices, personalLever, rankLevers, impactOf, smallStep, tryRange } from './levers.js';
 import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody } from './scenario.js';
 import { PARAMS, PARAM_GROUPS } from './params.js';
@@ -13,7 +13,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { assumptionLine, renderCard, summaryCardSpec, typeCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
+  allTypesHtml, cardBody, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -242,6 +242,10 @@ const dispCur = p => (S.view === 'simple' ? p.wCur : S.dispCur);
 
 // Writes state into inputs, skipping whatever the person is typing in right now.
 function syncInputs() {
+  for (const [id, v] of [['town-name', S.town.name], ['town-monthly', S.town.monthly ?? '']]) {
+    const el = $(id);
+    if (el && el !== document.activeElement) el.value = v;
+  }
   const set = (id, value) => {
     const el = $(id);
     if (!el || el === document.activeElement) return;
@@ -347,6 +351,7 @@ function slowParts() {
       $('places').innerHTML = placesHtml(latest.places, { all: pro, home: S.workC });
       $('places-title').textContent = placesTitle(latest.places);
     },
+    () => renderTown(),
     () => renderCards(p),
     ...(pro ? [
       () => { $('variants').innerHTML = variantsHtml({ p, dispCur: cur }); },
@@ -354,6 +359,13 @@ function slowParts() {
       () => { $('sensitivity').innerHTML = sensitivityHtml(p, PARAMS); },
     ] : []),
   ];
+}
+
+function renderTown() {
+  const { p } = latest;
+  const plan = townPlan(p, S.town.monthly);
+  latest.town = plan;
+  $('town-result').innerHTML = townHtml(S.town, plan, p);
 }
 
 function renderHero() {
@@ -668,6 +680,12 @@ function onInput(ev) {
     }
     return;
   }
+  if (el.id === 'town-name' || el.id === 'town-monthly') {
+    S = setTown(S, el.id === 'town-name' ? { name: el.value } : { monthly: el.value });
+    saveState(S, storage);
+    if (latest.p) renderTown();
+    return;
+  }
   labValues = {};
   if (el.id === 's-retexp') {
     S = setField(S, 'retExp', el.value === '' ? '' : Number(el.value) * 12, DATA, { commit: false });
@@ -761,8 +779,6 @@ async function saveCard() {
 
 function summaryInput() {
   const { mode, p, bwd, type, hero, places, lives, stories, fifth, dispCur: cur } = latest;
-  const best = places[0], here = places.find(r => r.current);
-  const gain = best.years !== null && here?.years != null ? here.years - best.years : 0;
   const achieved = goal && goalApplies(goal, p) && compareVisit(goal, p, today()).achieved;
   const ribbons = lives.map((life, i) => ({ label: (latest.names ?? lifeNames(stories))[i], base: fifth?.baseIndex === i, cells: lifeRibbon(life).map(c => c.state) }));
   if (fifth) ribbons.push({ label: '改签后', fifth: true, cells: lifeRibbon(fifth.path).map(c => c.state) });
@@ -772,7 +788,7 @@ function summaryInput() {
     years: latest.mc?.bands?.map(b => b[2]) ?? [],
     enough: latest.odds?.enough ?? bwd.s0 <= 0,
     monthlyText: wholeMoney(toDisplay((latest.odds?.s0 ?? Math.max(bwd.s0, 0)) / 12, p, cur), cur),
-    place: gain >= 0.05 ? { name: best.name, gain } : null,
+    place: cardPlace(places, S.town, latest.town),
     fifth: fifth && fifthBrief(fifth.base, fifth.story, latestMoney()) ? { ...fifthBrief(fifth.base, fifth.story, latestMoney()), baseName: (latest.names ?? lifeNames(stories))[fifth.baseIndex] } : null,
     // A spending goal is an amount, so a card without money says it was met without the number.
     goal: achieved ? { label: goal.label, plain: goal.paramId === 'expense' ? '每月支出降到了目标' : goal.label } : null,

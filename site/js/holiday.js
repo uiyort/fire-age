@@ -124,6 +124,23 @@ export function placeRanking(p, data, retC) {
   });
 }
 
+// The same plan with the spending the person typed for one town, a month's worth in the retirement currency.
+export function townPlan(p, monthly) {
+  const none = { age: null, years: null, gain: null };
+  if (!(Number(monthly) > 0)) return none;
+  const q = buildParams({ ...p, retExp: Number(monthly) * 12 }, p.fx);
+  const t = oddsSolve(q), years = oddsYears(q), now = oddsYears(p);
+  return { age: t === null ? null : p.age + t, years, gain: years === null || now === null ? null : now - years };
+}
+
+// The card names a place that gained at least a month: the town the person typed first, else the best overseas place.
+export function cardPlace(rows, town, plan) {
+  if (town?.name && plan?.gain >= 0.05) return { name: town.name, gain: plan.gain };
+  const best = rows[0], here = rows.find(r => r.current);
+  const gain = best && best.years !== null && here?.years != null ? here.years - best.years : 0;
+  return gain >= 0.05 ? { name: best.name, gain } : null;
+}
+
 export const drawLives = (p, retireT, s0, baseSeed, count = 4) =>
   Array.from({ length: count }, (_, i) => lifePath(p, retireT, s0, baseSeed + i));
 

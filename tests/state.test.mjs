@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
-import { defaultState, setField, setWorkCountry, setRetireCountry, estimateRetireSpend, toParams, loadState, saveState, missingFields } from '../site/js/state.js';
+import { defaultState, setField, setWorkCountry, setRetireCountry, estimateRetireSpend, toParams, loadState, saveState, missingFields, setTown } from '../site/js/state.js';
 
 test('the bad-year cut stays between 0 and 100 percent', () => {
   const at = v => toParams(setField(defaultState(DATA), 'flexCut', String(v), DATA), DATA).flexCut;
@@ -122,4 +122,19 @@ test('working backward also needs the age to holiday at', () => {
   const s = setField(defaultState(DATA), 'tAge', '', DATA);
   assert.deepEqual(missingFields(s), []);
   assert.deepEqual(missingFields({ ...s, mode: 'bwd' }), ['tAge']);
+});
+
+test('the town the person types keeps six characters and survives old or broken saved states', () => {
+  assert.deepEqual(defaultState(DATA).town, { name: '', monthly: null });
+  assert.equal(setTown(defaultState(DATA), { name: '一二三四五六七' }).town.name, '一二三四五六');
+  assert.equal(setTown(defaultState(DATA), { monthly: '4000' }).town.monthly, 4000);
+  assert.equal(setTown(defaultState(DATA), { monthly: '' }).town.monthly, null);
+  const mem = v => ({ getItem: () => JSON.stringify(v) });
+  const saved = defaultState(DATA);
+  delete saved.town;
+  assert.deepEqual(loadState(DATA, mem(saved)).town, { name: '', monthly: null });
+  for (const bad of ['大理', ['x'], null, { name: 5, monthly: 'a' }]) {
+    assert.deepEqual(loadState(DATA, mem({ ...saved, town: bad })).town, { name: '', monthly: null });
+  }
+  assert.deepEqual(loadState(DATA, mem({ ...saved, town: { name: '大理', monthly: 4000 } })).town, { name: '大理', monthly: 4000 });
 });
