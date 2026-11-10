@@ -196,3 +196,48 @@ test('using a pension estimate writes the yearly pension in the retirement curre
   const my = applyPensionEstimate(setRetireCountry(defaultState(DATA), 'MY', DATA), { monthly: 5000, claimAge: 63, selfPay: 960 }, DATA);
   assert.equal(my.pension, Math.round(60000 / fx('CNY') * fx('MYR')));
 });
+
+// ---- spending that ends at a known age ----
+import { eventsOf, lifeIssue } from '../site/js/state.js';
+const withReal = (real, o = {}) => ({ ...defaultState(DATA), age: 35, expense: 120000, retExp: 120000, real, ...o });
+const emptyReal = { mortgage: { monthly: null, endYear: null }, kids: { count: null, age: null, monthly: null } };
+
+test('events: default state has an empty real block and no events', () => {
+  const S = defaultState(DATA);
+  assert.deepEqual(S.real, emptyReal);
+  assert.deepEqual(eventsOf(S, 2026), []);
+  assert.deepEqual(toParams(S, DATA, 2026).events, []);
+});
+
+test('events: eventsOf turns a mortgage and children into events, and drops finished ones', () => {
+  const S = withReal({ mortgage: { monthly: 3000, endYear: 2046 }, kids: { count: 2, age: 6, monthly: 1500 } });
+  assert.deepEqual(eventsOf(S, 2026), [
+    { id: 'mortgage', amount: 36000, endAge: 55, nominal: true },
+    { id: 'kids', amount: 36000, endAge: 51, nominal: false },
+  ]);
+  assert.deepEqual(toParams(S, DATA, 2026).events, eventsOf(S, 2026));
+  assert.deepEqual(eventsOf(withReal({ mortgage: { monthly: 3000, endYear: null }, kids: { count: 2, age: null, monthly: 1500 } }), 2026), []);
+  assert.deepEqual(eventsOf(withReal({ mortgage: { monthly: 3000, endYear: 2026 }, kids: { count: 1, age: 22, monthly: 1500 } }), 2026), []);
+});
+
+test('events: lifeIssue speaks up when the payments do not fit, and events are dropped', () => {
+  const big = withReal({ mortgage: { monthly: 6000, endYear: 2046 }, kids: { count: 2, age: 6, monthly: 3000 } });
+  assert.equal(lifeIssue(big), '月供和孩子的花销加起来超过了每月支出，请检查这两处');
+  assert.deepEqual(eventsOf(big, 2026), []);
+  const ret = withReal({ mortgage: { monthly: 6000, endYear: 2046 }, kids: { count: 1, age: 6, monthly: 3000 } }, { expense: 240000, retExp: 60000 });
+  assert.equal(lifeIssue(ret), '退休后每月想花里也要算上月供和孩子的花销');
+  assert.deepEqual(eventsOf(ret, 2026), []);
+  assert.equal(lifeIssue(withReal({ mortgage: { monthly: 3000, endYear: 2046 }, kids: { count: 1, age: 6, monthly: 1000 } })), '');
+  assert.equal(lifeIssue(defaultState(DATA)), '');
+});
+
+test('events: an old save has empty events, and a bad real block reads as empty', () => {
+  const store = v => ({ getItem: () => JSON.stringify(v) });
+  const { real, ...old } = defaultState(DATA);
+  assert.deepEqual(toParams(loadState(DATA, store(old)), DATA, 2026).events, []);
+  for (const bad of ['abc', [1, 2], 7, null, { mortgage: 'x', kids: [] }]) {
+    const S = loadState(DATA, store({ ...old, real: bad }));
+    assert.deepEqual(S.real, emptyReal);
+    assert.deepEqual(toParams(S, DATA, 2026).events, []);
+  }
+});

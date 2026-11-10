@@ -29,6 +29,51 @@ export function cleanPen(raw) {
   };
 }
 
+// Spending that ends at a known age, already inside the monthly spending: a mortgage (monthly payment, last year)
+// and children (how many, the youngest's age, monthly cost each). Any item may be blank.
+export const REAL_DEFAULT = { mortgage: { monthly: null, endYear: null }, kids: { count: null, age: null, monthly: null } };
+const realNum = v => {
+  if (v === null || v === undefined || typeof v === 'boolean' || String(v).trim() === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+};
+const group = (raw, keys) => {
+  const t = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  return Object.fromEntries(keys.map(k => [k, realNum(t[k])]));
+};
+export function cleanReal(raw) {
+  const t = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  return { mortgage: group(t.mortgage, ['monthly', 'endYear']), kids: group(t.kids, ['count', 'age', 'monthly']) };
+}
+export const setReal = (S, part, field, rawText) => ({ ...S, real: cleanReal({ ...S.real, [part]: { ...S.real?.[part], [field]: rawText } }) });
+
+// Yearly amounts of the two items, or null while an item is not filled in.
+function realItems(S) {
+  const { mortgage: m, kids: k } = cleanReal(S.real);
+  return {
+    mortgage: m.monthly > 0 && m.endYear !== null ? { yearly: m.monthly * 12, endYear: m.endYear } : null,
+    kids: k.count > 0 && k.monthly > 0 && k.age !== null ? { yearly: k.count * k.monthly * 12, age: k.age } : null,
+  };
+}
+
+export function lifeIssue(S) {
+  const { mortgage, kids } = realItems(S);
+  const monthly = ((mortgage?.yearly ?? 0) + (kids?.yearly ?? 0)) / 12;
+  if (monthly <= 0) return '';
+  if (monthly > (S.expense ?? 0) / 12) return '月供和孩子的花销加起来超过了每月支出，请检查这两处';
+  if (monthly > (S.retExp ?? 0) / 12) return '退休后每月想花里也要算上月供和孩子的花销';
+  return '';
+}
+
+export function eventsOf(S, thisYear = new Date().getFullYear()) {
+  if (lifeIssue(S)) return [];
+  const { mortgage, kids } = realItems(S);
+  const out = [];
+  if (mortgage) out.push({ id: 'mortgage', amount: mortgage.yearly, endAge: S.age + (mortgage.endYear - thisYear), nominal: true });
+  if (kids) out.push({ id: 'kids', amount: kids.yearly, endAge: S.age + (22 - kids.age), nominal: false });
+  return out.filter(e => e.endAge > S.age);
+}
+
 export const setPen = (S, change) => ({ ...S, pen: cleanPen({ ...S.pen, ...change }) });
 
 // "Use this result": the monthly estimate (yuan, today's money) becomes the yearly pension in the retirement
@@ -68,7 +113,7 @@ export function defaultState(data) {
   };
   return {
     view: 'simple', mode: 'fwd', workC: 'CN', retC: 'CN', dispCur: 'CNY',
-    autoSwr: true, touched: {}, notice: '', town: { name: '', monthly: null }, pen: { ...PEN_DEFAULT },
+    autoSwr: true, touched: {}, notice: '', town: { name: '', monthly: null }, pen: { ...PEN_DEFAULT }, real: cleanReal(null),
     ...values,
     lastValid: Object.fromEntries(Object.entries(values).filter(([, v]) => v !== null)),
   };
@@ -131,7 +176,7 @@ export function setRetireCountry(S, code, data) {
   return moved;
 }
 
-export function toParams(S, data) {
+export function toParams(S, data, thisYear = new Date().getFullYear()) {
   const raw = { autoSwr: S.autoSwr, wCur: curOf(data, S.workC), rCur: curOf(data, S.retC) };
   for (const id of NUMERIC_FIELDS) {
     raw[id] = S[id] ?? (MONEY_FIELDS.includes(id) ? 0 : S.lastValid[id]);
@@ -142,6 +187,7 @@ export function toParams(S, data) {
   raw.selfPension = Math.max(raw.selfPension, 0);
   raw.selfMedical = Math.max(raw.selfMedical, 0);
   raw.selfPay = S.workC === 'CN' && raw.pension > 0 ? (raw.selfPension + raw.selfMedical) * 12 : 0;
+  raw.events = eventsOf(S, thisYear);
   return buildParams(raw, fx);
 }
 
@@ -178,7 +224,7 @@ export function loadState(data, storage) {
     // Assumptions nobody edited follow the current month's data rather than the saved copy.
     const local = localAssumptions(data.countries[saved.workC]);
     const fresh = Object.fromEntries(ASSUMPTION_FIELDS.filter(id => !touched[id]).map(id => [id, local[id]]));
-    return { ...base, ...saved, ...fresh, town: cleanTown(saved.town), pen: cleanPen(saved.pen), dispCur: dispOk ? saved.dispCur : base.dispCur, lastValid: { ...base.lastValid, ...saved.lastValid, ...fresh }, touched };
+    return { ...base, ...saved, ...fresh, town: cleanTown(saved.town), pen: cleanPen(saved.pen), real: cleanReal(saved.real), dispCur: dispOk ? saved.dispCur : base.dispCur, lastValid: { ...base.lastValid, ...saved.lastValid, ...fresh }, touched };
   } catch {
     return base;
   }

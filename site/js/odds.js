@@ -37,7 +37,7 @@ export function successAt(p, retireT, s0 = null, { paths = DEFAULT_PATHS, seed =
 const KEY_FIELDS = ['age', 'life', 'assets', 'income', 'expense', 'growth', 'retExp', 'pension', 'pAge', 'selfPay', 'r', 'sigma', 'flexCut', 'fxDrift', 'rCur', 'wCur'];
 const memo = new Map();
 function remember(kind, p, extra, compute) {
-  const key = `${kind}|${KEY_FIELDS.map(k => p[k]).join('|')}|${p.fx?.[p.rCur]}|${p.fx?.[p.wCur]}|${extra}`;
+  const key = `${kind}|${KEY_FIELDS.map(k => p[k]).join('|')}|${p.fx?.[p.rCur]}|${p.fx?.[p.wCur]}|${JSON.stringify(p.events ?? [])}|${extra}`;
   if (memo.has(key)) return memo.get(key);
   const value = compute();
   if (memo.size >= 600) memo.delete(memo.keys().next().value);
@@ -106,6 +106,28 @@ export function needLine(p, { target = ODDS, paths = DEFAULT_PATHS, seed = DEFAU
     // every amount from year T on is the no-drift amount times drift^T. One walk without drift serves every year,
     // and each year's line is scaled by its drift afterwards.
     const drift = T => (p.rCur === p.wCur ? 1 : Math.pow(1 + (p.fxDrift ?? 0) / 100, T));
+    // Spending that ends at a known age is work-currency money that does not drift, and the floors at zero
+    // (spending after the pension, spending cut by the events) make the split below inexact. So with events
+    // each holiday year gets its own backward walk from the flows of that exact year.
+    if (p.events?.length) {
+      const line = new Array(Y).fill(0);
+      for (let T = 0; T < Y; T++) {
+        const { full, after } = planFlows(p, T, null);
+        const c = new Float64Array(paths);
+        for (let i = 0; i < paths; i++) {
+          const row = i * Y;
+          let need = 0;
+          for (let t = Y - 1; t >= T; t--) {
+            const fall = t > 0 && g[row + t - 1] - 1 <= HARD_FALL;
+            need = (fall ? after[t] : full[t]) + need / g[row + t];
+          }
+          c[i] = need;
+        }
+        line[T] = c.sort()[k] * (1 + 1e-9);
+      }
+      line.push(0);
+      return line;
+    }
     const one = planFlows({ ...p, fxDrift: 0, selfPay: 0 }, 0, null);
     // Self-pay is work-currency money that does not drift; it gets its own backward sum (before the pension
     // starts the pension is 0, so the floor at zero never bites).

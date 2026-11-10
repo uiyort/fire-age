@@ -162,3 +162,44 @@ test('selfPay: starting the holiday with exactly the need line gives the target 
     }
   }
 });
+
+// ---- spending that ends at a known age ----
+const mort = (o = {}) => ({ id: 'mortgage', amount: 36000, endAge: 50, nominal: true, ...o });
+
+test('events: a mortgage ending in 20 years never makes the holiday later', () => {
+  const a = oddsSolve(base()), b = oddsSolve(base({ events: [mort({ endAge: 50 })] }));
+  assert.ok(b <= a, `${b} vs ${a}`);
+});
+
+test('events: the odds cache does not mix runs with different end ages', () => {
+  const a = oddsSolve(base({ events: [mort({ endAge: 36 })] }));
+  const b = oddsSolve(base({ events: [mort({ endAge: 60 })] }));
+  const c = oddsSolve(base({ events: [mort({ endAge: 36 })] }));
+  assert.notEqual(a, b);
+  assert.equal(a, c);
+  const nl = needLine(base({ events: [mort({ endAge: 36 })] }))[10];
+  assert.notEqual(nl, needLine(base({ events: [mort({ endAge: 60 })] }))[10]);
+});
+
+test('events: the without-pension plan keeps the events', () => {
+  const p = base({ selfPay: 20000, events: [mort()] });
+  const bare = base({ pension: 0, selfPay: 0, events: [mort()] });
+  assert.equal(dualOdds(p).withoutPension, (oddsSolve(bare) === null ? null : bare.age + oddsSolve(bare)));
+});
+
+test('events: starting with exactly the need line gives the target odds, with and without drift', () => {
+  for (const fxDrift of [2, -2, 0]) {
+    const p = base({ rCur: 'MYR', retExp: 60000, pension: 15000, fxDrift, events: [mort({ amount: 30000, endAge: 45 })] });
+    const line = needLine(p);
+    for (const T of [5, 15, 25]) {
+      const s = successAt(p, T, null, { startAt: T, startAssets: line[T] });
+      assert.ok(Math.abs(s - 0.8) <= 0.01, `drift ${fxDrift} T=${T}: ${s}`);
+    }
+  }
+  const q = base({ selfPay: 30000, events: [mort({ amount: 30000, endAge: 45 }), { id: 'kids', amount: 20000, endAge: 55, nominal: false }] });
+  const line = needLine(q);
+  for (const T of [5, 15, 25]) {
+    const s = successAt(q, T, null, { startAt: T, startAssets: line[T] });
+    assert.ok(Math.abs(s - 0.8) <= 0.01, `same currency T=${T}: ${s}`);
+  }
+});

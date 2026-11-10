@@ -17,6 +17,7 @@ export function buildParams(raw, fx) {
   p.life = Math.max(Math.round(raw.life), p.age + 2);
   p.tAge = Math.min(Math.max(Math.round(raw.tAge), p.age + 1), p.life - 1);
   p.flexCut = Math.min(Math.max(raw.flexCut ?? 0, 0), 100);
+  p.events = Array.isArray(raw.events) ? raw.events : [];
   const w = Math.min(Math.max(raw.eq, 0), 100) / 100;
   p.w = w;
   p.bondReal = (raw.bondY - raw.infl) / 100;
@@ -44,12 +45,38 @@ const drift = (p, t) => (p.rCur === p.wCur ? 1 : Math.pow(1 + p.fxDrift / 100, t
 const spendW = (p, t, E) => conv(E, p.rCur, p.wCur, p.fx) * drift(p, t);
 const pensW = (p, t) => conv(p.pension, p.rCur, p.wCur, p.fx) * drift(p, t);
 
+// Spending that ends at a known age (a mortgage, children's costs) is already inside the monthly spending
+// the person typed. This is how much year t's spending differs from today's (work currency, today's money):
+// minus the amount once it has ended; before that, a fixed nominal payment shrinks as prices rise.
+export function eventDelta(p, t) {
+  const events = p.events;
+  if (!events || events.length === 0) return 0;
+  let d = 0;
+  for (const e of events) {
+    if (p.age + t >= e.endAge) d -= e.amount;
+    else if (e.nominal) d += e.amount * (Math.pow(1 + p.infl / 100, -t) - 1);
+  }
+  return d;
+}
+
+// Present value, at the start of year t, of the event deltas from year t to the end of the plan.
+function eventPv(p, t, r) {
+  if (!p.events || p.events.length === 0) return 0;
+  const H = Math.max(p.life - (p.age + t), 1);
+  let pv = 0;
+  for (let k = 0; k < H; k++) pv += eventDelta(p, t + k) / Math.pow(1 + r, k);
+  return pv;
+}
+
 // Assets needed at the start of year t to retire then and spend E (retirement currency) until p.life.
 export function fiNeed(p, t, E = p.retExp, r = p.r) {
   const a = p.age + t, H = Math.max(p.life - a, 1);
+  // Event deltas are work-currency money that does not drift, so, like self-pay, they are added after the
+  // pension cap (which only limits what the pension saves), and the total cannot go below zero.
+  const ev = eventPv(p, t, r);
   const Ew = spendW(p, t, E), Pw = pensW(p, t);
-  if (Pw <= 0) return Ew / swrFor(p, H);
-  if (p.pAge <= a) return Math.max(Ew - Pw, 0) / swrFor(p, H);
+  if (Pw <= 0) return Math.max(Ew / swrFor(p, H) + ev, 0);
+  if (p.pAge <= a) return Math.max(Math.max(Ew - Pw, 0) / swrFor(p, H) + ev, 0);
   const b = Math.min(p.pAge - a, H);
   // Social insurance paid by hand until the pension starts is work-currency money in today's terms; it sits
   // outside the cap, which only limits what the pension itself can save.
@@ -57,11 +84,11 @@ export function fiNeed(p, t, E = p.retExp, r = p.r) {
   for (let k = 0; k < b; k++) { const d = Math.pow(1 + r, k); pv += Ew / d; paid += (p.selfPay ?? 0) / d; }
   if (b < H) pv += Math.max(Ew - Pw, 0) / swrFor(p, H - b) / Math.pow(1 + r, b);
   // A pension can only help: never ask for more than the same plan with no pension.
-  return Math.min(pv, Ew / swrFor(p, H)) + paid;
+  return Math.max(Math.min(pv, Ew / swrFor(p, H)) + paid + ev, 0);
 }
 
 export const savingsAt = (p, t, s0 = null) =>
-  s0 != null ? s0 * Math.pow(1 + p.growth / 100, t) : p.income * Math.pow(1 + p.growth / 100, t) - p.expense;
+  (s0 != null ? s0 * Math.pow(1 + p.growth / 100, t) : p.income * Math.pow(1 + p.growth / 100, t) - p.expense) - eventDelta(p, t);
 
 // Assets cannot fall below zero. Pass floor: false only to value a stream of savings on its own.
 export function assetsAt(p, n, { r = p.r, s0 = null, A0 = p.assets, floor = true } = {}) {
@@ -174,7 +201,7 @@ export function planFlows(p, retireT, s0) {
   for (let t = 0; t <= p.life - p.age; t++) {
     // Drift stops at retirement, matching fiNeed: the need is fixed in the year the holiday starts.
     const k = retireT == null ? t : Math.min(t, retireT);
-    gross.push(spendW(p, k, p.retExp) + (p.age + t < p.pAge ? (p.selfPay ?? 0) : 0));
+    gross.push(Math.max(spendW(p, k, p.retExp) + (p.age + t < p.pAge ? (p.selfPay ?? 0) : 0) + eventDelta(p, t), 0));
     pens.push(p.age + t >= p.pAge ? pensW(p, k) : 0);
     sav.push(savingsAt(p, t, s0));
   }
