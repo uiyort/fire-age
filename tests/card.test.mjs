@@ -5,7 +5,7 @@ import { findBannedCopy } from '../scripts/lint-copy.mjs';
 
 const type = {
   code: 'EHTS', name: '采菊人', emoji: '🌼', group: '归园派', blurb: '早早收工，回家种花。',
-  axes: [{ name: '启程', letter: 'E', pole: '早', value: '43 岁' }, { name: '目的地', letter: 'H', pole: '在地', value: '中国大陆' }, { name: '行李', letter: 'T', pole: '轻装', value: '40%' }, { name: '路费', letter: 'S', pole: '靠存', value: '30%' }],
+  axes: [{ name: '启程', letter: 'E', pole: '早班', value: '43 岁' }, { name: '目的地', letter: 'H', pole: '在地', value: '中国大陆' }, { name: '行李', letter: 'T', pole: '轻装', value: '40%' }, { name: '路费', letter: 'S', pole: '现攒', value: '30%' }],
 };
 const hero = { reachable: true, startAge: 30, holidayAge: 43, endAge: 95, workYears: 13, holidayYears: 52, mondays: 678, people: 7, months: 50, fund: { share: 0.14 } };
 const summary = { mode: 'fwd', type, hero: { ...hero, fund: { share: 0.14 } }, ribbons: [{ label: '顺风局', cells: ['work', 'holiday'] }] };
@@ -137,10 +137,10 @@ test('the barcode is the life itself: one bar a year, its height the assets, its
 test('the summary card spells out the type as four ticket fields', () => {
   const s = summaryCardSpec(summary);
   assert.deepEqual(s.fields, [
-    { label: '启程', letter: 'E', pole: '早' },
+    { label: '启程', letter: 'E', pole: '早班' },
     { label: '目的地', letter: 'H', pole: '在地' },
     { label: '行李', letter: 'T', pole: '轻装' },
-    { label: '路费', letter: 'S', pole: '靠存' },
+    { label: '路费', letter: 'S', pole: '现攒' },
   ]);
   assert.equal(s.departs, '50 岁前');
 });

@@ -332,7 +332,7 @@ export function variantsHtml({ p, dispCur }) {
   }
   const coastDone = p.assets >= coast;
   h += `<tr><td><b>Coast FIRE</b></td><td>此后不再储蓄，靠复利在 ${p.pAge} 岁达到标准 FIRE</td><td class="num">${money(p.retExp, p.rCur)}</td><td class="num">${D(coast)}</td><td class="num">${coastDone ? '已达成' : `还差 ${D(coast - p.assets)}`}</td></tr>`;
-  return `${h}</tbody>`;
+  return `${h}</tbody><tfoot><tr><td colspan="5" class="fine">英文圈的 Lean / Fat 多按绝对金额分；本工具的轻装 / 宽裕按“和现在比”来分。</td></tr></tfoot>`;
 }
 
 export function heatHtml({ p, dispCur }) {
@@ -365,17 +365,17 @@ export function heatHtml({ p, dispCur }) {
 export function typeHtml(type, lever) {
   const next = lever ? `<p class="next">下一步：${lever.label}，${lever.unlocks ? '就能看到放假那天' : `提前 ${yearsText(lever.gainYears)}`}。</p>` : '';
   const axes = type.axes.map(axis => {
-    const poles = Object.entries(axis.poles).map(([letter, label]) => `<span class="pole${letter === axis.letter ? ' on' : ''}">${letter} ${label}</span>`).join('');
+    const poles = Object.entries(axis.poles).map(([letter, label]) => `<span class="pole${letter === axis.letter ? ' on' : ''}">${label}</span>`).join('');
     return `<div class="axis"><span class="axis-name">${axis.name}</span><span class="poles">${poles}</span><span class="axis-value">${axis.value}</span></div>`;
   }).join('');
-  return `<div class="type-head"><span class="type-emoji" aria-hidden="true">${type.emoji}</span><div class="type-title"><div class="type-code">${type.code}</div><div class="type-name">${type.name}</div></div><div class="type-tags"><span class="pill">${type.group}</span><span class="pill">${type.status.name}</span></div></div>
+  return `<div class="type-head"><span class="type-emoji" aria-hidden="true">${type.emoji}</span><div class="type-title"><div class="type-name">${type.name} · ${type.group}</div></div><div class="type-tags"><span class="pill">${type.status.name}</span></div></div>
     <p class="type-blurb">${type.blurb}</p><div class="axes">${axes}</div><p class="why">${type.status.why}</p>${next}`;
 }
 
 export function allTypesHtml() {
   const rules = AXES.map(a => `<li><b>${a.name}</b>：${a.rule}</li>`).join('');
   const groups = GROUPS.map(g => {
-    const cells = TYPES.filter(t => t.group === g.name).map(t => `<div class="type-cell" data-code="${t.code}"><span class="type-emoji" aria-hidden="true">${t.emoji}</span><div><b>${t.name}</b> <span class="type-en">${t.code}</span><p>${t.blurb}</p></div></div>`).join('');
+    const cells = TYPES.filter(t => t.group === g.name).map(t => `<div class="type-cell" data-code="${t.code}"><span class="type-emoji" aria-hidden="true">${t.emoji}</span><div><b>${t.name}</b><p>${t.blurb}</p></div></div>`).join('');
     return `<h3>${g.name} <span class="type-en">${g.blurb}</span></h3><div class="type-grid">${cells}</div>`;
   }).join('');
   return `<summary>全部 ${TYPES.length} 种类型和判定规则</summary><ul class="type-list">${rules}</ul>${groups}`;

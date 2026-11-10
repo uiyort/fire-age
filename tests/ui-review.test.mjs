@@ -95,7 +95,7 @@ test('simple-view lab amounts are per month, as they were typed', () => {
 
 test('the card route does not repeat the age for someone who can stop today', () => {
   const h = hero(there);
-  const spec = summaryCardSpec({ mode: 'fwd', type: { ...TYPES[0], axes: [{ letter: 'E', name: '启程', pole: '早' }] }, hero: h, privacy: { money: false, now: true } });
+  const spec = summaryCardSpec({ mode: 'fwd', type: { ...TYPES[0], axes: [{ letter: 'E', name: '启程', pole: '早班' }] }, hero: h, privacy: { money: false, now: true } });
   assert.equal(spec.ticket.route, '40 → 95');
   assert.equal(spec.covered, true);
 });

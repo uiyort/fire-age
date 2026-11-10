@@ -187,7 +187,6 @@ textarea { font-family: var(--f-mono); font-size: 13px; width: 100%; padding: 8p
 .type-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 10px; }
 .type-emoji { font-size: 40px; line-height: 1; flex: none; }
 .type-title { min-width: 0; }
-.type-code { font-family: var(--f-mono); font-size: 13px; letter-spacing: .14em; color: var(--accent); font-weight: 700; }
 .type-name { font-family: var(--f-display); font-weight: 900; font-size: 28px; line-height: 1.2; }
 .type-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .type-tags .pill { color: var(--accent); }

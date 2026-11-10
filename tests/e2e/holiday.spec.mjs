@@ -44,14 +44,14 @@ test('someone who cannot reach the goal gets a complete, upbeat conclusion', asy
 
 test('the holiday type has a code, four axes and a full table with the person marked', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('#type-now .type-code')).toHaveText(/^[EL][HA][TF][SG]$/);
+  await expect(page.locator('#type-now')).not.toHaveText(/[EL][HA][TF][SG]/);
   await expect(page.locator('#type-now .axis')).toHaveCount(4);
   await page.locator('#type-all summary').click();
   await expect(page.locator('#type-all .type-cell')).toHaveCount(16);
   await expect(page.locator('#type-all .type-cell.mine')).toHaveCount(1);
-  const before = await page.locator('#type-now .type-code').innerText();
+  const before = await page.locator('#type-now .type-name').innerText();
   await page.selectOption('#s-ret', 'TH');
-  await expect(page.locator('#type-now .type-code')).not.toHaveText(before);
+  await expect(page.locator('#type-now .type-name')).not.toHaveText(before);
 });
 
 test('a lever shows its gain in Mondays', async ({ page }) => {

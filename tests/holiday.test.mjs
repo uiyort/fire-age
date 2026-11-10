@@ -5,8 +5,8 @@ import DATA from '../site/js/data-latest.js';
 import { fiNeed, fiYears, fwdSolve, lifePath, monteCarlo } from '../site/js/engine.js';
 import { defaultState, setField, setRetireCountry, setWorkCountry, toParams } from '../site/js/state.js';
 import { rankLevers } from '../site/js/levers.js';
-import { GROUPS, TYPES, drawLives, holidayType, lifeStory, mondaysIn, placeRanking, workdaysIn } from '../site/js/holiday.js';
-import { livesSummary, storyHtml } from '../site/js/views.js';
+import { AXES, GROUPS, TYPES, drawLives, holidayType, lifeStory, mondaysIn, placeRanking, workdaysIn } from '../site/js/holiday.js';
+import { allTypesHtml, livesSummary, storyHtml, typeHtml, variantsHtml } from '../site/js/views.js';
 
 test('a life that runs dry says fixed spending only when spending was fixed', () => {
   const p = toParams(defaultState(DATA), DATA);
@@ -234,4 +234,37 @@ test('the lives summary quotes the real number of simulated paths', () => {
   const stories = [{ outcome: 'lasted' }, { outcome: 'ruined' }];
   assert.match(livesSummary(stories, { success: 0.5, paths: 500 }), /500 次模拟/);
   assert.doesNotMatch(livesSummary(stories, { success: 0.5, paths: 500 }), /条人生里/);
+});
+
+test('the axes use plain words for departure and fare', () => {
+  const by = Object.fromEntries(AXES.map(a => [a.key, a]));
+  assert.deepEqual(by.when.poles, { E: '早班', L: '正点' });
+  assert.deepEqual(by.fare.poles, { S: '现攒', G: '老本' });
+  assert.deepEqual(by.where.poles, { H: '在地', A: '远方' });
+  assert.deepEqual(by.pack.poles, { T: '轻装', F: '宽裕' });
+  for (const a of AXES) assert.ok(!/[A-Z]/.test(a.rule), a.rule);
+});
+
+test('type and group blurbs never promise returns', () => {
+  for (const x of [...TYPES, ...GROUPS]) for (const w of ['复利', '钱生钱', '替你上班']) assert.ok(!x.blurb.includes(w), x.blurb);
+});
+
+test('the result page shows the name and group, not the letter code', () => {
+  const type = typeOf(person());
+  const html = typeHtml(type);
+  assert.ok(!html.includes(type.code));
+  assert.ok(!/>[A-Z] [^<]+</.test(html));
+  assert.ok(html.includes(type.name + ' · ' + type.group));
+});
+
+test('the all-types list shows no code as text', () => {
+  const html = allTypesHtml();
+  const text = html.replace(/<[^>]*>/g, ' ');
+  assert.ok(!/[EL][HA][TF][SG]/.test(text));
+  assert.ok(html.includes('data-code="EHTS"'));
+});
+
+test('the variants table says how Lean and Fat differ from the English-speaking usage', () => {
+  const p = person().p;
+  assert.ok(variantsHtml({ p, dispCur: 'CNY' }).includes('英文圈的 Lean / Fat 多按绝对金额分'));
 });
