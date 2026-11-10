@@ -3,8 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>放假年龄 · FIRE Age</title>
+  <title>放假年龄：财务自由、提前退休（FIRE）计算器</title>
   <meta name="description" content="放假年龄：边算边学的财务自由、提前退休计算器。算出你几岁能开始放假，看懂每个参数，并知道怎么提前。支持跨国退休，公式和数据来源全部公开。">
+  <link rel="canonical" href="https://fire-age.com/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="放假年龄">
+  <meta property="og:title" content="放假年龄：财务自由、提前退休（FIRE）计算器">
+  <meta property="og:description" content="放假年龄：边算边学的财务自由、提前退休计算器。算出你几岁能开始放假，看懂每个参数，并知道怎么提前。支持跨国退休，公式和数据来源全部公开。">
+  <meta property="og:url" content="https://fire-age.com/">
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -78,7 +84,7 @@
           </div>
           <div class="zone-col">
             <div class="card" id="levers"></div>
-            <div class="simple-only"><div class="card" id="goal" hidden><div id="goal-body"></div></div></div>
+            <div class="card" id="goal" hidden><div id="goal-body"></div></div>
           </div>
         </section>
 
@@ -190,7 +196,7 @@
               <label class="chk"><input type="checkbox" id="card-money"> 显示金额</label>
               <label class="chk"><input type="checkbox" id="card-now" checked> 显示现在年龄</label>
             </div>
-            <p class="fine">默认不放金额，别人看不出你的家底。</p>
+            <p class="fine privacy-note">默认不放金额，别人看不出你的家底。</p>
           </fieldset>
           <div class="goal-row"><button type="button" class="ghost fill" id="share-btn">生成放假卡</button></div>
           <div class="share" id="share-panel" hidden>
@@ -204,9 +210,15 @@
       </div>
     </main>
 
+    <section class="about" id="about">
+      <h2>放假年龄是什么</h2>
+      <p>放假年龄是一个免费的财务自由（FIRE）、提前退休计算器，不用注册。填上年龄、收入、支出和存款，它算出你几岁能开始放假：从那年起不再上班，钱有八成把握够花到规划年龄（默认 95 岁）。</p>
+      <p>结果来自 2,000 种年景的模拟，不是按固定收益率算出的单个数字。你还能看到怎么提前、遇上坏年景撑不撑得住，以及换个地方放假会差几年。</p>
+      <p>你填的数字只在你的浏览器里算，不上传。公式见<a href="method.html">计算方法</a>，数据见<a href="sources.html">数据来源</a>，每月更新。</p>
+    </section>
+
     <footer>
       <p>本工具仅用于教育和测算，不构成投资建议。市场数据版本 <span id="data-version"></span>，决策前请核对官方来源。</p>
-      <p><a href="method.html">计算方法</a> · <a href="sources.html">数据来源</a></p>
     </footer>
   </div>
   <script type="module" src="js/app.js"></script>

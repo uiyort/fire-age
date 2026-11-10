@@ -6,12 +6,12 @@ const STORAGE_KEY = 'fire-age-goal-v1';
 
 const KINDS = {
   saveRate: { read: p => savingsRate(p) ?? 0, met: (now, target) => now >= target, label: t => `储蓄率到 ${Math.round(t * 100)}%` },
-  expense: { read: p => p.expense, met: (now, target) => now <= target, label: t => `年支出降到 ${Math.round(t).toLocaleString('zh-CN')}` },
+  expense: { read: p => p.expense, met: (now, target) => now <= target, label: (t, cur) => `每月支出降到 ${cur === 'CNY' ? '¥' : cur ? `${cur} ` : ''}${Math.round(t / 12).toLocaleString('zh-CN')}` },
   drag: { read: p => p.drag, met: (now, target) => now <= target, label: t => `税费拖累降到 ${t.toFixed(1)}%` },
 };
 
 export function makeGoal(paramId, target, p, now) {
-  return { paramId, target, label: KINDS[paramId].label(target), years: oddsYears(p), odds: ODDS, createdAt: now, cur: p.wCur };
+  return { paramId, target, label: KINDS[paramId].label(target, p.wCur), years: oddsYears(p), odds: ODDS, createdAt: now, cur: p.wCur };
 }
 
 // A goal's amounts and years only compare within the currency and country it was set in.

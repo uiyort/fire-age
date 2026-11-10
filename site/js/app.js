@@ -329,8 +329,9 @@ function renderFast() {
   if (S.mode === 'bwd') $('solves').innerHTML = solvesHtml({ p, bwd, odds, dispCur: cur });
   $('type-now').innerHTML = typeHtml(type);
   document.querySelectorAll('.type-cell').forEach(cell => cell.classList.toggle('mine', cell.dataset.code === type.code));
-  $('levers').innerHTML = leversHtml(levers, p, { pro: S.view === 'pro', small, dispCur: cur });
-  $('lead-faster').textContent = fasterLead(levers);
+  const reached = S.mode === 'fwd' && t === 0;
+  $('levers').innerHTML = leversHtml(levers, p, { pro: S.view === 'pro', small, dispCur: cur, reached });
+  $('lead-faster').textContent = fasterLead(levers, { reached });
   renderGoal(p);
   saveState(S, storage);
 }
@@ -460,6 +461,8 @@ function renderLives() {
   latest.fifth = fifth;
   latest.names = names;
   const selectedFifth = fifth && lifeIndex === lives.length;
+  const empty = stories.every(s => s.outcome === 'working' && !(s.endAssets > 0));
+  $('life-section').classList.toggle('empty-lives', empty);
   $('lives').innerHTML = livesHtml(lives, stories, lifeIndex, { p, dispCur: cur, fifth, names, hardest });
   $('life-changes').innerHTML = labChangesHtml(labLabels());
   $('life-summary').textContent = livesSummary(stories, mc, p.life);
@@ -506,7 +509,7 @@ function viewsApplied() {
 
 function renderViewsBanner() {
   const p = toParams(S, DATA);
-  const sliders = Object.entries(writtenSliders()).map(([id, value]) => ({ id, name: paramById[id].name, text: tryValueText(value, tryRange(p, id).unit, p) }));
+  const sliders = Object.entries(writtenSliders()).map(([id, value]) => ({ id, name: paramById[id].name, text: tryValueText(value, tryRange(p, id).unit, p, id) }));
   $('views-banner').innerHTML = viewsBannerHtml(scnAnswers, baseline(), paramById, viewsApplied(), sliders);
 }
 
@@ -632,7 +635,7 @@ function fieldFromElement(id) {
 let splitting = false;
 const sumText = sum => {
   const cur = toParams(S, DATA).wCur;
-  return cur === 'CNY' ? `¥${wholeMoney(sum, cur)}` : wholeMoney(sum, cur);
+  return wholeMoney(sum, cur);
 };
 function onInput(ev) {
   const el = ev.target;
@@ -772,7 +775,7 @@ function summaryInput() {
     place: gain >= 0.05 ? { name: best.name, gain } : null,
     fifth: fifth && fifthBrief(fifth.base, fifth.story, latestMoney()) ? { ...fifthBrief(fifth.base, fifth.story, latestMoney()), baseName: (latest.names ?? lifeNames(stories))[fifth.baseIndex] } : null,
     // A spending goal is an amount, so a card without money says it was met without the number.
-    goal: achieved ? { label: goal.label, plain: goal.paramId === 'expense' ? '年支出降到了目标' : goal.label } : null,
+    goal: achieved ? { label: goal.label, plain: goal.paramId === 'expense' ? '每月支出降到了目标' : goal.label } : null,
     lever: personalLever(rankLevers(p, DATA, { retC: S.retC, top: 6 }), p, v => money(Math.round(toDisplay(v, p, cur)), cur)),
     // Forward, the age is the 8-in-10 age; working backward, the card says the odds of the plan as it is.
     odds: !hero.reachable ? '' : mode === 'bwd' ? oddsText(hero.success) : '八成把握',
@@ -967,6 +970,7 @@ function init() {
   document.addEventListener('input', onInput);
   document.addEventListener('change', ev => {
     if (ev.target.closest?.('#share-options')) {
+      $('share-options').classList.toggle('type-only', document.querySelector('input[name="card-kind"]:checked')?.value === 'type');
       if (!$('share-panel').hidden && flushSimulation()) showCard(cardSpec(), { scroll: false });
       return;
     }

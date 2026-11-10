@@ -255,7 +255,10 @@ export function heroModel({ mode, p, t, bwd, success, need = null, ruler = null 
     fund: { have: p.assets, need: line, share: line > 0 ? Math.min(p.assets / line, 1) : 1 },
     times: yearSpend > 0 && reachable ? Math.round(line / yearSpend) : null,
     months,
-    next: months === null || nextMonths * monthSpend <= p.assets ? null : { months: nextMonths, gap: nextMonths * monthSpend - p.assets },
+    // Savings that alone cover every month to the end of the plan, before any return: the count stops meaning anything.
+    covered: months !== null && months >= total * 12,
+    // Someone who can stop today has no next step to save for.
+    next: months === null || (reachable && workYears === 0) || months >= total * 12 || nextMonths * monthSpend <= p.assets ? null : { months: nextMonths, gap: nextMonths * monthSpend - p.assets },
     ruler,
   };
 }

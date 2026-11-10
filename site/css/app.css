@@ -5,7 +5,7 @@
   --surface-2: #e4ebe6;
   --ink: #14201b;
   --ink-2: #48564f;
-  --ink-3: #6a7871;
+  --ink-3: #5e6c65;
   --line: #d3ddd7;
   --accent: #136f52;
   --accent-ink: #ffffff;
@@ -108,7 +108,7 @@ h2 { font-family: var(--f-display); font-weight: 900; font-size: 19px; line-heig
 
 .lever-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .lever { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding: 10px 12px; background: var(--bg); border-radius: 8px; }
-.lever .lab { font-weight: 500; min-width: 0; }
+.lever .lab { font-weight: 500; min-width: 0; flex: 1 1 12em; }
 .lever .gain { font-family: var(--f-mono); color: var(--accent); font-weight: 500; white-space: nowrap; }
 .ghost { font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; }
 .ghost:hover, .ghost:focus-visible { background: var(--accent-soft); }
@@ -138,6 +138,7 @@ h2 { font-family: var(--f-display); font-weight: 900; font-size: 19px; line-heig
 .tip .h { font-weight: 700; margin-bottom: 2px; }
 
 .tbl { overflow-x: auto; }
+.tbl table { min-width: 520px; }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
 th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { font-size: 12px; color: var(--ink-2); font-weight: 500; white-space: nowrap; }
@@ -152,6 +153,9 @@ details summary { cursor: pointer; color: var(--accent); font-size: 13px; margin
 .lab-progress { margin: 8px 0 0; font-size: 13px; font-weight: 700; color: var(--accent); }
 #cards .lcard { margin-top: 6px; }
 a { color: var(--accent); }
+.about { margin-top: 32px; max-width: 760px; font-size: 13px; color: var(--ink-2); }
+.about h2 { margin: 0 0 6px; }
+.about p { margin: 0 0 6px; }
 footer { margin-top: 24px; font-size: 12px; color: var(--ink-3); }
 footer p { margin: 0 0 4px; }
 
@@ -300,7 +304,7 @@ h3 { font-family: var(--f-display); font-weight: 900; font-size: 16px; margin: 1
 .hero-months { margin: 6px 0 0; font-size: 14px; }
 .hero-months b { font-family: var(--f-mono); font-weight: 700; font-size: 18px; }
 .hero-ruler { margin: 8px 0 0; font-size: 13px; }
-.hero-ruler summary { display: flex; align-items: center; gap: 4px; cursor: pointer; list-style: none; color: var(--ink-2); font-size: 13px; margin: 0; }
+.hero-ruler summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; cursor: pointer; list-style: none; color: var(--ink-2); font-size: 13px; margin: 0; }
 .hero-ruler summary::-webkit-details-marker { display: none; }
 .hero-ruler .step { padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; color: var(--ink); opacity: .8; }
 .hero-ruler .step.on { border-color: var(--accent); color: var(--accent); font-weight: 700; opacity: 1; }
@@ -333,8 +337,8 @@ h3 { font-family: var(--f-display); font-weight: 900; font-size: 16px; margin: 1
 .zone-nav a { text-decoration: none; padding: 2px 0; }
 
 .results { gap: 28px; }
-.zone { display: flex; flex-direction: column; gap: 10px; min-width: 0; scroll-margin-top: 84px; }
-#share-section { scroll-margin-top: 84px; }
+.zone { display: flex; flex-direction: column; gap: 10px; min-width: 0; scroll-margin-top: 96px; }
+#share-section, #headline { scroll-margin-top: 96px; }
 .zone-title { font-size: 24px; margin: 0; }
 .zone-lead { margin: -6px 0 2px; font-size: 15px; font-weight: 700; color: var(--accent); }
 .zone-lead:empty { display: none; }
@@ -415,6 +419,19 @@ body.intro .mode-note, body.intro .legend-note { display: none; }
 
 .share-options { border: 0; padding: 0; margin: 12px 0; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
 .share-chks { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.share-options.type-only .share-chks, .share-options.type-only .privacy-note { display: none; }
+#life-section.empty-lives .chart-box, #life-section.empty-lives .legend, #life-section.empty-lives #lives,
+#life-section.empty-lives #life-story, #life-section.empty-lives #life-draw { display: none; }
+
+/* Touch screens: every control is at least 44px tall, the size a thumb hits reliably. */
+@media (pointer: coarse) {
+  .ghost, .seg button, .zone-nav a, .chk, .card-kind label { min-height: 44px; }
+  .ghost, .seg button, .zone-nav a { display: inline-flex; align-items: center; justify-content: center; }
+  .chk input { width: 20px; height: 20px; }
+  .fold > summary { padding-block: 10px; }
+  .help { width: 32px; height: 32px; }
+  .about a, footer a { display: inline-block; padding: 12px 0; margin: -12px 0; }
+}
 .share-options legend { padding: 0; margin: 0 0 6px; }
 .share-options .chk { grid-column: auto; }
 .share-options > .fine { flex-basis: 100%; margin: 0; }

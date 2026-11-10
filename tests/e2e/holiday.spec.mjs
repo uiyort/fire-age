@@ -31,7 +31,11 @@ test('someone who cannot reach the goal gets a complete, upbeat conclusion', asy
   await page.fill('#s-income', '3000');
   await page.fill('#s-expense', '9000');
   const hero = page.locator('#hero');
-  await expect(hero).toContainText('还没看到放假那天');
+  // The headline says it is out of reach; the hero does not say it again, and gives the first year to save instead.
+  await expect(page.locator('#headline')).toContainText('存不下钱');
+  await expect(hero.locator('.hero-big')).toHaveCount(0);
+  await expect(hero).toContainText('还没开始攒假');
+  await expect(hero).not.toContainText('0 个月');
   await expect(hero.locator('.lifebar .rest')).toHaveCount(0);
   await expect(hero.locator('.people')).toHaveCount(0);
   await expect(hero).not.toContainText(noBadText);

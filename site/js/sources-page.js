@@ -17,7 +17,7 @@ $('work').innerHTML = `<thead><tr><th>地区</th><th>最新 CPI 同比</th><th>�
   <td>${c.name}</td>
   <td data-field="${code}.cpi">${cell(c.cpi, 2, '%')}</td>
   <td data-field="${code}.target">${fmt(c.target.value, 1)}%</td>
-  <td data-field="${code}.y10">${cell(c.y10, 2, '%')}${c.y10.status === 'assumed' ? ` <span class="fine">${c.y10.note}</span>` : ''}</td>
+  <td data-field="${code}.y10">${cell(c.y10, 2, '%')}${c.y10.status === 'assumed' ? ' <span class="fine">见下文</span>' : ''}</td>
   <td>${c.pAge.value} 岁</td>
   <td>${fmt(c.drag.value, 2)}%</td></tr>`).join('')}</tbody>`;
 

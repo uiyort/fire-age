@@ -56,7 +56,7 @@ export function summaryCardSpec({ mode, type, hero, monthlyText, enough, place, 
   const ticket = {
     flight: dated ? `FA${String(hero.holidayAge).padStart(3, '0')}` : 'FA---',
     issued: issued ? issued.replace('-', '.') : '',
-    route: !showNow ? '' : dated ? `${hero.startAge} → ${hero.holidayAge} → ${hero.endAge}` : `${hero.startAge} → ? → ${hero.endAge}`,
+    route: !showNow ? '' : !dated ? `${hero.startAge} → ? → ${hero.endAge}` : hero.workYears === 0 ? `${hero.startAge} → ${hero.endAge}` : `${hero.startAge} → ${hero.holidayAge} → ${hero.endAge}`,
   };
   // The departure field would repeat the big age, so it states the rule that made the letter.
   const departs = !dated ? '规划期内还到不了' : type.axes[0]?.letter === 'E' ? '50 岁前' : '50 岁后';
@@ -85,6 +85,7 @@ export function summaryCardSpec({ mode, type, hero, monthlyText, enough, place, 
     // Mondays left are the work years in other words, so they go with the age.
     mondays: hero.reachable && showNow ? hero.mondays : null,
     months: hero.months ?? null,
+    covered: Boolean(hero.covered),
     note,
     boarding,
     barcode,
@@ -293,7 +294,7 @@ function renderSummary(spec, canvas) {
   const sentencePx = fitFontSize(measureAt(display), spec.sentence, inner, 48, 32);
   put(display(sentencePx), CREAM, spec.sentence, left, heroY + 122);
 
-  // The four letters of the type are the ticket's fields: departure, destination, luggage and fare.
+  // The four axes of the type are the ticket's fields: departure, destination, luggage and fare, in words.
   const fieldTop = heroY + 180, fieldW = inner / spec.fields.length;
   spec.fields.forEach((f, i) => {
     const fx = left + i * fieldW;
@@ -303,8 +304,7 @@ function renderSummary(spec, canvas) {
       ctx.beginPath(); ctx.moveTo(fx - 14, fieldTop - 26); ctx.lineTo(fx - 14, fieldTop + 92); ctx.stroke();
     }
     put(plain(22), CREAM_DIM, f.label, fx, fieldTop);
-    put(display(48), SUN, f.letter, fx, fieldTop + 54);
-    put(bold(fitFontSize(measureAt(bold), f.pole, fieldW - 70, 32, 24)), CREAM, f.pole, fx + measureAt(display)(f.letter, 48) + 10, fieldTop + 52);
+    put(bold(fitFontSize(measureAt(bold), f.pole, fieldW - 28, 40, 26)), SUN, f.pole, fx, fieldTop + 54);
     if (f.value) put(plain(fitFontSize(measureAt(plain), f.value, fieldW - 24, 22, 16)), CREAM_DIM, f.value, fx, fieldTop + 88);
   });
 
@@ -393,6 +393,8 @@ function renderSummary(spec, canvas) {
   // Months of holiday already saved: a fact, with no amount in it.
   if (spec.months === null || spec.months === undefined) {
     put(bold(34), STUB_INK, '—', hx, valueY);
+  } else if (spec.covered) {
+    put(bold(fitFontSize(measureAt(bold), `够花到 ${spec.route.endAge} 岁`, colW - 40, 34, 22)), STUB_INK, `够花到 ${spec.route.endAge} 岁`, hx, valueY);
   } else {
     const monthsText = spec.months.toLocaleString('zh-CN');
     put(display(44), STUB_INK, monthsText, hx, valueY);

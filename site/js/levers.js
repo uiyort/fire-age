@@ -104,7 +104,8 @@ export function impactOf(p, paramId) {
   if (paramId === 'fxDrift' && p.rCur === p.wCur) return { stepLabel: '工作地和退休地用同一种货币，这一项不起作用。', gainYears: null };
   const step = IMPACT_STEPS[paramId];
   const before = oddsYears(p), after = oddsYears(rebuild(p, step.change(p)));
-  return { stepLabel: step.stepLabel, note: step.note, gainYears: before === null || after === null ? null : before - after };
+  const reach = after === null ? 'none' : before === null ? 'unlocks' : null;
+  return { stepLabel: step.stepLabel, note: step.note, gainYears: reach ? null : before - after, ...(reach ? { reach } : {}) };
 }
 
 const RISK_PARAMS = ['eq', 'sigEq', 'sigBd', 'rho', 'flexCut'];

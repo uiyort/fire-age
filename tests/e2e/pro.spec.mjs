@@ -10,7 +10,9 @@ test('sources page lists every source with its licence', async ({ page }) => {
 test('sources page marks assumed values and states their basis', async ({ page }) => {
   await page.goto('/sources.html');
   await expect(page.locator('[data-field="HK.y10"]')).toContainText('假设');
-  await expect(page.locator('[data-field="HK.y10"]')).toContainText('金管局');
+  // The basis is told once, under the assumptions; the cell points there so the table stays narrow on a phone.
+  await expect(page.locator('[data-field="HK.y10"]')).toContainText('见下文');
+  await expect(page.locator('main')).toContainText('金管局');
   await expect(page.locator('[data-field="CN.y10"]')).not.toContainText('假设');
   await expect(page.locator('[data-field="CN.y10"]')).toContainText('官方');
   await expect(page.locator('[data-source="oecd"]')).toContainText('CC BY 4.0');
@@ -24,8 +26,9 @@ test('method page publishes the formulas and the disclaimer', async ({ page }) =
 test('the main page shows the data version and links both pages', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#data-version')).toContainText(DATA.version);
-  await expect(page.locator('footer a[href="method.html"]')).toBeVisible();
-  await expect(page.locator('footer a[href="sources.html"]')).toBeVisible();
+  // The about section links both pages, so the footer does not repeat them.
+  await expect(page.locator('#about a[href="method.html"]')).toBeVisible();
+  await expect(page.locator('#about a[href="sources.html"]')).toBeVisible();
 });
 
 test('exports download from the pro view', async ({ page }) => {
