@@ -44,3 +44,21 @@ A failed fetch keeps the previous value and marks it `carried`. A jump of more t
 ## If the tool ever charges users
 
 Recheck the BIS terms, which allow inclusion only where there is no additional charge to users. The Bank of Canada terms also require telling buyers the data is free on its site.
+
+## China basic pension rules
+
+Used by `site/js/pension.js`. Checked on 2026-11-10. Tables of numbers live in the code (`PAYOUT_MONTHS`), not here.
+
+| Rule | Source | Body and date | Figure |
+|---|---|---|---|
+| Gradual delay of the statutory retirement age | Decision on implementing gradual delay of the statutory retirement age, with the State Council measures annexed: <http://www.npc.gov.cn/npc/c2/kgfb/202409/t20240913_439534.html>, <https://www.gov.cn/yaowen/liebiao/202409/content_6974294.htm> | NPC Standing Committee, adopted 2024-09-13, in force 2025-01-01 | From 2025-01-01, men and women originally retiring at 55: 1 month of delay per 4 months, up to 63 and 58. Women originally retiring at 50: 1 month per 2 months, up to 55 |
+| Minimum contribution years | Same decision, measure 2 | Same | From 2030-01-01 rises from 15 years by 6 months a year to 20 years (2030: 15.5 ... 2039: 20) |
+| Personal-account payout months | Annex of State Council Decision Guo Fa [2005] No. 38: <https://www.gov.cn/gongbao/content/2006/content_169950.htm> | State Council, 2005-12-03 | Age 60: 139, 61: 132, 62: 125, 63: 117 (full table in code) |
+| Self-paid contribution of flexible workers | Same Guo Fa [2005] No. 38, art. 3 | Same | Rate 20%, of which 8% goes to the personal account |
+
+Notes and caveats:
+
+- The delay rule is applied as: months of delay = min(cap, ceil(k / step)), where k counts months from the start birth month (1965-01 for men, 1970-01 for women at 55, 1975-01 for women at 50), caps 36, 36 and 60 months. The official comparison tables are images on the government sites. The formula was checked against transcribed rows of those tables (1965-01 men: 60 years 1 month; 1971-01 men: 61 years 7 months, 19 months delay; 1974-01 men: 62 years 4 months; 1976-09 men: 63 years; 1975-01 and 1975-03 women at 50: 50 years 1 and 2 months), not against the images themselves.
+- The payout-months table is an image on gov.cn. The values were taken from provincial copies of the same table (Chongqing HRSS attachments, Shenzhen reprints) and agree with each other from age 40 to 70. One source, a CAS docx, shows age 47 as 207; Chongqing and the other copies show 208, which is used here.
+- Self-paid contribution default: the national rule is the 20% rate on a base chosen between about 60% and 300% of the previous year's local average wage. The 60% floor and the base are set by each province (see, for example, the Henan, Sichuan and Fujian human-resources pages), and the national text of Guo Fa [2005] No. 38 itself does not state 60%. The tool uses 60% x 20% of the user's base only as an editable default, labelled as this tool's setting.
+- Basic-pension formula (basic = base x (1 + index) / 2 x years x 1%; personal = account / payout months) is from Guo Fa [2005] No. 38 art. 6. The assumptions about the base, the account interest and the contribution years are this tool's settings.
