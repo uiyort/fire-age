@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+const openFolds = page => page.evaluate(() => document.querySelectorAll('details.fold').forEach(d => { d.open = true; }));
 
 const phone = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true };
 
@@ -31,12 +32,13 @@ test.describe('layout on a phone', () => {
     await page.fill('#s-assets', '800000');
     await page.reload();
     await expect(page.locator('#s-assets')).toBeHidden();
-    await page.locator('#inputs-box summary').click();
+    await page.locator('#inputs-box > summary').click();
     await expect(page.locator('#s-assets')).toHaveValue('800000');
   });
 
   test('the place ranking shows the top few and folds the rest', async ({ page }) => {
     await page.goto('/');
+    await page.locator('#places-fold > summary').click();
     await expect(page.locator('#places .place')).toHaveCount(11);
     await expect(page.locator('#places .place:visible')).toHaveCount(5);
     await page.locator('#places summary').click();
@@ -51,11 +53,12 @@ test.describe('layout on a phone', () => {
 });
 
 test('related things sit together', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/'); await openFolds(page);
   await expect(page.locator('.headline #type-now')).toBeVisible();
   await expect(page.locator('.headline #hero')).toBeVisible();
   await expect(page.locator('#zone-faster #levers')).toBeVisible();
-  await expect(page.locator('#zone-faster #places')).toBeVisible();
+  await expect(page.locator('#zone-faster #places')).toHaveCount(0);
+  await expect(page.locator('#places-fold > summary')).toBeVisible();
   await expect(page.locator('#zone-risk #lives')).toBeVisible();
   await expect(page.locator('#zone-risk #scenario')).toBeVisible();
   await expect(page.locator('#zone-learn #cards')).toBeVisible();
@@ -69,9 +72,9 @@ test('each zone leads with its takeaway', async ({ page }) => {
 
 test('on a wide screen the inputs stay open and beside the result, and lives sit beside the quiz', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/');
+  await page.goto('/'); await openFolds(page);
   await page.fill('#s-assets', '800000');
-  await page.reload();
+  await page.reload(); await openFolds(page);
   await expect(page.locator('#s-assets')).toBeVisible();
   const lives = await page.locator('#lives').boundingBox();
   const box = await page.locator('#scenario').boundingBox();
@@ -84,52 +87,23 @@ test('the section has its new name', async ({ page }) => {
   await expect(page.locator('main')).not.toContainText('五条人生');
 });
 
-test.describe('professional view locked', () => {
+test.describe('professional view open to all', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test('it stays locked and says how to open it', async ({ page }) => {
+  test('a first visit opens it straight away, with no lock and a note on what it holds', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('#to-pro')).toContainText('🔒');
+    await expect(page.locator('#to-pro')).toHaveText('专业');
+    await expect(page.locator('#mode-note')).toHaveText('专业版：改收益、通胀等全部假设');
     await page.click('#to-pro');
-    await expect(page.locator('#tiles')).toBeHidden();
-    await expect(page.locator('#to-simple')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('#pro-lock-note')).toBeInViewport();
-    await expect(page.locator('#pro-lock-note')).toContainText('生成');
-  });
-
-  test('generating the card opens it, for good', async ({ page }) => {
-    await page.goto('/');
-    await page.click('#share-btn');
-    await expect(page.locator('#to-pro')).not.toContainText('🔒');
-    await page.click('#pro-enter');
+    await expect(page.locator('#pro-form')).toBeVisible();
     await expect(page.locator('#tiles')).toBeVisible();
-    await page.reload();
-    await expect(page.locator('#to-pro')).not.toContainText('🔒');
-    await expect(page.locator('#tiles')).toBeVisible();
-  });
-
-  test('a saved professional view cannot bypass the lock', async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('fire-age-v1', JSON.stringify({ view: 'pro', workC: 'CN', retC: 'CN' })));
-    await page.goto('/');
-    await expect(page.locator('#tiles')).toBeHidden();
-  });
-
-  test('formulas and data sources stay open to everyone', async ({ page }) => {
-    await page.goto('/');
-    await expect(page.locator('footer a[href="method.html"]')).toBeVisible();
-    await expect(page.locator('footer a[href="sources.html"]')).toBeVisible();
-  });
-
-  test('the page never asks people to share', async ({ page }) => {
-    await page.goto('/');
-    await page.click('#share-btn');
-    await expect(page.locator('main')).not.toContainText('分享');
-    await expect(page.locator('main')).not.toContainText('评论区');
+    await expect(page.locator('body')).not.toContainText('解锁');
+    await expect(page.locator('body')).not.toContainText('🔒');
   });
 });
 
 test('the professional view drops the fun and leads with the numbers', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/'); await openFolds(page);
   await page.click('#to-pro');
   for (const id of ['#hero', '#type-now', '#type-all', '#life-section', '#scenario', '#goal', '#cards', '#share-section']) {
     await expect(page.locator(id)).toBeHidden();
@@ -167,4 +141,51 @@ test('the story of the chosen life sits right under its chart', async ({ page })
 test('the empty fifth life points at what really writes it', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#life-fifth-empty')).toContainText('年景');
+});
+
+test.describe('UI review fixes', () => {
+  test.use(phone);
+
+  test('the spending split spans the row, shows its total, and clears when spending is typed by hand', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => { document.getElementById('inputs-box').open = true; document.getElementById('expense-split').open = true; });
+    const split = await page.locator('#expense-split').boundingBox();
+    const form = await page.locator('#simple-form').boundingBox();
+    expect(split.width).toBeGreaterThan(form.width * 0.9);
+    const box = await page.locator('#split-rent').boundingBox();
+    expect(box.width).toBeGreaterThan(80);
+    await page.fill('#split-rent', '12500');
+    await page.fill('#split-food', '3200');
+    await page.fill('#split-other', '7633');
+    await expect(page.locator('#s-expense')).toHaveValue('23333');
+    await expect(page.locator('#split-note')).toHaveText('合计 ¥23,333，已填进每月支出。');
+    await page.fill('#s-expense', '9000');
+    await expect(page.locator('#split-rent')).toHaveValue('');
+    await expect(page.locator('#split-note')).toHaveText('三项加起来，自动填进每月支出。');
+  });
+
+  test('the view note stays when the view changes, and names the other view', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#mode-note')).toHaveText('专业版：改收益、通胀等全部假设');
+    await page.click('#to-pro');
+    await expect(page.locator('#mode-note')).toBeVisible();
+    await expect(page.locator('#mode-note')).toHaveText('简单版：只填几个数');
+  });
+
+  test('forward, the odds are told once on the ruler, which fits one line', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#hero .hero-odds')).toHaveCount(0);
+    const ruler = page.locator('#hero .hero-ruler > summary');
+    await expect(ruler).toContainText('八成');
+    const steps = await ruler.locator('.step').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top)));
+    expect(new Set(steps).size).toBe(1);
+  });
+
+  test('the example label goes once the numbers are the person\'s own', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => { document.getElementById('inputs-box').open = true; });
+    await expect(page.locator('#simple-form .legend-note')).toBeVisible();
+    await page.fill('#s-assets', '350000');
+    await expect(page.locator('#simple-form .legend-note')).toBeHidden();
+  });
 });

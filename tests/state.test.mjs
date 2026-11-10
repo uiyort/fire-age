@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
-import { defaultState, setField, setWorkCountry, setRetireCountry, estimateRetireSpend, toParams, loadState, saveState } from '../site/js/state.js';
+import { defaultState, setField, setWorkCountry, setRetireCountry, estimateRetireSpend, toParams, loadState, saveState, missingFields } from '../site/js/state.js';
 
 test('the bad-year cut stays between 0 and 100 percent', () => {
   const at = v => toParams(setField(defaultState(DATA), 'flexCut', String(v), DATA), DATA).flexCut;
@@ -65,7 +65,7 @@ test('switching retirement country converts a pension at the market rate', () =>
 
 test('switching work country preserves purchasing power and fills local data', () => {
   const s = setWorkCountry(defaultState(DATA), 'US', DATA);
-  assert.ok(Math.abs(s.assets - 500000 / fx('CNY')) < 1);
+  assert.ok(Math.abs(s.assets - 200000 / fx('CNY')) < 1);
   assert.equal(s.bondY, DATA.countries.US.y10.value);
   assert.equal(s.pAge, DATA.countries.US.pAge.value);
   assert.equal(s.drag, DATA.countries.US.drag.value);
@@ -102,4 +102,24 @@ test('a saved state round-trips', () => {
   const s = setField(defaultState(DATA), 'age', '41');
   saveState(s, store);
   assert.equal(loadState(DATA, store).age, 41);
+});
+
+test('the numbers the result rests on must be filled in before it updates', () => {
+  const s = defaultState(DATA);
+  assert.deepEqual(missingFields(s), []);
+  const blank = ['age', 'assets', 'income', 'expense'].reduce((acc, id) => setField(acc, id, '', DATA, { commit: false }), s);
+  assert.deepEqual(missingFields(blank), ['age', 'assets', 'income', 'expense']);
+  assert.deepEqual(missingFields(setField(s, 'assets', '0', DATA)), [], 'zero is an answer');
+});
+
+test('retirement spending must be filled in; a pension may stay blank', () => {
+  const s = defaultState(DATA);
+  assert.deepEqual(missingFields(setField(s, 'retExp', '', DATA)), ['retExp']);
+  assert.deepEqual(missingFields(setField(s, 'pension', '', DATA)), []);
+});
+
+test('working backward also needs the age to holiday at', () => {
+  const s = setField(defaultState(DATA), 'tAge', '', DATA);
+  assert.deepEqual(missingFields(s), []);
+  assert.deepEqual(missingFields({ ...s, mode: 'bwd' }), ['tAge']);
 });

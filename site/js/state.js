@@ -21,8 +21,10 @@ function localAssumptions(country) {
 
 export function defaultState(data) {
   const values = {
-    age: 30, assets: 500000, income: 300000, expense: 120000, growth: 2,
-    retExp: 120000, life: 95, pension: null, tAge: 45,
+    // Example numbers at an ordinary level, labelled as examples on the page: take-home ¥12,000 a month,
+    // spending ¥6,000, ¥200,000 saved.
+    age: 30, assets: 200000, income: 144000, expense: 72000, growth: 2,
+    retExp: 72000, life: 95, pension: null, tAge: 45,
     eq: 60, eqReal: 5, fxDrift: 0, swr: 3.9,
     sigEq: 0.17, sigBd: 0.06, rho: 0.2, flexCut: 0,
     ...localAssumptions(data.countries.CN),
@@ -56,7 +58,15 @@ export function setField(S, id, rawText, data, { commit = true } = {}) {
   return next;
 }
 
-export const commitField = (S, id) => (S[id] === null || S[id] === undefined ? S : { ...S, lastValid: { ...S.lastValid, [id]: S[id] } });
+// The numbers a result rests on. Left blank, they would quietly count as zero or as an old value, so the
+// result waits for them instead. A pension may stay blank; the age to holiday at matters only working backward.
+const REQUIRED_FIELDS = ['age', 'assets', 'income', 'expense', 'retExp'];
+export function missingFields(S) {
+  const ids = S.mode === 'bwd' ? [...REQUIRED_FIELDS, 'tAge'] : REQUIRED_FIELDS;
+  return ids.filter(id => S[id] === null || S[id] === undefined);
+}
+
+export const commitField =(S, id) => (S[id] === null || S[id] === undefined ? S : { ...S, lastValid: { ...S.lastValid, [id]: S[id] } });
 
 export function setWorkCountry(S, code, data) {
   const country = data.countries[code];
@@ -126,20 +136,3 @@ export function saveState(S, storage) {
   }
 }
 
-const PRO_KEY = 'fire-age-pro-v1';
-
-export function isProUnlocked(storage) {
-  try {
-    return storage.getItem(PRO_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function unlockPro(storage) {
-  try {
-    storage.setItem(PRO_KEY, '1');
-  } catch {
-    // Without storage the view stays open for this visit only.
-  }
-}

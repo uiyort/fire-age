@@ -8,15 +8,17 @@ test('the personal lever skips the place move everyone shares, and speaks in the
   const p = toParams(defaultState(DATA), DATA);
   const D = v => `¥${Math.round(v).toLocaleString('en-US')}`;
   const levers = rankLevers(p, DATA, { retC: 'CN' });
-  assert.equal(levers[0].id, 'place', 'the cheapest place usually wins, which is why the card leaves it out');
+  assert.ok(!levers.some(l => l.id === 'place'), 'moving away is not a way to retire earlier');
   const lever = personalLever(levers, p, D);
-  assert.equal(lever.action, '每月少花 10%（约 ¥1,000）');
+  assert.equal(lever.action, '每月少花 10%（约 ¥600）');
   assert.ok(lever.gain > 0);
   const save = personalLever([{ id: 'saveRate', gainYears: 0.5, unlocks: false }], p, D);
-  assert.equal(save.action, '每月多存 ¥1,250');
+  assert.equal(save.action, '每月多存 ¥600');
   assert.equal(personalLever([{ id: 'place', gainYears: 4 }], p, D), null);
   const unlock = personalLever([{ id: 'growth', unlocks: true, afterYears: 20 }], p, D);
-  assert.deepEqual(unlock, { action: '收入每年多涨 1 个百分点', unlockAge: p.age + 20 });
+  assert.deepEqual(unlock, { action: '收入每年多涨 1 个百分点', plain: '收入每年多涨 1 个百分点', unlockAge: p.age + 20 });
+  assert.equal(personalLever([{ id: 'spend', gainYears: 1, unlocks: false }], p, D).plain, '每月少花一成');
+  assert.ok(!/[¥\d,]{4,}/.test(personalLever([{ id: 'saveRate', gainYears: 1, unlocks: false }], p, D).plain));
 });
 import { PARAMS } from '../site/js/params.js';
 import { findBannedCopy } from '../scripts/lint-copy.mjs';
@@ -36,7 +38,7 @@ test('levers are sorted by years gained and capped at three', () => {
 
 test('a lever that makes the goal reachable ranks first', () => {
   // Explicit return assumptions keep this case stable as monthly data changes: the baseline never reaches the goal.
-  const stuck = p({ assets: 500000, income: 120000, expense: 120000, growth: 0, retExp: 120000, pension: 0, eq: 60, eqReal: 5, bondY: 1.65, infl: 1.5, drag: 0.2 });
+  const stuck = p({ assets: 0, income: 120000, expense: 120000, growth: 0, retExp: 120000, pension: 0, eq: 60, eqReal: 5, bondY: 1.65, infl: 1.5, drag: 0.2 });
   const out = rankLevers(stuck, DATA, { retC: 'CN' });
   assert.equal(out[0].unlocks, true);
   assert.equal(out[0].beforeYears, null);
@@ -53,14 +55,6 @@ test('retiring in the cheapest place offers no place lever', () => {
   const cheapest = Object.entries(DATA.countries).sort((a, b) => a[1].priceLevel.value - b[1].priceLevel.value)[0][0];
   const out = rankLevers(p(), DATA, { retC: cheapest, top: 9 });
   assert.ok(!out.some(l => l.id === 'place'));
-});
-
-test('a cheaper place names the country and lowers spending by the price ratio', () => {
-  const out = rankLevers(p(), DATA, { retC: 'CN', top: 9 });
-  const place = out.find(l => l.id === 'place');
-  const [cheapest] = Object.values(DATA.countries).sort((a, b) => a.priceLevel.value - b.priceLevel.value);
-  assert.ok(place);
-  assert.ok(place.label.includes(cheapest.name));
 });
 
 test('allocation is never offered as a lever', () => {
@@ -87,8 +81,10 @@ test('impact is reported per step in years', () => {
   assert.ok(Number.isFinite(i.gainYears) && i.gainYears > 0);
 });
 
-test('risk parameters report no years because they change the success rate instead', () => {
-  assert.equal(impactOf(p(), 'sigEq').gainYears, null);
+test('volatility moves the holiday age, because the age is counted by the odds', () => {
+  assert.ok(impactOf(p(), 'sigEq').gainYears < 0);
+  assert.ok(impactOf(p(), 'flexCut').gainYears > 0);
+  assert.equal(impactOf(p(), 'swr').gainYears, null);
 });
 
 test('every card has an impact description that does not crash', () => {

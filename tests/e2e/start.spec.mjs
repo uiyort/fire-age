@@ -55,3 +55,52 @@ test.describe('a first visit on a computer', () => {
     expect(download.suggestedFilename()).toBe('fire-age.png');
   });
 });
+
+test.describe('a blank number the result rests on', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, storageState: fresh });
+
+  test('stops the first calculation and points at the blank', async ({ page }) => {
+    await page.goto('/');
+    await page.fill('#s-expense', '');
+    await page.click('#start-calc');
+    await expect(page.locator('#start-calc')).toBeVisible();
+    await expect(page.locator('#hero')).toBeHidden();
+    await expect(page.locator('#s-expense')).toBeFocused();
+    await expect(page.locator('#s-expense')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('#missing-note')).toContainText('每月支出');
+    await page.fill('#s-expense', '6000');
+    await expect(page.locator('#missing-note')).toBeHidden();
+    await page.click('#start-calc');
+    await expect(page.locator('#hero')).toBeVisible();
+  });
+});
+
+test.describe('on a computer', () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test('a blank number holds the last result until it is filled in', async ({ page }) => {
+    await page.goto('/');
+    const initial = await page.locator('#headline').textContent();
+    await page.fill('#s-income', '20000');
+    await expect(page.locator('#headline')).not.toHaveText(initial);
+    const before = await page.locator('#headline').textContent();
+    await page.fill('#s-income', '');
+    await expect(page.locator('#missing-note')).toContainText('每月到手收入');
+    await expect(page.locator('body')).toHaveClass(/inputs-missing/);
+    await expect(page.locator('#headline')).toHaveText(before);
+    await page.locator('#s-age').focus();
+    await expect(page.locator('#s-income')).toHaveAttribute('aria-invalid', 'true');
+    await page.fill('#s-income', '30000');
+    await expect(page.locator('body')).not.toHaveClass(/inputs-missing/);
+    await expect(page.locator('#s-income')).not.toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('#headline')).not.toHaveText(before);
+  });
+
+  test('the card waits for the blank too', async ({ page }) => {
+    await page.goto('/');
+    await page.fill('#s-age', '');
+    await page.click('#share-btn');
+    await expect(page.locator('#share-panel')).toBeHidden();
+    await expect(page.locator('#s-age')).toBeFocused();
+  });
+});

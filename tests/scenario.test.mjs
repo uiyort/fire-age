@@ -47,7 +47,7 @@ test('answers become parameter values, and are the same every time they are appl
 });
 
 test('stored answers keep only current questions with a valid option', () => {
-  assert.deepEqual(cleanAnswers({ market: 9, crash: 1, nerve: -1, prices: 1.5, rates: '2', wages: 0, gone: 1 }), { crash: 1, wages: 0 });
+  assert.deepEqual(cleanAnswers({ market: 9, crash: 1, stocks: -1, prices: 1.5, rates: '2', wages: 0, gone: 1, nerve: 1 }), { crash: 1, wages: 0 });
   for (const bad of [null, 'x', 7, [1, 2]]) assert.deepEqual(cleanAnswers(bad), {});
 });
 
@@ -126,4 +126,38 @@ test('the professional banner lists answers and stays quiet when there are none'
   assert.ok(html.includes(params[s.param].name));
   assert.match(html, /views-apply/);
   assert.match(viewsBannerHtml({ [s.id]: 0 }, base, params, true), /已带入/);
+});
+
+test('the stock question asks for the share people hold, not how much loss they can take', () => {
+  const q = SCENARIOS.find(s => s.id === 'stocks');
+  assert.equal(q.param, 'eq');
+  assert.equal(q.question, '你现在的股票占比大概是多少？');
+  assert.deepEqual(q.options(baselineOf(DATA, 'CN')), [['三成左右或更少', 30], ['六成左右', 60], ['八成左右或更多', 80]]);
+  assert.match(q.insight, /不是建议/);
+  assert.match(q.insight, /等你来写/);
+  assert.ok(!SCENARIOS.some(s => s.id === 'nerve'));
+  assert.deepEqual(cleanAnswers({ nerve: 1, stocks: 2 }), { stocks: 2 });
+});
+
+test('the crowd share of an answer counts only people who answered that question', async () => {
+  const { scenarioHtml: html } = await import('../site/js/views.js');
+  const crowd = { status: 'shown', total: 200, counts: { market: [50, 100, 50], stocks: [10, 20, 10] } };
+  const base = baselineOf(DATA, 'CN');
+  const params = Object.fromEntries(PARAMS.map(p => [p.id, p]));
+  const out = html({ index: SCENARIOS.length, answers: { stocks: 1 }, base, effect: '', params, crowd });
+  assert.match(out, /50% 也这么看/);
+});
+
+test('the written life tells its odds and the price of the chosen mix, and says it is not better', async () => {
+  const { fifthOddsHtml } = await import('../site/js/views.js');
+  const out = fifthOddsHtml({ mode: 'fwd', age: 47, success: 0.83, worstYear: -0.18, life: 95, baseAge: 45 });
+  assert.match(out, /八成把握的放假年龄是 47 岁（原来 45 岁）/);
+  // Forward, the age is the measure: the odds are not said a second time.
+  assert.doesNotMatch(out, /8 成把握/);
+  assert.match(fifthOddsHtml({ mode: 'fwd', age: 45, worstYear: -0.18, baseAge: 45 }), /和原来一样/);
+  const back = fifthOddsHtml({ mode: 'bwd', age: 45, success: 0.62, baseSuccess: 0.83, worstYear: -0.18 });
+  assert.match(back, /45 岁放假，6 成把握（原来 8 成把握）/);
+  assert.match(out, /约跌 18%/);
+  assert.match(out, /不代表更好/);
+  assert.equal(fifthOddsHtml(null), '');
 });

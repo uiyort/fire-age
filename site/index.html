@@ -21,8 +21,9 @@
         </div>
         <div class="seg" role="group" aria-label="界面详细程度">
           <button type="button" id="to-simple">简单</button>
-          <button type="button" id="to-pro">专业 🔒</button>
+          <button type="button" id="to-pro">专业</button>
         </div>
+        <p class="fine mode-note" id="mode-note">专业版：改收益、通胀等全部假设</p>
       </div>
     </header>
 
@@ -62,7 +63,8 @@
           <form id="pro-form" autocomplete="off" hidden></form>
           <div class="estimate" id="estimate"></div>
         </details>
-        <div class="goal-row start-row"><button type="button" class="ghost" id="start-calc" hidden>算出我的放假年龄</button></div>
+        <p class="missing-note" id="missing-note" role="status" hidden></p>
+        <div class="goal-row start-row"><button type="button" class="ghost fill" id="start-calc" hidden>算出我的放假年龄</button></div>
       </section>
 
       <div class="results">
@@ -74,25 +76,32 @@
             <p class="sub">每条路只改一个数字。</p>
             <div class="solves" id="solves"></div>
           </div>
-          <div class="zone-grid">
-            <div class="zone-col">
-              <div class="card" id="levers"></div>
-              <div class="simple-only"><div class="card" id="goal" hidden><div id="goal-body"></div></div></div>
-            </div>
-            <div class="card" id="places-card">
-              <h2>同样的钱，在哪放假最早</h2>
-              <p class="sub">按当地物价折算，生活水平不变。不含签证、税和医疗。</p>
-              <div id="places"></div>
-            </div>
+          <div class="zone-col">
+            <div class="card" id="levers"></div>
+            <div class="simple-only"><div class="card" id="goal" hidden><div id="goal-body"></div></div></div>
           </div>
         </section>
+
+        <details class="card fold" id="places-fold">
+          <summary id="places-title">换个地方放假</summary>
+          <div id="places-card">
+            <p class="sub">同样的钱，按当地物价折算，生活水平不变。</p>
+            <div id="places"></div>
+            <ul class="fine fold-notes">
+              <li>没算签证、医保和回国机票的花销。</li>
+              <li>很多国家的退休类签证有年龄下限，政策以官方为准；个人每年购汇便利化额度为 5 万美元。</li>
+              <li>物价水平按当地居民的消费篮子算，外来居住者常常花得更多，所以排名偏乐观。</li>
+            </ul>
+          </div>
+        </details>
 
         <section class="zone" id="zone-risk">
           <h2 class="zone-title">撑得住吗</h2>
           <p class="zone-lead" id="lead-risk"></p>
 
           <div class="card simple-only" id="life-section">
-            <h2>平行人生</h2>
+            <details class="fold" id="lives-fold">
+            <summary><h2>平行人生</h2>：挑出 4 个你，讲讲他们的人生</summary>
             <p class="sub">同一个计划，不同的年景。最后一条由你来写。</p>
             <div class="legend" id="lives-chart-legend"></div>
             <div class="chart-box">
@@ -114,6 +123,7 @@
               </div>
             </div>
             <p class="fine" id="life-seed"></p>
+            </details>
           </div>
 
           <div class="card pro-only" hidden>
@@ -141,11 +151,12 @@
         <section class="zone" id="zone-learn">
           <h2 class="zone-title"><span class="simple-only">你能决定的参数</span><span class="pro-only" hidden>敏感度</span></h2>
 
-          <div class="card simple-only">
-            <p class="sub">拖一拖，结果写进"等你来写"。全部参数在专业模式。</p>
+          <details class="card fold simple-only" id="lab-fold">
+            <summary>放假实验室：拖一拖，看每个数字对放假年龄的影响</summary>
+            <p class="sub">结果会写进"等你来写"，全部参数在专业版。</p>
             <p class="lab-progress" id="lab-progress" role="status"></p>
             <div id="cards"></div>
-          </div>
+          </details>
 
           <div class="card pro-only" hidden>
             <h2>单参数敏感度</h2>
@@ -155,7 +166,7 @@
 
           <div class="card pro-only" hidden>
             <h2>收益和储蓄的组合</h2>
-            <p class="sub">行是实际年化收益，列是每年储蓄额。颜色越深放假越早，黑框是当前输入。</p>
+            <p class="sub">行是实际年化收益，列是每年储蓄额。蓝色越浓放假越早，带框的一格是当前输入。</p>
             <div class="tbl" id="heat-box"></div>
           </div>
 
@@ -168,14 +179,24 @@
 
         <section class="card simple-only" id="share-section">
           <h2 id="share-title">生成我的放假卡</h2>
-          <p class="sub" id="share-sub">一张图收下你的结论。生成后解锁专业模式。</p>
-          <p class="pro-lock-note" id="pro-lock-note" role="status" hidden></p>
-          <div class="goal-row"><button type="button" class="ghost" id="share-btn">生成放假卡</button></div>
+          <p class="sub" id="share-sub">一张图收下你的结论。</p>
+          <fieldset class="share-options" id="share-options">
+            <legend class="fine">卡上放什么</legend>
+            <div class="card-kind" role="radiogroup" aria-label="卡片样式">
+              <label><input type="radio" name="card-kind" value="pass" checked> 放假通行证</label>
+              <label><input type="radio" name="card-kind" value="type"> 只发类型</label>
+            </div>
+            <div class="share-chks">
+              <label class="chk"><input type="checkbox" id="card-money"> 显示金额</label>
+              <label class="chk"><input type="checkbox" id="card-now" checked> 显示现在年龄</label>
+            </div>
+            <p class="fine">默认不放金额，别人看不出你的家底。</p>
+          </fieldset>
+          <div class="goal-row"><button type="button" class="ghost fill" id="share-btn">生成放假卡</button></div>
           <div class="share" id="share-panel" hidden>
             <img id="share-img" alt="">
             <div class="share-actions">
               <button type="button" class="ghost fill" id="share-save">保存图片</button>
-              <button type="button" class="ghost" id="pro-enter" hidden>进入专业模式</button>
             </div>
             <p class="fine" id="share-hint">数字改了，卡片跟着变。手机可长按图片保存。</p>
           </div>

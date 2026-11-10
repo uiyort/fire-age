@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+const openFolds = page => page.evaluate(() => document.querySelectorAll('details.fold').forEach(d => { d.open = true; }));
 
 const collect = async page => {
   const events = [];
@@ -44,7 +45,7 @@ test('the main interactions are each recorded', async ({ page }) => {
 
 test('an open learning card is counted once and stays open while typing', async ({ page }) => {
   const events = await collect(page);
-  await page.goto('/');
+  await page.goto('/'); await openFolds(page);
   await page.locator('#cards summary').first().click();
   await expect.poll(() => events.filter(e => e.e === 'card_open').length).toBe(1);
   await page.fill('#s-age', '35');

@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { oddsSolve } from '../site/js/odds.js';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
 import { fwdSolve, buildParams } from '../site/js/engine.js';
@@ -34,14 +35,14 @@ test('trying a value reports the age it would give and leaves the plan alone', (
   const p = person();
   const before = { ...p };
   const out = tryParam(p, 'expense', 60000);
-  assert.ok(out.age < p.age + fwdSolve(p));
+  assert.ok(out.age < p.age + oddsSolve(p));
   assert.equal(out.success, null);
   assert.deepEqual(p, before);
 });
 
 test('trying the current value gives the current age', () => {
   const p = person();
-  assert.equal(tryParam(p, 'assets', p.assets).age, p.age + fwdSolve(p));
+  assert.equal(tryParam(p, 'assets', p.assets).age, p.age + oddsSolve(p));
 });
 
 test('risk parameters report a success rate, which moves with risk', () => {
@@ -50,10 +51,9 @@ test('risk parameters report a success rate, which moves with risk', () => {
   assert.ok(calm.success > wild.success);
 });
 
-test('trying a withdrawal rate takes effect even with automatic rates on', () => {
+test('a withdrawal rate no longer moves the holiday age, which is counted by the odds', () => {
   const p = person();
-  assert.equal(p.autoSwr, true);
-  assert.ok(tryParam(p, 'swr', 6).age < tryParam(p, 'swr', 2.5).age);
+  assert.equal(tryParam(p, 'swr', 6).age, tryParam(p, 'swr', 2.5).age);
 });
 
 test('trying a value that can never work reports no age', () => {

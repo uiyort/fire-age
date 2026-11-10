@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { oddsSolve, oddsYears } from '../site/js/odds.js';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
 import { fiNeed, fiYears, fwdSolve, lifePath, monteCarlo } from '../site/js/engine.js';
@@ -46,8 +47,8 @@ test('working backward, the type starts the holiday at the age asked for', () =>
 test('luggage compares the holiday lifestyle with today\'s, at local prices', () => {
   const pack = fields => typeOf(person(fields)).axes.find(a => a.key === 'pack');
   assert.deepEqual([pack({}).letter, pack({}).value], ['T', '和现在差不多']);
-  assert.deepEqual([pack({ retExp: 180000 }).letter, pack({ retExp: 180000 }).value], ['F', '比现在宽裕 1.5 倍']);
-  assert.deepEqual([pack({ retExp: 60000 }).letter, pack({ retExp: 60000 }).value], ['T', '只花现在的 50%']);
+  assert.deepEqual([pack({ retExp: 108000 }).letter, pack({ retExp: 108000 }).value], ['F', '比现在宽裕 1.5 倍']);
+  assert.deepEqual([pack({ retExp: 36000 }).letter, pack({ retExp: 36000 }).value], ['T', '只花现在的 50%']);
   assert.equal(pack({ expense: 1000, retExp: 120000 }).value, '比现在宽裕 10 倍以上', 'a tiny spending entry gives no silly ratio');
 });
 
@@ -111,7 +112,7 @@ test('progress is reported separately from the type', () => {
 
 test('every one of the 16 types is reachable', () => {
   const seen = new Set();
-  for (const age of [25, 40, 50]) for (const assets of [0, 3000000, 20000000]) for (const income of [100000, 1000000]) for (const share of [0.3, 0.7]) for (const richer of [0.7, 1.6]) for (const retC of ['CN', 'TH']) {
+  for (const age of [25, 40, 50, 56]) for (const assets of [0, 3000000, 20000000]) for (const income of [100000, 1000000]) for (const share of [0.3, 0.7]) for (const richer of [0.7, 1.6]) for (const retC of ['CN', 'TH']) {
     let S = setRetireCountry(defaultState(DATA), retC, DATA);
     for (const [id, value] of Object.entries({ age, assets, income, expense: income * share })) S = setField(S, id, String(value), DATA);
     S = setField(S, 'retExp', String(Math.round(S.retExp * richer)), DATA);
@@ -127,17 +128,9 @@ test('place ranking covers every country, earliest first, and marks the current 
   assert.equal(rows.filter(r => r.current).length, 1);
   const home = rows.find(r => r.current);
   assert.equal(home.code, 'CN');
-  assert.equal(home.age, p.age + fwdSolve(p));
+  assert.equal(home.age, p.age + oddsSolve(p));
   const years = rows.filter(r => r.years !== null).map(r => r.years);
   assert.deepEqual(years, [...years].sort((a, b) => a - b));
-});
-
-test('place ranking agrees with the place lever', () => {
-  const { p, retC } = person({ assets: 100000 });
-  const lever = rankLevers(p, DATA, { retC, top: 10 }).find(l => l.id === 'place');
-  assert.ok(lever, 'China is not the cheapest place, so a place lever exists');
-  const best = placeRanking(p, DATA, retC)[0];
-  assert.ok(Math.abs(best.years - lever.afterYears) < 1e-9);
 });
 
 test('place ranking keeps purchasing power for spending but converts a pension at market rates', () => {
@@ -227,7 +220,7 @@ test('a holiday that starts today has no years to rank before it, yet tells its 
 test('fractional years stay consistent with the ranking', () => {
   const { p, retC } = person();
   const home = placeRanking(p, DATA, retC).find(r => r.current);
-  assert.ok(Math.abs(home.years - fiYears(p)) < 1e-9);
+  assert.ok(Math.abs(home.years - oddsYears(p)) < 1e-9);
 });
 
 test('a return that rounds to zero is not shown with a minus sign', () => {
@@ -239,5 +232,6 @@ test('a return that rounds to zero is not shown with a minus sign', () => {
 
 test('the lives summary quotes the real number of simulated paths', () => {
   const stories = [{ outcome: 'lasted' }, { outcome: 'ruined' }];
-  assert.match(livesSummary(stories, { success: 0.5, paths: 500 }), /500 条/);
+  assert.match(livesSummary(stories, { success: 0.5, paths: 500 }), /500 次模拟/);
+  assert.doesNotMatch(livesSummary(stories, { success: 0.5, paths: 500 }), /条人生里/);
 });

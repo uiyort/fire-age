@@ -1,5 +1,6 @@
 // A small target the person sets for themselves, compared against their numbers on the next visit.
-import { fiYears, savingsRate } from './engine.js';
+import { savingsRate } from './engine.js';
+import { ODDS, oddsYears } from './odds.js';
 
 const STORAGE_KEY = 'fire-age-goal-v1';
 
@@ -10,7 +11,7 @@ const KINDS = {
 };
 
 export function makeGoal(paramId, target, p, now) {
-  return { paramId, target, label: KINDS[paramId].label(target), years: fiYears(p), createdAt: now, cur: p.wCur };
+  return { paramId, target, label: KINDS[paramId].label(target), years: oddsYears(p), odds: ODDS, createdAt: now, cur: p.wCur };
 }
 
 // A goal's amounts and years only compare within the currency and country it was set in.
@@ -19,7 +20,7 @@ export const goalApplies = (goal, p) => goal.cur === undefined || goal.cur === p
 export function compareVisit(goal, p, now) {
   const kind = KINDS[goal.paramId];
   const current = kind.read(p);
-  const years = fiYears(p);
+  const years = oddsYears(p);
   return {
     current,
     achieved: kind.met(current, goal.target),
@@ -31,7 +32,8 @@ export function compareVisit(goal, p, now) {
 export function loadGoal(storage) {
   try {
     const goal = JSON.parse(storage.getItem(STORAGE_KEY));
-    return goal && KINDS[goal.paramId] ? goal : null;
+    // A goal saved before the holiday age was counted by the odds measured its years another way, so it is dropped.
+    return goal && KINDS[goal.paramId] && goal.odds === ODDS ? goal : null;
   } catch {
     return null;
   }

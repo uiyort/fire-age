@@ -1,5 +1,6 @@
 // Ranks what would move this person's holiday age the most, and measures each parameter's effect.
-import { buildParams, fiYears, fwdSolve, monteCarlo, swrFor } from './engine.js';
+import { buildParams, fwdSolve, swrFor } from './engine.js';
+import { oddsSolve, oddsYears, successAt } from './odds.js';
 
 const rebuild = (p, changes) => buildParams({ ...p, ...changes }, p.fx);
 
@@ -11,19 +12,28 @@ function leverCandidates(p, data, retC) {
   if (p.income > 0) out.push({ id: 'saveRate', label: '储蓄率提高 5 个百分点', next: rebuild(p, { expense: p.expense - p.income * 0.05 }) });
   if (p.drag > 0) out.push({ id: 'fee', label: '投资费率降 0.5 个百分点', next: rebuild(p, { drag: Math.max(p.drag - 0.5, 0) }) });
 
-  const here = data.countries[retC].priceLevel.value;
-  const [cheapest] = Object.values(data.countries).sort((a, b) => a.priceLevel.value - b.priceLevel.value);
-  if (cheapest.priceLevel.value < here) {
-    out.push({ id: 'place', label: `退休地换成${cheapest.name}`, next: rebuild(p, { retExp: p.retExp * cheapest.priceLevel.value / here }) });
-  }
+  // Moving away is not listed: it is a different life, not a way to retire earlier from this one. It has its own section.
   return out;
 }
 
+// A step small enough to take this month: about 2% of monthly income, rounded to a plain amount, saved each month.
+export function smallStep(p) {
+  if (!(p.income > 0)) return null;
+  const raw = p.income / 12 * 0.02;
+  const amount = raw < 1000 ? Math.max(Math.round(raw / 100) * 100, 100) : Math.round(raw / 500) * 500;
+  const beforeYears = oddsYears(p), afterYears = oddsYears(rebuild(p, { expense: p.expense - amount * 12 }));
+  if (afterYears === null) return null;
+  const unlocks = beforeYears === null;
+  const gainYears = unlocks ? null : beforeYears - afterYears;
+  if (!unlocks && gainYears <= 1e-9) return null;
+  return { id: 'small', amount, beforeYears, afterYears, gainYears, unlocks };
+}
+
 export function rankLevers(p, data, { retC, top = 3 }) {
-  const beforeYears = fiYears(p);
+  const beforeYears = oddsYears(p);
   const scored = [];
   for (const { id, label, next } of leverCandidates(p, data, retC)) {
-    const afterYears = fiYears(next);
+    const afterYears = oddsYears(next);
     if (afterYears === null) continue;
     const unlocks = beforeYears === null;
     const gainYears = unlocks ? null : beforeYears - afterYears;
@@ -34,8 +44,7 @@ export function rankLevers(p, data, { retC, top = 3 }) {
   return scored.slice(0, top);
 }
 
-// The lever in the person's own money. Moving to the cheapest place is left out: it tops almost everyone's list,
-// so it says nothing about this person.
+// The lever in the person's own money.
 const ACTIONS = {
   spend: (p, D) => `每月少花 10%（约 ${D(p.expense * 0.1 / 12)}）`,
   saveRate: (p, D) => `每月多存 ${D(p.income * 0.05 / 12)}`,
@@ -43,11 +52,19 @@ const ACTIONS = {
   fee: () => '投资费率降 0.5 个百分点',
 };
 
+// The same steps with no amount in them, for a card that shows no money.
+const ACTIONS_PLAIN = {
+  spend: '每月少花一成',
+  saveRate: '每月多存收入的 5%',
+  growth: '收入每年多涨 1 个百分点',
+  fee: '投资费率降 0.5 个百分点',
+};
+
 export function personalLever(levers, p, D) {
   const lever = levers.find(l => ACTIONS[l.id]);
   if (!lever) return null;
-  const action = ACTIONS[lever.id](p, D);
-  return lever.unlocks ? { action, unlockAge: Math.round(p.age + lever.afterYears) } : { action, gain: lever.gainYears };
+  const action = ACTIONS[lever.id](p, D), plain = ACTIONS_PLAIN[lever.id];
+  return lever.unlocks ? { action, plain, unlockAge: Math.round(p.age + lever.afterYears) } : { action, plain, gain: lever.gainYears };
 }
 
 function currentSwrPercent(p) {
@@ -70,15 +87,15 @@ const IMPACT_STEPS = {
   infl: { stepLabel: '长期通胀低 0.5 个百分点', change: p => ({ infl: p.infl - 0.5 }) },
   drag: { stepLabel: '税费拖累少 0.5 个百分点', change: p => ({ drag: Math.max(p.drag - 0.5, 0) }) },
   fxDrift: { stepLabel: '退休地货币每年少升值 1 个百分点', change: p => ({ fxDrift: p.fxDrift - 1 }) },
-  swr: { stepLabel: '提取率高 0.5 个百分点', change: p => ({ autoSwr: false, swr: currentSwrPercent(p) + 0.5 }) },
+  flexCut: { stepLabel: '大跌后多少花 10 个百分点', change: p => ({ flexCut: Math.min((p.flexCut ?? 0) + 10, 100) }) },
+  sigEq: { stepLabel: '股票波动率高 0.02', change: p => ({ sigEq: p.sigEq + 0.02 }) },
+  sigBd: { stepLabel: '债券波动率高 0.02', change: p => ({ sigBd: p.sigBd + 0.02 }) },
+  rho: { stepLabel: '股债相关性高 0.2', change: p => ({ rho: Math.min(p.rho + 0.2, 1) }) },
 };
 
 const NO_YEARS = {
-  flexCut: '大跌后少花改变的是成功率，不是放假年龄',
   age: '年龄决定你还有多少年可以复利',
-  sigEq: '波动率改变的是成功率，不是放假年龄',
-  sigBd: '波动率改变的是成功率，不是放假年龄',
-  rho: '相关性改变的是成功率，不是放假年龄',
+  swr: '放假年龄按八成把握算，提取率只作对照，不改变放假年龄',
 };
 
 // gainYears is positive when the step brings the holiday age forward, negative when it pushes it back.
@@ -86,12 +103,11 @@ export function impactOf(p, paramId) {
   if (NO_YEARS[paramId]) return { stepLabel: NO_YEARS[paramId], gainYears: null };
   if (paramId === 'fxDrift' && p.rCur === p.wCur) return { stepLabel: '工作地和退休地用同一种货币，这一项不起作用。', gainYears: null };
   const step = IMPACT_STEPS[paramId];
-  const before = fiYears(p), after = fiYears(rebuild(p, step.change(p)));
+  const before = oddsYears(p), after = oddsYears(rebuild(p, step.change(p)));
   return { stepLabel: step.stepLabel, note: step.note, gainYears: before === null || after === null ? null : before - after };
 }
 
 const RISK_PARAMS = ['eq', 'sigEq', 'sigBd', 'rho', 'flexCut'];
-const TRY_PATHS = 500;
 
 function niceStep(raw) {
   const unit = Math.pow(10, Math.floor(Math.log10(raw)));
@@ -135,15 +151,15 @@ export function tryRange(p, id) {
 // What the plan would give with one value changed. Works on a copy, so the real plan is untouched.
 export function tryParam(p, id, value) {
   const q = rebuild(p, { [id]: value, ...(id === 'swr' ? { autoSwr: false } : {}) });
-  const t = fwdSolve(q);
+  const t = oddsSolve(q);
   return {
     age: t === null ? null : q.age + t,
-    success: RISK_PARAMS.includes(id) && t !== null ? monteCarlo(q, t, null, { paths: TRY_PATHS }).success : null,
+    success: RISK_PARAMS.includes(id) && t !== null ? successAt(q, t) : null,
   };
 }
 
 // What a person can decide. Age, savings already made and the market are not choices, so sliders for those only preview.
-export const LIFE_CHOICES = ['income', 'expense', 'growth', 'retExp', 'life', 'pension', 'pAge', 'swr', 'drag'];
+export const LIFE_CHOICES = ['income', 'expense', 'growth', 'retExp', 'life', 'pension', 'pAge', 'drag'];
 // Working backward from a chosen age, the saving plan is set by that age, so income, spending and wage growth change nothing.
 const FIXED_WHEN_BACKWARD = ['income', 'expense', 'growth'];
 export const lifeChoices = mode => (mode === 'bwd' ? LIFE_CHOICES.filter(id => !FIXED_WHEN_BACKWARD.includes(id)) : LIFE_CHOICES);

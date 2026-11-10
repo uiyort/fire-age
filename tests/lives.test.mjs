@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { oddsSolve } from '../site/js/odds.js';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
 import { bwdSolve, fiNeed, fwdSolve, lifePath } from '../site/js/engine.js';
@@ -58,15 +59,22 @@ test('the backward hero uses the target age', () => {
   assert.equal(h.fund.need, bwdSolve(p).need);
 });
 
-test('parallel people round a chance without implying certainty or doom', () => {
+test('parallel people round the odds down, so they are never said to be better than they are', async () => {
+  const { oddsText, oddsBand } = await import('../site/js/holiday.js');
   assert.equal(peopleOf(0.7), 7);
-  assert.equal(peopleOf(0.65), 7);
-  assert.equal(peopleOf(0.645), 7, 'matches the 65% shown beside it');
+  assert.equal(peopleOf(0.79), 7);
+  assert.equal(peopleOf(0.795), 7);
+  assert.equal(peopleOf(0.8), 8);
   assert.equal(peopleOf(0.99), 9, 'ten of ten is only for a certain result');
   assert.equal(peopleOf(1), 10);
-  assert.equal(peopleOf(0.01), 1, 'zero of ten is only for an impossible result');
-  assert.equal(peopleOf(0), 0);
+  assert.equal(peopleOf(0.05), 0);
   assert.equal(peopleOf(null), null);
+  assert.equal(oddsText(0.05), '不到 1 成把握');
+  assert.equal(oddsText(0.83), '8 成把握');
+  assert.equal(oddsText(null), '');
+  assert.equal(oddsBand(0.795), 'hedge');
+  assert.equal(oddsBand(0.8), 'sure');
+  assert.equal(oddsBand(0.49), 'thin');
 });
 
 const path = (retireT, ruinAge, rets) => ({
@@ -178,9 +186,9 @@ test('the chart tip lists only lives that reach that age', () => {
 
 test('the pension line says how far a pension moves the holiday, in months when under a year', async () => {
   const { headlineText } = await import('../site/js/views.js');
-  const { dualAges } = await import('../site/js/engine.js');
-  const note = q => headlineText({ mode: 'fwd', p: q, t: fwdSolve(q), bwd: bwdSolve(q), dual: dualAges(q), dispCur: 'CNY' }).note;
-  assert.match(note(person({ pension: 12000 })), /^养老金 \d+ 岁才开始领，(只让放假提前 \d+ 个月|对 \d+ 岁放假几乎没有影响)。$/);
+ const { dualOdds } = await import('../site/js/odds.js');
+  const note = q => headlineText({ mode: 'fwd', p: q, t: fwdSolve(q), bwd: bwdSolve(q), dual: dualOdds(q), dispCur: 'CNY' }).note;
+  assert.match(note(person({ pension: 6000 })), /^养老金 \d+ 岁才开始领，(只让放假提前 \d+ 个月|对 \d+ 岁放假几乎没有影响)。$/);
   assert.match(note(person({ pension: 120000 })), /^算上养老金 \d+ 岁 \/ 不算养老金 \d+ 岁$/);
   assert.equal(note(person({ pension: 12000, assets: 50000000 })), '现在就能放假，养老金是额外的保障。');
   assert.equal(note(person()), '填上养老金，看看能提前多少。');
@@ -267,11 +275,11 @@ test('what wrote the last life is listed, with no clear-all button', () => {
 test('the rewritten plan applies values, leaving the real plan alone', () => {
   const p = person();
   const before = { ...p };
-  const q = labPlan(p, { values: { income: p.income * 1.1, retExp: 90000 } });
+  const q = labPlan(p, { values: { income: p.income * 1.1, retExp: 54000 } });
   assert.ok(Math.abs(q.income - p.income * 1.1) < 1e-6);
-  assert.equal(q.retExp, 90000);
+  assert.equal(q.retExp, 54000);
   assert.deepEqual(p, before);
-  assert.ok(fwdSolve(q) < fwdSolve(p));
+  assert.ok(oddsSolve(q) < oddsSolve(p));
 });
 
 test('a withdrawal rate written into the plan takes effect with automatic rates on', () => {
@@ -319,29 +327,16 @@ test('ribbons share one age scale even when a plan runs longer', () => {
   assert.equal((svg.match(/r-(work|holiday|broke)/g) ?? []).length, 4);
 });
 
-test('unlocking the professional view persists, and blocked storage does not break it', async () => {
-  const { isProUnlocked, unlockPro } = await import('../site/js/state.js');
-  const box = new Map();
-  const storage = { getItem: k => box.get(k) ?? null, setItem: (k, v) => box.set(k, v) };
-  assert.equal(isProUnlocked(storage), false);
-  unlockPro(storage);
-  assert.equal(isProUnlocked(storage), true);
-  const blocked = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
-  assert.equal(isProUnlocked(blocked), false);
-  assert.doesNotThrow(() => unlockPro(blocked));
-  assert.equal(isProUnlocked(null), false);
-});
-
 test('the professional headline states the result without the slogan', async () => {
   const { headlineText } = await import('../site/js/views.js');
-  const { dualAges } = await import('../site/js/engine.js');
+  const { dualOdds, bwdOdds } = await import('../site/js/odds.js');
   const p = person();
-  const base = { mode: 'fwd', p, bwd: bwdSolve(p), dual: dualAges(p), dispCur: 'CNY', view: 'pro' };
+  const base = { mode: 'fwd', p, bwd: bwdSolve(p), odds: bwdOdds(p), dual: dualOdds(p), dispCur: 'CNY', view: 'pro' };
   const t = fwdSolve(p);
   assert.match(headlineText({ ...base, t }).say, new RegExp(`财务独立年龄 ${p.age + t} 岁`));
   assert.ok(!headlineText({ ...base, t }).say.includes('余生'));
   assert.match(headlineText({ ...base, t: 0 }).say, /已达到财务独立/);
-  assert.match(headlineText({ ...base, t: null }).say, /规划期内未达到/);
+  assert.match(headlineText({ ...base, t: null }).say, /规划期内达不到八成把握/);
   assert.match(headlineText({ ...base, mode: 'bwd', t }).say, new RegExp(`目标 ${p.tAge} 岁`));
 });
 
@@ -361,7 +356,8 @@ test('the sticky summary suits each view and each outcome', async () => {
   const hero = heroModel({ mode: 'fwd', p, t, bwd: bwdSolve(p), success: 0.7 });
   const simple = stickyHtml(hero, { p, dispCur: 'CNY', success: 0.7, pro: false });
   assert.match(simple, new RegExp(`${p.age + t} 岁放假`));
-  assert.match(simple, /7\/10/);
+  assert.match(simple, /八成把握/);
+  assert.doesNotMatch(simple, /\/10/);
   const pro = stickyHtml(hero, { p, dispCur: 'CNY', success: 0.7, pro: true });
   assert.match(pro, /成功率 70%/);
   const none = heroModel({ mode: 'fwd', p, t: null, bwd: bwdSolve(p), success: null });
@@ -384,7 +380,8 @@ test('the sensitivity table never claims age has no effect, and keeps the stock 
   const { PARAMS } = await import('../site/js/params.js');
   const row = id => sensitivityHtml(person(), PARAMS.filter(c => c.id === id));
   assert.ok(!row('age').includes('不影响放假年龄'));
-  assert.match(row('sigEq'), /成功率/);
+  assert.match(row('sigEq'), /年/);
+  assert.match(row('swr'), /只作对照/);
   assert.match(row('eq'), /波动/);
 });
 
@@ -406,7 +403,7 @@ test('the card gets the written life as one short main line and a quiet detail',
   const base = story({ outcome: 'ruined', retireAge: 39, ruinAge: 64 });
   assert.deepEqual(fifthBrief(base, story({ outcome: 'ruined', retireAge: 42, ruinAge: 64 }), D), { main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 64 岁花完' });
   assert.deepEqual(fifthBrief(story({ outcome: 'ruined', ruinAge: 71 }), story({ outcome: 'lasted' }), D), { main: '有钱花的假期 28 → 52 年', detail: '钱撑到 95 岁' });
-  assert.deepEqual(fifthBrief(story({ endAssets: 5770000 }), story({ endAssets: 1880000 }), D), { main: '最后剩下 ¥577万 → ¥188万', detail: '钱都撑到 95 岁' });
+  assert.deepEqual(fifthBrief(story({ endAssets: 5770000 }), story({ endAssets: 1880000 }), D), { main: '最后剩下 ¥577万 → ¥188万', detail: '钱都撑到 95 岁', amount: true });
   assert.equal(fifthBrief(story(), story(), D), null, 'nothing changed, so the card says something else');
   assert.deepEqual(fifthBrief(story(), story({ outcome: 'working', retireAge: null }), D), { main: '到 95 岁也放不了假', detail: '' });
 });
@@ -428,4 +425,23 @@ test('the written life is compared against the dashed life it rewrites', () => {
   assert.match(html, /虚线/);
   assert.ok(html.includes('中途断粮'));
   assert.ok(html.includes('有钱花的假期从 28 年变成 52 年'));
+});
+
+test('working backward, the hero and the sticky bar say the odds of the plan as it is, not 八成把握', async () => {
+  const { heroHtml, stickyHtml } = await import('../site/js/views.js');
+  const p = person({ tAge: 40 });
+  const h = heroModel({ mode: 'bwd', p, t: null, bwd: bwdSolve(p), success: 0.34 });
+  assert.equal(h.label, '3 成把握');
+  assert.match(heroHtml(h, { p, dispCur: 'CNY' }), /3 成把握/);
+  assert.doesNotMatch(heroHtml(h, { p, dispCur: 'CNY' }), /八成把握/);
+  assert.match(stickyHtml(h, { p, dispCur: 'CNY', success: 0.34, pro: false }), /3 成把握/);
+  const f = heroModel({ mode: 'fwd', p, t: 14, bwd: bwdSolve(p), success: 0.83 });
+  assert.equal(f.label, '八成把握');
+});
+
+test('a written life told only in money says it has an amount, so a card without money can skip it', async () => {
+  const { fifthBrief } = await import('../site/js/views.js');
+  const D = v => `¥${Math.round(v / 1e4)}万`;
+  assert.equal(fifthBrief(story({ endAssets: 5770000 }), story({ endAssets: 1880000 }), D).amount, true);
+  assert.equal(fifthBrief(story({ outcome: 'ruined', ruinAge: 71 }), story({ outcome: 'lasted' }), D).amount, undefined);
 });

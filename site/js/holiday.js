@@ -1,6 +1,7 @@
 // Makes a result feel personal: Mondays left, a four-letter holiday type, the same money elsewhere, one drawn life.
 // Pure functions, no DOM. Every label and number comes from the model, with its rule published on the method page.
-import { assetsAt, buildParams, coastNeed, conv, fiNeed, fiYears, fwdSolve, lifePath, savingsRate } from './engine.js';
+import { assetsAt, buildParams, coastNeed, conv, fiNeed, lifePath, savingsRate } from './engine.js';
+import { needLine, oddsSolve, oddsYears } from './odds.js';
 
 const DAYS_PER_YEAR = 365.25;
 const WORKDAYS_PER_YEAR = 250;
@@ -71,18 +72,18 @@ function packText(lifestyle) {
 
 export function holidayType(p, data, { workC, retC, retireT }) {
   const backward = retireT !== undefined;
-  const t = backward ? retireT : fwdSolve(p);
+  const t = backward ? retireT : oddsSolve(p);
   const age = t === null ? null : p.age + t;
   const priceRatio = data.countries[retC].priceLevel.value / data.countries[workC].priceLevel.value;
   const lifestyle = p.expense > 0 ? conv(p.retExp, p.rCur, p.wCur, p.fx) / priceRatio / p.expense : Infinity;
-  const atHoliday = t === null ? 0 : backward ? fiNeed(p, t) : assetsAt(p, t);
+  const atHoliday = t === null ? 0 : backward ? needLine(p)[t] : assetsAt(p, t);
   const capitalShare = atHoliday > 0 ? Math.min(p.assets * Math.pow(1 + p.r, t) / atHoliday, 1) : 0;
 
   const picks = {
     when: [age !== null && age <= EARLY_AGE ? 'E' : 'L', age === null ? '还没到' : `${age} 岁放假`],
     where: [workC === retC ? 'H' : 'A', data.countries[retC].name],
     pack: [lifestyle <= 1 + SAME_BAND ? 'T' : 'F', packText(lifestyle)],
-    fare: [capitalShare >= GROW_SHARE ? 'G' : 'S', t === null ? '还在攒' : `本金复利占 ${percent(capitalShare)}`],
+    fare: [capitalShare >= GROW_SHARE ? 'G' : 'S', t === null ? '还在攒' : `${percent(capitalShare)} 来自今天已有的存款`],
   };
   const axes = AXES.map(axis => {
     const [letter, value] = picks[axis.key];
@@ -99,8 +100,8 @@ export function placeRanking(p, data, retC) {
     const retExp = conv(p.retExp, p.rCur, c.cur, p.fx) * c.priceLevel.value / here;
     const pension = conv(p.pension, p.rCur, c.cur, p.fx);
     const q = buildParams({ ...p, rCur: c.cur, retExp, pension }, p.fx);
-    const t = fwdSolve(q);
-    return { code, name: c.name, cur: c.cur, retExp, pension, age: t === null ? null : p.age + t, years: fiYears(q), current: code === retC };
+    const t = oddsSolve(q);
+    return { code, name: c.name, cur: c.cur, retExp, pension, age: t === null ? null : p.age + t, years: oddsYears(q), current: code === retC };
   });
   return rows.sort((a, b) => {
     if (a.years === null || b.years === null) return (a.years === null) - (b.years === null);
@@ -114,7 +115,7 @@ export const drawLives = (p, retireT, s0, baseSeed, count = 4) =>
 const moment = (years, i) => ({ age: years[i].age, ret: years[i].ret, before: years[i].assets, after: years[i + 1].assets });
 
 // The moments worth telling from one path. Years after the money ran out have nothing left to gain or lose.
-export function lifeStory(path, p) {
+export function lifeStory(path, p, need = null) {
   const { years, retireT, ruinAge } = path;
   const lived = years.map((y, i) => [y, i]).filter(([y]) => y.ret !== null && (ruinAge === null || y.age < ruinAge)).map(([, i]) => i);
   const pickBy = better => (lived.length ? moment(years, lived.reduce((a, b) => (better(years[b].ret, years[a].ret) ? b : a))) : null);
@@ -133,7 +134,7 @@ export function lifeStory(path, p) {
     ruinAge,
     retireAge: retireT === null ? null : p.age + retireT,
     retireAssets: retireT === null ? null : years[retireT].assets,
-    retireNeed: retireT === null ? null : fiNeed(p, retireT),
+    retireNeed: retireT === null ? null : need ?? fiNeed(p, retireT),
     lowPoint: retireT === null ? null : Math.min(...years.slice(retireT).map(y => y.assets)),
     worst: pickBy((a, b) => a < b),
     best: pickBy((a, b) => a > b),
@@ -210,22 +211,35 @@ export function hardestIndex(stories) {
   return stories.reduce((worst, s, i) => (rank(s) < rank(stories[worst]) ? i : worst), 0);
 }
 
-// Ten of ten is only for a certain result, and none of ten only for an impossible one.
+// Rounded down, so the odds are never said to be better than they are: 79.9% is 7 in 10, and under 10% is none of 10.
 export function peopleOf(success) {
   if (success === null || success === undefined) return null;
-  if (success >= 1) return 10;
-  if (success <= 0) return 0;
-  // Rounds the whole percentage shown on the page, so 64.5% reads as 65% and as 7 of 10.
-  return Math.min(Math.max(Math.round(Math.round(success * 100) / 10), 1), 9);
+  return Math.min(Math.max(Math.floor(success * 10 + 1e-9), 0), 10);
 }
 
-// The conclusion as shapes: how a life splits between work and holiday, and how far along the money is.
-export function heroModel({ mode, p, t, bwd, success }) {
+// The odds in words for the simple view. Under one in ten is said as such, never as zero.
+export function oddsText(success) {
+  const n = peopleOf(success);
+  if (n === null) return '';
+  return n === 0 ? '不到 1 成把握' : `${n} 成把握`;
+}
+
+// The odds band a sentence speaks for, judged on the success rate itself, not on the rounded figure.
+export const oddsBand = success => (success === null || success === undefined ? null : success >= 0.8 ? 'sure' : success >= 0.5 ? 'hedge' : 'thin');
+
+// The conclusion as shapes: how a life splits between work and holiday, how far along the money is,
+// and how many months of holiday are already saved.
+export function heroModel({ mode, p, t, bwd, success, need = null, ruler = null }) {
   const total = p.life - p.age;
   const backward = mode === 'bwd';
   const workYears = backward ? bwd.n : t;
   const reachable = workYears !== null;
-  const need = backward ? bwd.need : fiNeed(p, t ?? 0);
+  const line = need ?? fiNeed(p, workYears ?? 0);
+  const yearSpend = conv(p.retExp, p.rCur, p.wCur, p.fx);
+  const monthSpend = yearSpend / 12;
+  const months = monthSpend > 0 ? Math.floor(p.assets / monthSpend + 1e-9) : null;
+  // The next whole year of holiday: a first full year, then each year after.
+  const nextMonths = months === null ? null : months < 12 ? 12 : (Math.floor(months / 12) + 1) * 12;
   return {
     reachable,
     startAge: p.age,
@@ -234,7 +248,14 @@ export function heroModel({ mode, p, t, bwd, success }) {
     workYears: reachable ? workYears : total,
     holidayYears: reachable ? total - workYears : 0,
     mondays: reachable ? mondaysIn(workYears) : 0,
+    success: reachable ? success : null,
     people: reachable ? peopleOf(success) : null,
-    fund: { have: p.assets, need, share: need > 0 ? Math.min(p.assets / need, 1) : 1 },
+    // Forward, the age is the 8-in-10 age by definition; working backward, the odds are those of the plan as it is.
+    label: !reachable ? '' : backward ? oddsText(success) : '八成把握',
+    fund: { have: p.assets, need: line, share: line > 0 ? Math.min(p.assets / line, 1) : 1 },
+    times: yearSpend > 0 && reachable ? Math.round(line / yearSpend) : null,
+    months,
+    next: months === null || nextMonths * monthSpend <= p.assets ? null : { months: nextMonths, gap: nextMonths * monthSpend - p.assets },
+    ruler,
   };
 }

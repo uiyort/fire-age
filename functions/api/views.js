@@ -1,6 +1,7 @@
 // Anonymous totals of the views on the years ahead. Stores only how many people chose each option:
 // no IP, user agent, cookie, time of answer, or any other input. Needs the D1 binding VIEWS (see docs/deploy.md).
-export const QUESTIONS = ['market', 'crash', 'nerve', 'prices', 'rates', 'wages'];
+// 'nerve' was replaced by 'stocks' in 2026-11; its old rows stay in D1 and are no longer read.
+export const QUESTIONS = ['market', 'crash', 'stocks', 'prices', 'rates', 'wages'];
 const OPTIONS = 3;
 const TOTAL = '_total';
 

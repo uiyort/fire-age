@@ -6,8 +6,8 @@ import { makeGoal, compareVisit, loadGoal, saveGoal } from '../site/js/goals.js'
 
 test('a met goal is achieved and reports years gained', () => {
   const before = toParams(defaultState(DATA), DATA);
-  const goal = makeGoal('saveRate', 0.65, before, '2026-11-07');
-  const after = toParams(setField(defaultState(DATA), 'expense', '90000', DATA), DATA);
+  const goal = makeGoal('saveRate', 0.55, before, '2026-11-07');
+  const after = toParams(setField(defaultState(DATA), 'expense', '60000', DATA), DATA);
   const out = compareVisit(goal, after, '2026-12-07');
   assert.equal(out.achieved, true);
   assert.ok(out.yearsDelta > 0);
@@ -48,4 +48,14 @@ test('a saved goal round-trips', () => {
   const p = toParams(defaultState(DATA), DATA);
   saveGoal(makeGoal('saveRate', 0.7, p, '2026-11-07'), store);
   assert.equal(loadGoal(store).target, 0.7);
+});
+
+test('a goal saved before the age was counted by the odds is dropped, so its years are never compared the wrong way', () => {
+  const box = new Map();
+  const storage = { getItem: k => box.get(k) ?? null, setItem: (k, v) => box.set(k, v), removeItem: k => box.delete(k) };
+  box.set('fire-age-goal-v1', JSON.stringify({ paramId: 'saveRate', target: 0.6, label: 'x', years: 11.2, createdAt: '2026-10-01', cur: 'CNY' }));
+  assert.equal(loadGoal(storage), null);
+  const p = toParams(defaultState(DATA), DATA);
+  saveGoal(makeGoal('saveRate', 0.55, p, '2026-11-09'), storage);
+  assert.equal(loadGoal(storage).odds, 0.8);
 });

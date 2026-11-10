@@ -5,7 +5,8 @@ const yearly = ({ p, mc, target }, scale = 1) => mc.bands.map((b, t) => ({
   age: p.age + t, p10: b[0] * scale, p25: b[1] * scale, p50: b[2] * scale, p75: b[3] * scale, p90: b[4] * scale, target: target[t] * scale,
 }));
 
-const requiredSavings = ({ mode, bwd }) => (mode === 'bwd' ? Math.max(bwd.s0, 0) : null);
+// Working backward, the saving that gives 8 in 10 at the chosen age.
+const requiredSavings = ({ mode, bwd, odds }) => (mode === 'bwd' ? odds?.s0 ?? Math.max(bwd.s0, 0) : null);
 
 function assumptionRows(p) {
   const rows = [];
@@ -23,7 +24,7 @@ export function toCsv(result) {
   const scale = cur === p.wCur ? 1 : p.fx[cur] / p.fx[p.wCur];
   const meta = [
     `# currency,${cur}`, `# dataVersion,${dataVersion}`, `# seed,${mc.seed}`, `# paths,${mc.paths}`, `# success,${mc.success}`,
-    `# mode,${mode}`, `# retireYearIndex,${retireT}`,
+    `# mode,${mode}`, `# retireYearIndex,${retireT}`, '# holidayAgeOdds,0.8',
     ...(mode === 'bwd' ? [`# requiredSavings,${requiredSavings(result)}`] : []),
     ...assumptionRows(p),
   ];
@@ -44,6 +45,7 @@ export function toJson(result) {
     currency: p.wCur,
     displayCurrency: result.dispCur ?? p.wCur,
     retireYearIndex: retireT,
+    holidayAgeOdds: 0.8,
     assumptions: p,
     yearly: yearly(result),
   }, null, 2);

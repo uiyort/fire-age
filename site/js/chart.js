@@ -65,7 +65,7 @@ export function drawChart(svg, tip, { age, bands, target, retireT, year0, money 
       <div class="r"><span>90 分位</span><b>${money(b[4])}</b></div>
       <div class="r"><span>中位数</span><b>${money(b[2])}</b></div>
       <div class="r"><span>10 分位</span><b>${money(b[0])}</b></div>
-      <div class="r"><span>所需资产</span><b>${money(target[t])}</b></div>`;
+      <div class="r"><span>放假线</span><b>${money(target[t])}</b></div>`;
     tip.hidden = false;
     const tw = tip.offsetWidth;
     tip.style.left = `${x(t) + 12 + tw > W ? Math.max(x(t) - tw - 12, 0) : x(t) + 12}px`;
@@ -141,6 +141,21 @@ export function drawLivesChart(svg, tip, { age, lives, money }) {
     if (W - m.r - rx > 116) g += `<text x="${rx + 8}" y="${m.t - 16}" class="zone-label on">${age + selected.retireT} 岁起放假 ${restYears} 年</text>`;
   } else {
     g += `<text x="${m.l}" y="${m.t - 16}" class="zone-label">一直在上班</text>`;
+  }
+  // Each drawn line says whose life it is, at its last year with money. The names stay inside the plot, clear of
+  // the age ticks, and keep apart from each other; they are drawn last with a halo so no line cuts through them.
+  const named = [...lives.filter(l => l.kind === 'compare'), selected].map(life => {
+    const end = Math.min(life.values.length - 1, Y);
+    const above = life.kind === 'selected' ? -8 : 14;
+    return { life, end, ty: Math.min(Math.max(y(life.values[end]) + above, m.t + 12), m.t + ih - 6) };
+  });
+  if (named.length === 2 && Math.abs(named[0].ty - named[1].ty) < 14 && Math.abs(x(named[0].end) - x(named[1].end)) < 90) {
+    const [a, b] = named;
+    if (a.ty >= b.ty) a.ty = Math.min(b.ty + 14, m.t + ih - 6), b.ty = a.ty - 14;
+    else b.ty = Math.min(a.ty + 14, m.t + ih - 6), a.ty = b.ty - 14;
+  }
+  for (const { life, end, ty } of named) {
+    g += `<text class="line-name${life.kind === 'selected' ? ' on' : ''}" x="${(x(end) - 4).toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="end">${life.label}</text>`;
   }
   g += `<line id="lives-cross" y1="${m.t}" y2="${m.t + ih}" stroke="var(--ink-2)" visibility="hidden"/>`;
   g += `<rect id="lives-hit" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/>`;

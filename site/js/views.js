@@ -1,6 +1,7 @@
 // Turns model results into page text and tables. Strings only, no DOM access.
-import { coastNeed, conv, fiNeed, fwdSolve, swrFor, bwdSolve, savingsAt, savingsRate, buildParams } from './engine.js';
-import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn } from './holiday.js';
+import { coastNeed, conv, bwdSolve, savingsAt, savingsRate, buildParams } from './engine.js';
+import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn, oddsBand, oddsText, peopleOf } from './holiday.js';
+import { needLine, oddsSolve } from './odds.js';
 import { MIN_SHOWN, SCENARIOS, answerValues, scenarioOptions } from './scenario.js';
 import { impactOf, lifeChoices, tryParam } from './levers.js';
 
@@ -11,39 +12,62 @@ export function money(v, cur) {
   return moneyFormats[cur].format(v);
 }
 
+// Amounts a person compares at a glance, to three figures: ¥240万 rather than ¥239.75万.
+const roughFormats = {};
+export function roughMoney(v, cur) {
+  if (!Number.isFinite(v)) return '—';
+  roughFormats[cur] ??= new Intl.NumberFormat('zh-CN', { style: 'currency', currency: cur, notation: 'compact', maximumSignificantDigits: 3 });
+  return roughFormats[cur].format(v);
+}
+
 const whole = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 0 });
 export const wholeMoney = (v, cur) => (cur === 'CNY' ? whole.format(v) : `${cur} ${whole.format(v)}`);
 export const pct = (v, d = 1) => (Number.isFinite(v) ? `${(v * 100).toFixed(d)}%` : '—');
 
 export const toDisplay = (v, p, cur) => conv(v, p.wCur, cur, p.fx);
 
-function proHeadline({ mode, p, t, bwd, dispCur }) {
+function proHeadline({ mode, p, t, odds, dispCur }) {
   if (mode === 'bwd') {
-    const first = toDisplay(Math.max(bwd.s0, 0), p, dispCur);
-    return bwd.s0 <= 0 ? `目标 ${p.tAge} 岁：现有资产已足够。` : `目标 ${p.tAge} 岁：第一年需储蓄 ${wholeMoney(first, dispCur)}。`;
+    const first = toDisplay(odds.s0, p, dispCur);
+    const now = `当前计划成功率 ${pct(odds.success, 0)}。`;
+    return odds.enough ? `目标 ${p.tAge} 岁：现有资产已有八成把握。${now}` : `目标 ${p.tAge} 岁：八成把握需第一年储蓄 ${wholeMoney(first, dispCur)}。${now}`;
   }
-  if (t === 0) return '已达到财务独立。';
-  if (t === null) return '规划期内未达到财务独立。';
-  return `财务独立年龄 ${p.age + t} 岁（第 ${t} 年）。`;
+  if (t === 0) return '已达到财务独立（八成把握）。';
+  if (t === null) return '规划期内达不到八成把握。';
+  return `财务独立年龄 ${p.age + t} 岁（第 ${t} 年，八成把握）。`;
 }
 
-export function headlineText({ mode, p, t, bwd, dual, dispCur, view = 'simple' }) {
+// What to do when the odds for a chosen age are short of 8 in 10: the saving that reaches it, or the age that does.
+function toEight(p, odds, eightAge, dispCur) {
+  const ways = [];
+  if (!odds.enough) ways.push(`每月需存 ${wholeMoney(toDisplay(odds.s0 / 12, p, dispCur), dispCur)}`);
+  if (eightAge !== null && eightAge > p.tAge) ways.push(`等到 ${eightAge} 岁`);
+  return ways.length ? `要有八成把握，${ways.join('，或者')}。` : '';
+}
+
+const THIN = '钱够花的把握不到一半：晚几年放，或者放假后留一点收入。';
+
+// The slogan is only for odds of 8 in 10 or better, judged on the success rate itself.
+export function headlineText({ mode, p, t, odds = null, eightAge = null, dual, dispCur, view = 'simple' }) {
   let say;
   if (view === 'pro') {
-    say = proHeadline({ mode, p, t, bwd, dispCur });
+    say = proHeadline({ mode, p, t, odds, dispCur });
   } else if (mode === 'bwd') {
-    const monthly = toDisplay(Math.max(bwd.s0, 0) / 12, p, dispCur);
-    say = bwd.s0 <= 0 ? `想 ${p.tAge} 岁放假，现在的存款已经够了。` : `想 ${p.tAge} 岁放假，每月需存 ${wholeMoney(monthly, dispCur)}。`;
+    const band = oddsBand(odds.success);
+    const lead = `想 ${p.tAge} 岁放假：按现在的计划，`;
+    if (band === 'sure') say = `${lead}有${oddsText(odds.success)}。从 ${p.tAge} 岁起，余生皆假期。`;
+    else if (band === 'hedge') say = `${lead}有${oddsText(odds.success)}，可以放，但要带着后手放。${toEight(p, odds, eightAge, dispCur)}`;
+    else say = `${lead}${odds.success < 0.1 ? '' : '只有'}${oddsText(odds.success)}。${THIN}${toEight(p, odds, eightAge, dispCur)}`;
   } else if (t === 0) {
-    say = '恭喜，现在就可以放假。从今天起，余生皆假期。';
+    say = '恭喜，现在就可以放假，八成把握。从今天起，余生皆假期。';
   } else if (t !== null && savingsAt(p, 0) <= 0) {
-    say = `目前存不下钱，按现在的节奏要到 ${p.age + t} 岁才能放假。先让收入超过支出，每一步都算数。`;
+    say = `目前存不下钱，按现在的节奏要到 ${p.age + t} 岁才有八成把握放假。先让收入超过支出，每一步都算数。`;
   } else if (t !== null) {
-    say = `你的放假年龄是 ${p.age + t} 岁。再坚持 ${t} 年，从 ${p.age + t} 岁起，余生皆假期。`;
+    say = `你的放假年龄是 ${p.age + t} 岁。八成把握：再坚持 ${t} 年，从 ${p.age + t} 岁起，余生皆假期。`;
   } else if (savingsAt(p, 0) <= 0) {
-    say = '目前存不下钱，所以先从下面的杠杆开始，每一步都算数。';
+    say = '目前存不下钱，所以先从下面提前的办法开始，每一步都算数。';
   } else {
-    say = '按现在的节奏还到不了放假那天。先试试下面的杠杆，一步步来。';
+    say = '按现在的节奏，规划期内还到不了八成把握。先试试下面提前的办法，一步步来。';
   }
   return { say, note: pensionNote(p, dual) };
 }
@@ -51,7 +75,7 @@ export function headlineText({ mode, p, t, bwd, dual, dispCur, view = 'simple' }
 // A pension starts late, so for an early holiday it often moves the date by months, not years.
 function pensionNote(p, { withPension: w, withoutPension: wo, gain }) {
   if (!(p.pension > 0)) return '填上养老金，看看能提前多少。';
-  if (w === null) return '算上养老金也还到不了放假。';
+  if (w === null) return '算上养老金也还到不了八成把握。';
   if (wo === null) return `算上养老金 ${w} 岁放假；不算养老金还到不了。`;
   if (w === p.age && wo === p.age) return '现在就能放假，养老金是额外的保障。';
   const months = Math.round((gain ?? 0) * 12);
@@ -69,37 +93,46 @@ export function statusPill(success) {
 
 const tile = (k, v, n = '') => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="n">${n}</div></div>`;
 
-export function tilesHtml({ mode, p, t, bwd, mc, dispCur }) {
+// The withdrawal rate the holiday line implies, next to the published one it no longer depends on.
+function swrCompare(p, line) {
+  const spend = conv(p.retExp, p.rCur, p.wCur, p.fx);
+  return line > 0 ? `本工具在你的假设下反推的提取率是 ${pct(spend / line, 1)}；Morningstar 30 年九成把握是 3.9%` : '';
+}
+
+export function tilesHtml({ mode, p, t, bwd, mc, dispCur, target = needLine(p) }) {
   const D = v => money(toDisplay(v, p, dispCur), dispCur);
   const rate = savingsRate(p);
   const success = mc?.success ?? null;
   const parts = [];
   if (mode === 'bwd') {
-    parts.push(tile(`${p.tAge} 岁所需资产`, D(bwd.need), `提取率 ${pct(swrFor(p, p.life - p.tAge))}`));
-    parts.push(tile('当前计划在那时有', D(bwd.An), bwd.An >= bwd.need ? '已经够了' : `还差 ${D(bwd.need - bwd.An)}`));
+    const line = target[bwd.n];
+    parts.push(tile(`${p.tAge} 岁的放假线`, D(line), `八成把握所需。${swrCompare(p, line)}`));
+    parts.push(tile('当前计划在那时有（中位数）', D(bwd.An), bwd.An >= line ? '已经够了' : `还差 ${D(line - bwd.An)}`));
   } else if (t !== null) {
-    parts.push(tile('放假所需资产', D(fiNeed(p, t)), `提取率 ${pct(swrFor(p, p.life - p.age - t))}，放假 ${p.life - p.age - t} 年`));
+    parts.push(tile('放假线（八成把握）', D(target[t]), `放假 ${p.life - p.age - t} 年。${swrCompare(p, target[t])}`));
   } else {
-    parts.push(tile('今天放假所需资产', D(fiNeed(p, 0)), `每年花 ${money(p.retExp, p.rCur)}`));
+    parts.push(tile('今天的放假线', D(target[0]), `每年花 ${money(p.retExp, p.rCur)}`));
   }
-  if (success !== null) parts.push(tile('计划成功率', pct(success, 0), `${statusPill(success)} 资产撑到 ${p.life} 岁的概率`));
+  if (success !== null) parts.push(tile('计划成功率', `${pct(success, 0)}<small>（${peopleOf(success) === 0 ? '不到 1 成' : `${peopleOf(success)} 成`}）</small>`, `${statusPill(success)} 资产撑到 ${p.life} 岁的概率，按本工具假设模拟`));
   parts.push(tile('储蓄率', rate === null || rate <= 0 ? '—' : pct(rate, 0), rate !== null && rate > 0 ? `每年存 ${D(p.income - p.expense)}` : '目前存不下钱'));
   return parts.join('');
 }
 
-export function solvesHtml({ p, bwd, dispCur }) {
+const FIXED = '按固定收益算，约五成把握';
+
+export function solvesHtml({ p, bwd, odds, dispCur }) {
   const D = v => money(toDisplay(v, p, dispCur), dispCur);
   const rate = savingsRate(p);
-  const needRate = p.income > 0 ? bwd.s0 / p.income : NaN;
-  const rNote = bwd.reqR === Infinity ? '只靠收益补不上，需要别的杠杆'
+  const needRate = p.income > 0 ? odds.s0 / p.income : NaN;
+  const rNote = bwd.reqR === Infinity ? '只靠收益补不上，需要别的办法'
     : bwd.reqR === -Infinity ? '收益很低也够了' : `当前假设 ${pct(p.r, 2)}，储蓄不变`;
   const reqR = bwd.reqR === Infinity ? '> 30%' : bwd.reqR === -Infinity ? '< −10%' : pct(bwd.reqR, 2);
   const rows = [
-    ['多存：第一年需存', bwd.s0 <= 0 ? '不用再存' : `${D(bwd.s0)}/年`,
-      bwd.s0 <= 0 ? '现有资产靠复利就能达到' : `约 ${D(bwd.s0 / 12)}/月，储蓄率 ${pct(needRate, 0)}（现在 ${rate === null || rate <= 0 ? '—' : pct(rate, 0)}）`],
-    ['多赚：需要的实际年化收益', reqR, rNote],
-    ['少花：退休后每年最多花', `${money(bwd.maxE, p.rCur)}/年`, `约 ${money(bwd.maxE / 12, p.rCur)}/月，现在设的是 ${money(p.retExp, p.rCur)}`],
-    ['本金：今天需要有', D(bwd.reqA0), bwd.reqA0 <= p.assets ? '你已经有了' : `比现在多 ${D(bwd.reqA0 - p.assets)}`],
+    ['多存：第一年需存（八成把握）', odds.enough ? '不用再存' : `${D(odds.s0)}/年`,
+      odds.enough ? '现有资产靠复利就能达到' : `约 ${D(odds.s0 / 12)}/月，储蓄率 ${pct(needRate, 0)}（现在 ${rate === null || rate <= 0 ? '—' : pct(rate, 0)}）`],
+    ['多赚：需要的实际年化收益', reqR, `${rNote}。${FIXED}`],
+    ['少花：退休后每年最多花', `${money(bwd.maxE, p.rCur)}/年`, `约 ${money(bwd.maxE / 12, p.rCur)}/月，现在设的是 ${money(p.retExp, p.rCur)}。${FIXED}`],
+    ['本金：今天需要有', D(bwd.reqA0), `${bwd.reqA0 <= p.assets ? '你已经有了' : `比现在多 ${D(bwd.reqA0 - p.assets)}`}。${FIXED}`],
   ];
   return rows.map(([q, v, n]) => `<div class="solve"><div class="q">${q}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join('');
 }
@@ -123,8 +156,15 @@ export const fasterLead = levers => {
   return top.unlocks ? `最有效的一步：${top.label}，就能看到放假那天。` : `最有效的一步：${top.label}，提前 ${yearsText(top.gainYears)}。`;
 };
 
-export function leversHtml(levers, p, { pro = false } = {}) {
-  const intro = '<h2>你的最大杠杆</h2>';
+// The small step comes first in the simple view: an amount this month, counted in Mondays, not years.
+function smallHtml(small, p, dispCur) {
+  if (!small) return '';
+  const gain = small.unlocks ? `能在 ${Math.round(p.age + small.afterYears)} 岁放假` : `少上 ${mondaysIn(small.gainYears).toLocaleString('zh-CN')} 个周一`;
+  return `<li class="lever small"><span class="lab">每月多存 ${wholeMoney(toDisplay(small.amount, p, dispCur), dispCur)}</span><span class="gain">${gain}</span></li>`;
+}
+
+export function leversHtml(levers, p, { pro = false, small = null, dispCur = p.wCur } = {}) {
+  const intro = '<h2>提前的办法</h2>';
   const gap = p.expense - p.income;
   if (!levers.length && gap >= 0) {
     const detail = gap > 0 ? `现在每年还差 ${money(gap, p.wCur)}。` : '现在收入刚好等于支出，多存一点就能启动。';
@@ -137,7 +177,7 @@ export function leversHtml(levers, p, { pro = false } = {}) {
     const button = goal ? `<button type="button" class="ghost" data-goal="${l.id}">定为小目标</button>` : '';
     return `<li class="lever"><span class="lab">${l.label}</span><span class="gain">${gain}</span>${button}</li>`;
   }).join('');
-  return `${intro}<ul class="lever-list">${items}</ul>`;
+  return `${intro}<ul class="lever-list">${pro ? '' : smallHtml(small, p, dispCur)}${items}</ul>`;
 }
 
 export function goalHtml(goal, cmp) {
@@ -217,9 +257,12 @@ function crowdHtml(crowd) {
   return '<div class="crowd"><p class="fine">正在汇总大家的判断……</p></div>';
 }
 
+// Shares count only the people who answered that question, so a question added later starts from its own answers.
 const crowdShare = (crowd, id, chosen) => {
-  if (crowd.status !== 'shown' || crowd.total < MIN_SHOWN || !crowd.counts?.[id]) return '';
-  return `<span class="crowd-share">${Math.round(crowd.counts[id][chosen] / crowd.total * 100)}% 也这么看</span>`;
+  const counts = crowd.counts?.[id];
+  const answered = counts ? counts.reduce((a, b) => a + b, 0) : 0;
+  if (crowd.status !== 'shown' || answered < MIN_SHOWN) return '';
+  return `<span class="crowd-share">${Math.round(counts[chosen] / answered * 100)}% 也这么看</span>`;
 };
 
 export function scenarioHtml({ index, answers, base, effect, params, crowd = { status: 'idle' } }) {
@@ -227,7 +270,7 @@ export function scenarioHtml({ index, answers, base, effect, params, crowd = { s
   if (index >= total) {
     const rows = SCENARIOS.map((s, i) => (answers[s.id] === undefined ? ''
       : `<li><button type="button" class="scn-goto" data-scn-goto="${i}"><span>${params[s.param].name}</span><b>${scenarioOptions(s, base)[answers[s.id]].label}</b>${crowdShare(crowd, s.id, answers[s.id])}</button></li>`)).join('');
-    return `<p class="scn-done">这是你对未来年景的判断，点一项可以改。</p><ul class="scn-summary">${rows}</ul>${crowdHtml(crowd)}<p class="fine">打开专业模式后，可以一键带入这些假设。</p>`;
+    return `<p class="scn-done">这是你对未来年景的判断和现在的股票占比，点一项可以改。</p><ul class="scn-summary">${rows}</ul>${crowdHtml(crowd)}<p class="fine">打开专业模式后，可以一键带入这些假设。</p>`;
   }
   const scenario = SCENARIOS[index];
   const chosen = answers[scenario.id];
@@ -272,8 +315,9 @@ export function variantsHtml({ p, dispCur }) {
   ];
   let h = '<thead><tr><th>类型</th><th>含义</th><th class="num">年支出</th><th class="num">今天所需资产</th><th class="num">放假年龄</th></tr></thead><tbody>';
   for (const [name, desc, E] of rows) {
-    const t = fwdSolve(p, { E });
-    h += `<tr><td><b>${name}</b></td><td>${desc}</td><td class="num">${money(E, p.rCur)}</td><td class="num">${D(fiNeed(p, 0, E))}</td><td class="num">${t === null ? '—' : `${p.age + t} 岁`}</td></tr>`;
+    const q = { ...p, retExp: E };
+    const t = oddsSolve(q);
+    h += `<tr><td><b>${name}</b></td><td>${desc}</td><td class="num">${money(E, p.rCur)}</td><td class="num">${D(needLine(q)[0])}</td><td class="num">${t === null ? '—' : `${p.age + t} 岁`}</td></tr>`;
   }
   const coastDone = p.assets >= coast;
   h += `<tr><td><b>Coast FIRE</b></td><td>此后不再储蓄，靠复利在 ${p.pAge} 岁达到标准 FIRE</td><td class="num">${money(p.retExp, p.rCur)}</td><td class="num">${D(coast)}</td><td class="num">${coastDone ? '已达成' : `还差 ${D(coast - p.assets)}`}</td></tr>`;
@@ -288,7 +332,7 @@ export function heatHtml({ p, dispCur }) {
   const sMul = [0.6, 0.8, 1, 1.2, 1.4, 1.6];
   const cells = rOff.map(dr => sMul.map(mul => {
     const q = buildParams({ ...p, income: sav0 * mul + p.expense }, p.fx);
-    const t = fwdSolve(q, { r: p.r + dr });
+    const t = oddsSolve({ ...q, r: p.r + dr });
     return t === null ? null : p.age + t;
   }));
   const vals = cells.flat().filter(v => v !== null);
@@ -328,12 +372,22 @@ export function allTypesHtml() {
 
 const PLACES_SHOWN = 5;
 
-export function placesHtml(rows, { all = false } = {}) {
+// The title of the folded section carries its number: how much earlier the earliest place is than the current one.
+export function placesTitle(rows) {
+  const best = rows[0], here = rows.find(r => r.current);
+  const gain = best && here && best.years !== null && here.years !== null ? here.years - best.years : 0;
+  // Ages on the page are whole years, so the gain is too; the visa and insurance caveat sits in the notes inside.
+  const years = Math.round(gain);
+  return years >= 1 ? `换个地方放假：最多早 ${years} 年` : '换个地方放假';
+}
+
+export function placesHtml(rows, { all = false, home = 'CN' } = {}) {
   const longest = Math.max(...rows.map(r => r.years ?? 0), 1);
   const row = r => {
     const width = r.years === null ? 0 : Math.max(r.years / longest * 100, 1);
     const age = r.age === null ? '还到不了' : `${r.age} 岁`;
-    const tag = r.current ? '<span class="pill">当前</span>' : '';
+    const abroad = !r.current && r.code !== home ? '<span class="tag">未含签证 · 医保 · 回国机票</span>' : '';
+    const tag = r.current ? '<span class="pill">当前</span>' : abroad;
     const spend = `每年花 ${money(r.retExp, r.cur)}`;
     return `<div class="place${r.current ? ' current' : ''}"><div class="place-top"><span class="place-name">${r.name}${tag}</span><b class="place-age">${age}</b></div>
       <div class="place-bar" aria-hidden="true"><i style="width:${width.toFixed(1)}%"></i></div><div class="place-note">${spend}</div></div>`;
@@ -397,10 +451,31 @@ export function fifthBrief(base, fifth, D = wan) {
   const before = holidayYearsOf(base), after = holidayYearsOf(fifth), diff = base.retireAge - fifth.retireAge;
   if (!diff && before === after && base.outcome === fifth.outcome) {
     const moved = base.outcome === 'lasted' && Math.abs(fifth.endAssets - base.endAssets) > Math.max(Math.abs(base.endAssets), 1) * 0.01;
-    return moved ? { main: `最后剩下 ${D(base.endAssets)} → ${D(fifth.endAssets)}`, detail: `钱都撑到 ${fifth.endAge} 岁` } : null;
+    return moved ? { main: `最后剩下 ${D(base.endAssets)} → ${D(fifth.endAssets)}`, detail: `钱都撑到 ${fifth.endAge} 岁`, amount: true } : null;
   }
   const when = diff ? [`${diff > 0 ? '早' : '晚'} ${Math.abs(diff)} 年放假`] : [];
   return { main: `有钱花的假期 ${before} → ${after} 年`, detail: [...when, end].join(' · ') };
+}
+
+// The written life's own odds, and what its stock share costs in a bad year. It is a choice, not an improvement.
+// Forward, the measure is the age itself; backward, the age is fixed and the odds move.
+export function fifthOddsHtml(f) {
+  if (!f) return '';
+  const known = v => v !== null && v !== undefined;
+  let when;
+  if (f.mode === 'bwd') {
+    const odds = known(f.success) ? oddsText(f.success) : '';
+    const before = known(f.baseSuccess) ? oddsText(f.baseSuccess) : '';
+    const was = before && before !== odds ? `（原来${/^\d/.test(before) ? ' ' : ''}${before}）` : '';
+    when = odds ? `${f.age} 岁放假，${odds}${was}` : `${f.age} 岁放假`;
+  } else if (f.age === null) {
+    when = '规划期内到不了八成把握';
+  } else {
+    const was = !known(f.baseAge) ? '' : f.baseAge === f.age ? '，和原来一样' : `（原来 ${f.baseAge} 岁）`;
+    when = `八成把握的放假年龄是 ${f.age} 岁${was}`;
+  }
+  const drop = Number.isFinite(f.worstYear) ? `20 年一遇的坏年份，这个配置约跌 ${Math.round(-f.worstYear * 100)}%。` : '';
+  return `<p class="fifth-odds">按你的判断重算：${when}。上面那条是最难的一种年景。${drop}这是你选的配置下的结果，不代表更好。</p>`;
 }
 
 export function fifthCompareHtml(base, fifth, baseName = lifeName(base), D = wan) {
@@ -434,12 +509,12 @@ export function stickyHtml(h, { p, dispCur, success, pro }) {
   if (pro) {
     const age = h.reachable ? `财务独立 ${h.holidayAge} 岁` : '规划期内未达到';
     const odds = success === null || success === undefined ? '' : `<span>成功率 ${pct(success, 0)}</span>`;
-    return `<b class="sticky-age">${age}</b><span>所需 ${money(toDisplay(h.fund.need, p, dispCur), dispCur)}</span>${odds}<span class="sticky-more">实际收益 ${pct(p.r, 2)}</span>`;
+    return `<b class="sticky-age">${age}</b><span>放假线 ${money(toDisplay(h.fund.need, p, dispCur), dispCur)}</span>${odds}<span class="sticky-more">实际收益 ${pct(p.r, 2)}</span>`;
   }
-  if (!h.reachable) return '<b class="sticky-age">还在路上</b><span>先把杠杆用起来</span>';
+  if (!h.reachable) return '<b class="sticky-age">还在路上</b><span>先看提前的办法</span>';
   const age = h.workYears === 0 ? '现在就能放假' : `${h.holidayAge} 岁放假`;
   const bar = `<span class="sticky-bar-mini" aria-hidden="true"><i style="width:${(h.workYears / (h.workYears + h.holidayYears) * 100).toFixed(1)}%"></i></span>`;
-  const odds = h.people === null ? '' : `<span>${h.people}/10 撑到 ${h.endAge} 岁</span>`;
+  const odds = h.people === null || !h.label ? '' : `<span>${h.label}</span>`;
   const work = h.workYears ? `<span class="sticky-more">再上 ${h.workYears} 年班</span>` : '';
   return `<b class="sticky-age">${age}</b>${bar}${work}${odds}`;
 }
@@ -466,32 +541,45 @@ export function heroHtml(h, { p, dispCur }) {
   const total = h.workYears + h.holidayYears;
   const share = v => (v / total * 100).toFixed(1);
   let big;
-  if (!h.reachable) big = '<span class="hero-line">还没看到放假那天，先把杠杆用起来</span>';
+  if (!h.reachable) big = '<span class="hero-line">还没看到放假那天，先看提前的办法</span>';
   else if (h.workYears === 0) big = `<span class="hero-rest">现在就能放假 <b>${h.holidayYears}</b> 年</span>`;
   else big = `<span class="hero-work">再上 <b>${h.workYears}</b> 年班</span><span class="hero-arrow">→</span><span class="hero-rest">放假 <b>${h.holidayYears}</b> 年</span>`;
   const work = h.workYears ? `<i class="work" style="width:${share(h.workYears)}%"></i>` : '';
   const rest = h.holidayYears ? `<i class="rest" style="width:${share(h.holidayYears)}%"></i>` : '';
   const mid = h.reachable && h.workYears ? `<span>${h.holidayAge} 岁放假</span>` : '';
   const mondays = h.mondays ? `<p class="hero-mondays">还有 <b>${h.mondays.toLocaleString('zh-CN')}</b> 个周一</p>` : '';
-  const people = h.people === null ? '' : `<div class="people" role="img" aria-label="10 个平行的你，约 ${h.people} 个的钱够花到 ${h.endAge} 岁"><div class="people-row">${Array.from({ length: 10 }, (_, i) => personSvg(i < h.people)).join('')}</div><p>10 个平行的你，约 <b>${h.people}</b> 个的钱够花到 ${h.endAge} 岁</p></div>`;
+  const people = h.people === null ? '' : `<div class="people" role="img" aria-label="10 个平行的你，${h.people} 个的钱够花到 ${h.endAge} 岁"><div class="people-row">${Array.from({ length: 10 }, (_, i) => personSvg(i < h.people)).join('')}</div><p>10 个平行的你，<b>${h.people}</b> 个的钱够花到 ${h.endAge} 岁</p></div>`;
   const fundPct = Math.round(h.fund.share * 100);
-  return `<div class="hero-big">${big}</div>
+  const lasted = h.success === null || h.success === undefined ? '' : `${Math.round(h.success * 2000).toLocaleString('en-US')} 次`;
+  const why = `<p>按本工具假设模拟 2,000 次，${lasted ? `其中 ${lasted}` : '至少 1,600 次'}的钱够花到 ${h.endAge} 岁。</p>`;
+  const r = h.ruler;
+  // Forward, the ruler carries the odds and their explanation; backward there is no ruler, so the odds stand alone.
+  const ruler = h.reachable && r && r.eight !== null
+    ? `<details class="hero-ruler"><summary aria-label="把握尺">把握：${[['五成', r.five], ['八成', r.eight], ['九成', r.nine]].map(([k, v]) => `<span class="step${k === '八成' ? ' on' : ''}">${k} ${v === null ? '到不了' : `${v} 岁`}</span>`).join('')}<span class="odds-q" aria-label="八成把握是什么意思">?</span></summary>${why.replace('<p>', '<p>八成把握：')}</details>`
+    : '';
+  const sure = !ruler && h.reachable && h.label ? `<details class="hero-odds"><summary><b>${h.label}</b><span class="odds-q" aria-label="是什么意思">?</span></summary>${why}</details>` : '';
+  const next = h.next ? `，再存 ${D(h.next.gap)}，就攒够${h.next.months === 12 ? '一整年' : ` ${h.next.months / 12} 年`}的假` : '';
+  // Under a year the count is in months; after that in years, the unit the next step is told in.
+  const span = m => (m < 12 ? `<b>${m}</b> 个月` : `<b>${Math.floor(m / 12)}</b> 年${m % 12 ? ` <b>${m % 12}</b> 个月` : ''}`);
+  const months = h.months === null ? '' : `<p class="hero-months">你已经攒够了 ${span(h.months)}的假${next}。</p>`;
+  const R = v => roughMoney(toDisplay(v, p, dispCur), dispCur);
+  const times = h.times ? `<span class="nowrap">，大约是 ${h.times} 年的花销</span>` : '';
+  return `<div class="hero-big">${big}</div>${sure}${ruler}${months}
     <div class="lifebar" role="img" aria-label="人生进度：上班 ${h.workYears} 年，放假 ${h.holidayYears} 年">${work}${rest}</div>
     <div class="lifebar-ticks"><span>${h.startAge} 岁 · 今天</span>${mid}<span>${h.endAge} 岁</span></div>
     ${mondays}${people}
-    <div class="fund"><div class="fund-bar" role="img" aria-label="放假资金已攒到 ${fundPct}%"><i style="width:${fundPct}%"></i></div><p>放假资金攒到 <b>${fundPct}%</b>（${D(h.fund.have)} / ${D(h.fund.need)}）</p></div>`;
+    <div class="fund"><div class="fund-bar" role="img" aria-label="放假资金已攒到 ${fundPct}%"><i style="width:${fundPct}%"></i></div><p>放假资金：已有 ${R(h.fund.have)} / 需要 ${R(h.fund.need)}（<b>${fundPct}%</b>）${times}</p></div>`;
 }
 
 function personSvg(on) {
   return `<svg class="person${on ? ' on' : ''}" viewBox="0 0 20 28" aria-hidden="true"><circle cx="10" cy="6" r="5"/><path d="M2 27c0-9 3-13 8-13s8 4 8 13z"/></svg>`;
 }
 
-export function livesSummary(stories, mc) {
-  const retired = stories.filter(s => s.outcome !== 'working');
-  if (!retired.length) return '这几条人生里都还没到放假那天。先用上面的杠杆，再回来抽一次。';
-  const lasted = retired.filter(s => s.outcome === 'lasted').length;
-  const share = mc?.success == null ? '' : ` ${mc.paths.toLocaleString('en-US')} 条人生的统计成功率是 ${pct(mc.success, 0)}。`;
-  return `这 ${retired.length} 条人生里，${lasted} 条的钱撑到了最后。${share}`;
+export function livesSummary(stories, mc, life = 95) {
+  if (stories.every(s => s.outcome === 'working')) return '这几条人生都还没到放假那天。先用上面提前的办法，再回来看。';
+  const n = mc?.success == null ? null : peopleOf(mc.success);
+  const share = n === null ? '' : `全部模拟里，${n === 0 ? '不到 1 成' : `${n} 成`}的钱够花到 ${life} 岁。`;
+  return `这几条人生是从全部 ${(mc?.paths ?? 2000).toLocaleString('en-US')} 次模拟里挑出来讲故事的：最难的、偏难的、中间的、顺的。${share}`;
 }
 
 export function storyHtml(story, { p, dispCur }) {

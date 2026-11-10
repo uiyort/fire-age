@@ -205,3 +205,29 @@ test('I14: no learning card points at a product type', () => {
   assert.ok(!JSON.stringify(PARAMS).includes('指数化'));
 });
 
+
+test('no visitor-facing text says 杠杆, 裸放 or 解锁', async () => {
+  const { readFileSync } = await import('node:fs');
+  for (const f of ['site/index.html', 'site/method.html', 'site/js/views.js', 'site/js/card.js', 'site/js/studio.js', 'site/js/app.js', 'site/js/holiday.js', 'site/js/levers.js']) {
+    const visible = readFileSync(f, 'utf8').split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+    for (const word of ['杠杆', '裸放', '解锁']) assert.ok(!visible.includes(word), `${f}: ${word}`);
+  }
+});
+
+test('the fare axis says where the money comes from, and the card says 50 岁前', async () => {
+  const DATA = (await import('../site/js/data-latest.js')).default;
+  const { defaultState, toParams } = await import('../site/js/state.js');
+  const { holidayType } = await import('../site/js/holiday.js');
+  const { summaryCardSpec } = await import('../site/js/card.js');
+  const p = toParams(defaultState(DATA), DATA);
+  const type = holidayType(p, DATA, { workC: 'CN', retC: 'CN' });
+  assert.match(type.axes[3].value, /^\d+% 来自今天已有的存款$/);
+  const hero = { reachable: true, startAge: 30, holidayAge: 44, endAge: 95, workYears: 14, holidayYears: 51, mondays: 730, people: 8, fund: { share: 0.2 } };
+  const spec = summaryCardSpec({ mode: 'fwd', type: { ...type, axes: type.axes.map((a, i) => (i === 0 ? { ...a, letter: 'E' } : a)) }, hero });
+  assert.equal(spec.departs, '50 岁前');
+});
+
+test('the copy lint flags 杠杆, 解锁 and 裸放', async () => {
+  const { findBannedCopy } = await import('../scripts/lint-copy.mjs');
+  assert.deepEqual(findBannedCopy('解锁专业模式，用杠杆，不能裸放'), ['杠杆', '解锁', '裸放']);
+});

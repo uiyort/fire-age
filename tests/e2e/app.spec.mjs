@@ -89,3 +89,25 @@ test('the page still calculates with storage blocked', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#headline')).toContainText('岁');
 });
+
+test('spending can be added up from rent, food and the rest', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#inputs-box').evaluate(d => { d.open = true; });
+  await expect(page.locator('#simple-form')).toContainText('示例，改成你的');
+  const before = await page.locator('#headline').innerText();
+  await page.locator('#expense-split > summary').click();
+  await page.fill('#split-rent', '3000');
+  await page.fill('#split-food', '1500');
+  await page.fill('#split-other', '500');
+  await expect(page.locator('#s-expense')).toHaveValue('5000');
+  await expect(page.locator('#headline')).not.toHaveText(before);
+});
+
+test('the simple numbers say which stock share and return they assume, and where that comes from', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#inputs-box').evaluate(d => { d.open = true; });
+  const note = page.locator('#estimate .mix-note');
+  await expect(note).toContainText('股票 60%');
+  await expect(note).toContainText('不是建议');
+  await expect(note.locator('a')).toHaveAttribute('href', /sources/);
+});

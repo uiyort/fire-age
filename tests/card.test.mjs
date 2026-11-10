@@ -1,25 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { barcodeBars, lifeBars, summaryCardSpec, placeCardSpec, lifeCardSpec, typeCardSpec, fitFontSize, fitLines, noteLayout, wrapText } from '../site/js/card.js';
+import { assumptionLine, barcodeBars, lifeBars, summaryCardSpec, placeCardSpec, lifeCardSpec, typeCardSpec, fitFontSize, fitLines, noteLayout, wrapText } from '../site/js/card.js';
 import { findBannedCopy } from '../scripts/lint-copy.mjs';
 
 const type = {
   code: 'EHTS', name: '采菊人', emoji: '🌼', group: '归园派', blurb: '早早收工，回家种花。',
   axes: [{ name: '启程', letter: 'E', pole: '早', value: '43 岁' }, { name: '目的地', letter: 'H', pole: '在地', value: '中国大陆' }, { name: '行李', letter: 'T', pole: '轻装', value: '40%' }, { name: '路费', letter: 'S', pole: '靠存', value: '30%' }],
 };
-const hero = { reachable: true, startAge: 30, holidayAge: 43, endAge: 95, workYears: 13, holidayYears: 52, mondays: 678, people: 7, fund: { share: 0.14 } };
-const summary = { mode: 'fwd', type, hero, lit: { done: 3, total: 20 }, ribbons: [{ label: '顺风局', cells: ['work', 'holiday'] }] };
+const hero = { reachable: true, startAge: 30, holidayAge: 43, endAge: 95, workYears: 13, holidayYears: 52, mondays: 678, people: 7, months: 50, fund: { share: 0.14 } };
+const summary = { mode: 'fwd', type, hero: { ...hero, fund: { share: 0.14 } }, ribbons: [{ label: '顺风局', cells: ['work', 'holiday'] }] };
 
 test('the summary card carries the age, slogan, type, brand and search hint', () => {
   const s = summaryCardSpec(summary);
   assert.equal(s.kind, 'summary');
   assert.equal(s.hero, '43 岁');
   assert.equal(s.sentence, type.blurb, 'the line under the age is the type\'s own, not a fixed slogan');
-  assert.equal(s.code, 'EHTS');
+  assert.equal(s.code, undefined, 'the letter code stays off the card');
+  assert.equal(s.eyebrow, '采菊人 · 归园派');
   assert.equal(s.typeName, '采菊人');
   assert.equal(s.emoji, '🌼');
   assert.equal(s.brand, '放假年龄 / FIRE Age');
   assert.equal(s.searchHint, '搜：放假年龄');
+  assert.equal(s.searchSub, undefined);
+  assert.equal(summaryCardSpec({ ...summary, search: false }).searchHint, '', 'studio cards carry no search words');
   assert.deepEqual(s.size, [1080, 1440]);
 });
 
@@ -27,15 +30,54 @@ test('the card keeps every label short', () => {
   const s = summaryCardSpec({ ...summary, fifth: { main: '有钱花的假期 25 → 22 年', detail: '晚 3 年放假 · 67 岁花完', baseName: '中途断粮' } });
   assert.ok([...s.sentence].length <= 20, s.sentence);
   assert.ok([...s.note.label].length <= 12, s.note.label);
-  assert.deepEqual(s.stampLabels, ['撑到 95 岁', '还要上的周一', '点亮参数']);
+  assert.deepEqual(s.stampLabels, ['10 个平行的你', '还要上的周一', '攒够的假']);
+  assert.deepEqual(summaryCardSpec({ ...summary, privacy: { money: true, now: true } }).stampLabels, ['10 个平行的你', '还要上的周一', '攒够的假', '已攒到']);
 });
 
-test('with a written life, the card shows only that life and the one it rewrote', () => {
-  const row = (label, extra = {}) => ({ label, cells: ['work', 'holiday'], ...extra });
-  const ribbons = [row('顺风局'), row('中途断粮', { base: true }), row('起步就难'), row('改签后', { fifth: true })];
-  const fifth = { main: '有钱花的假期 25 → 22 年', detail: '', baseName: '中途断粮' };
-  assert.deepEqual(summaryCardSpec({ ...summary, ribbons, fifth }).ribbons.map(r => r.label), ['中途断粮', '改签后']);
-  assert.equal(summaryCardSpec({ ...summary, ribbons: ribbons.slice(0, 3) }).ribbons.length, 3);
+test('the card draws no life ribbons any more', () => {
+  assert.equal(summaryCardSpec(summary).ribbons, undefined);
+});
+
+test('the pass card shows no money and no saved share by default', () => {
+  const lever = { action: '每月少花 10%（约 ¥1,000）', plain: '每月少花一成', gain: 1.4 };
+  const s = summaryCardSpec({ ...summary, lever });
+  const text = JSON.stringify(s);
+  assert.ok(!/[¥$€£]|CNY|已攒到/.test(text), text);
+  assert.equal(s.note.main, '每月少花一成');
+  assert.equal(s.fund, undefined);
+  assert.ok(s.fields.every(f => f.value === undefined));
+  assert.equal(s.months, 50);
+});
+
+test('showing money brings back the saved share and the amount', () => {
+  const lever = { action: '每月少花 10%（约 ¥1,000）', plain: '每月少花一成', gain: 1.4 };
+  const s = summaryCardSpec({ ...summary, lever, privacy: { money: true, now: true } });
+  assert.equal(s.fund, 0.14);
+  assert.equal(s.note.main, '每月少花 10%（约 ¥1,000）');
+});
+
+test('hiding the age hides every line that gives it away', () => {
+  const s = summaryCardSpec({ ...summary, privacy: { money: false, now: false } });
+  assert.equal(s.now, '');
+  assert.equal(s.ticket.route, '');
+  assert.equal(s.route.startLabel, '今天');
+  assert.ok(!JSON.stringify({ now: s.now, ticket: s.ticket, barcode: s.barcode }).includes('30'));
+});
+
+test('the odds sit with the age, and the assumptions are spelled out', () => {
+  const s = summaryCardSpec({ ...summary, odds: '八成把握', assumptions: assumptionLine({ r: 0.029, pension: 0 }) });
+  assert.equal(s.odds, '八成把握');
+  assert.equal(assumptionLine({ r: 0.029, pension: 0 }), '按今天的钱算 · 实际收益 2.9%/年 · 未算养老金 / 社保自缴');
+  assert.equal(assumptionLine({ r: 0.0286, pension: 36000 }), '按今天的钱算 · 实际收益 2.9%/年 · 含养老金 · 未算社保自缴');
+  assert.match(s.assumptions, /按本工具假设模拟，方法见网页『计算方法』$/);
+  assert.equal(summaryCardSpec(summary).assumptions, '');
+});
+
+test('the type-only card has no numbers at all', () => {
+  const s = typeCardSpec(type);
+  assert.deepEqual(s.size, [1080, 1440]);
+  assert.ok(!/\d/.test(JSON.stringify({ e: s.eyebrow, h: s.hero, t: s.sentence, st: s.stats, l: s.lines })), JSON.stringify(s));
+  assert.match(s.hero, /采菊人/);
 });
 
 test('a written life reads like a changed ticket: the old value struck out, the new one beside it', () => {
@@ -45,30 +87,33 @@ test('a written life reads like a changed ticket: the old value struck out, the 
   assert.equal(note('52 岁就能放假').tag, '已改签');
 });
 
-test('the age wears a boarding stamp that tells how far the trip has got', () => {
+test('the stamp beside the age is the group seal, never a status that reads as already retired', () => {
   const words = s => ({ main: s.boarding.main, sub: s.boarding.sub });
-  assert.deepEqual(words(summaryCardSpec(summary)), { main: '已登机', sub: 'BOARDED' });
-  assert.deepEqual(words(summaryCardSpec({ ...summary, hero: { ...hero, workYears: 0 } })), { main: '已起飞', sub: 'DEPARTED' });
-  assert.deepEqual(words(summaryCardSpec({ ...summary, hero: { ...hero, reachable: false } })), { main: '候补中', sub: 'STANDBY' });
-  assert.deepEqual(words(summaryCardSpec({ ...summary, mode: 'bwd', monthlyText: '8,600', enough: false })), { main: '待登机', sub: 'BOARDING' });
-  assert.deepEqual(words(summaryCardSpec({ ...summary, mode: 'bwd', enough: true })), { main: '已登机', sub: 'BOARDED' });
+  assert.deepEqual(words(summaryCardSpec(summary)), { main: '归园派', sub: 'FIRE AGE' });
+  assert.deepEqual(words(summaryCardSpec({ ...summary, hero: { ...hero, reachable: false } })), { main: '归园派', sub: 'FIRE AGE' });
 });
 
-test('each type group has its own stamp, in its own shape and ink, carrying the type code', () => {
+test('a line under the age says where the person stands today', () => {
+  assert.equal(summaryCardSpec(summary).now, '现在 30 岁，再上 13 年班');
+  assert.equal(summaryCardSpec({ ...summary, hero: { ...hero, workYears: 0, holidayAge: 30 } }).now, '现在 30 岁，已经可以放假');
+  assert.equal(summaryCardSpec({ ...summary, hero: { ...hero, reachable: false } }).now, '现在 30 岁，规划期内还到不了');
+  assert.equal(summaryCardSpec({ ...summary, mode: 'bwd', enough: true }).now, '现在 30 岁，存款已经够了');
+  assert.equal(summaryCardSpec({ ...summary, mode: 'bwd', monthlyText: '8,600', enough: false }).now, '现在 30 岁，再上 13 年班');
+});
+
+test('each type group has its own stamp, in its own shape and ink', () => {
   const stamp = group => summaryCardSpec({ ...summary, type: { ...type, group } }).boarding;
   const groups = ['归园派', '主场派', '漫游派', '环球派'].map(stamp);
   assert.equal(new Set(groups.map(g => g.shape)).size, 4);
   assert.equal(new Set(groups.map(g => g.ink)).size, 4);
-  assert.equal(stamp('归园派').code, 'EHTS');
+  assert.equal(stamp('归园派').sub, 'FIRE AGE');
 });
 
 test('the foot of the card is a barcode with the pass number under it', () => {
   const s = summaryCardSpec(summary);
-  assert.equal(s.barcode, 'FIRE AGE · ' + s.code + ' · 43');
-  assert.deepEqual(s.ticket, { flight: 'FA043', cabin: '经济舱', issued: '', route: '30 → 43 → 95' });
-  const rich = summaryCardSpec({ ...summary, issued: '2026-11', type: { ...type, axes: type.axes.map((a, i) => (i === 2 ? { ...a, letter: 'F', pole: '宽裕' } : a)) } });
-  assert.equal(rich.ticket.cabin, '商务舱');
-  assert.equal(rich.ticket.issued, '2026.11');
+  assert.equal(s.barcode, 'FIRE AGE · 43');
+  assert.deepEqual(s.ticket, { flight: 'FA043', issued: '', route: '30 → 43 → 95' }, 'no cabin: economy read as poor');
+  assert.equal(summaryCardSpec({ ...summary, issued: '2026-11' }).ticket.issued, '2026.11');
   assert.equal(summaryCardSpec({ ...summary, hero: { ...hero, reachable: false } }).ticket.flight, 'FA---');
   assert.deepEqual(barcodeBars('FIRE AGE · EHTS · 43', 300), barcodeBars('FIRE AGE · EHTS · 43', 300), 'the same pass draws the same bars');
   assert.notDeepEqual(barcodeBars('FIRE AGE · EHTS · 43', 300), barcodeBars('FIRE AGE · LAFG · 51', 300));
@@ -92,20 +137,20 @@ test('the barcode is the life itself: one bar a year, its height the assets, its
 test('the summary card spells out the type as four ticket fields', () => {
   const s = summaryCardSpec(summary);
   assert.deepEqual(s.fields, [
-    { label: '启程', letter: 'E', pole: '早', value: '再上 13 年班' },
-    { label: '目的地', letter: 'H', pole: '在地', value: '中国大陆' },
-    { label: '行李', letter: 'T', pole: '轻装', value: '40%' },
-    { label: '路费', letter: 'S', pole: '靠存', value: '30%' },
+    { label: '启程', letter: 'E', pole: '早' },
+    { label: '目的地', letter: 'H', pole: '在地' },
+    { label: '行李', letter: 'T', pole: '轻装' },
+    { label: '路费', letter: 'S', pole: '靠存' },
   ]);
+  assert.equal(s.departs, '50 岁前');
 });
 
 test('the summary card is a ticket: route, people, Mondays and a barcode of lives', () => {
   const s = summaryCardSpec(summary);
-  assert.deepEqual(s.route, { startAge: 30, holidayAge: 43, endAge: 95, work: 13, holiday: 52 });
+  assert.deepEqual(s.route, { startAge: 30, startLabel: '30 岁', holidayAge: 43, endAge: 95, work: 13, holiday: 52 });
   assert.equal(s.people, 7);
   assert.equal(s.mondays, 678);
-  assert.deepEqual(s.lit, { done: 3, total: 20 });
-  assert.equal(s.ribbons.length, 1);
+  assert.equal(s.months, 50, 'the third field is the months of holiday saved, a fact with no amount in it');
 });
 
 test('the summary card carries one note at most, the most personal one, as a label, a main line and a detail', () => {
@@ -117,13 +162,13 @@ test('the summary card carries one note at most, the most personal one, as a lab
     change: { prefix: '有钱花的假期 ', was: '25', now: '22 年' },
   });
   assert.deepEqual(summaryCardSpec({ ...all, fifth: null }).note, { label: '小目标达成', main: '储蓄率到 45%', detail: '' });
-  assert.deepEqual(summaryCardSpec({ ...all, fifth: null, goal: null }).note, { label: '你的杠杆', main: '每月多存 ¥1,250', detail: '早 1.4 年放假' });
+  assert.deepEqual(summaryCardSpec({ ...all, fifth: null, goal: null }).note, { label: '提前的办法', main: '每月多存 ¥1,250', detail: '早 1.4 年放假' });
   assert.deepEqual(summaryCardSpec({ ...all, fifth: null, goal: null, lever: null }).note, { label: '同样的钱', main: '去泰国放假', detail: '早 4.3 年' });
   assert.equal(summaryCardSpec(summary).note, null);
 });
 
 test('a lever that makes the holiday reachable says the age', () => {
-  assert.deepEqual(summaryCardSpec({ ...summary, lever: { action: '每月多存 ¥1,250', unlockAge: 58 } }).note, { label: '你的杠杆', main: '每月多存 ¥1,250', detail: '就能在 58 岁放假' });
+  assert.deepEqual(summaryCardSpec({ ...summary, lever: { action: '每月多存 ¥1,250', unlockAge: 58 } }).note, { label: '提前的办法', main: '每月多存 ¥1,250', detail: '就能在 58 岁放假' });
 });
 
 test('the summary card has no links or QR codes and passes the compliance lint', () => {
@@ -145,15 +190,17 @@ test('someone who can stop now gets the today wording', () => {
   const s = summaryCardSpec({ mode: 'fwd', type, hero: { ...hero, holidayAge: 30, workYears: 0, holidayYears: 65, mondays: 0 }, ribbons: [] });
   assert.equal(s.hero, '现在');
   assert.equal(s.sentence, type.blurb);
-  assert.equal(s.fields[0].value, '现在就走');
+  assert.equal(s.departs, '50 岁前');
   assert.equal(s.mondays, 0);
 });
 
-test('a backward result uses the monthly amount', () => {
-  const s = summaryCardSpec({ ...summary, mode: 'bwd', monthlyText: '8,600', enough: false });
-  assert.equal(s.sentence, '每月存 8,600 就能到');
-  const done = summaryCardSpec({ ...summary, mode: 'bwd', monthlyText: '0', enough: true });
+test('a backward result uses the monthly amount only when money is shown', () => {
+  const money = { money: true, now: true };
+  const s = summaryCardSpec({ ...summary, mode: 'bwd', monthlyText: '8,600', enough: false, privacy: money });
+  assert.equal(s.sentence, '每月存 8,600，就有八成把握');
+  const done = summaryCardSpec({ ...summary, mode: 'bwd', monthlyText: '0', enough: true, privacy: money });
   assert.equal(done.sentence, '现在的存款已经够了');
+  assert.equal(summaryCardSpec({ ...summary, mode: 'bwd', monthlyText: '8,600', enough: false }).sentence, type.blurb);
 });
 
 test('long amounts shrink to fit and respect the minimum', () => {
@@ -252,12 +299,39 @@ test('closing punctuation never starts a wrapped line', () => {
   assert.deepEqual(wrapText(t => [...t].length, '一二三四。五六', 4), ['一二三', '四。五六']);
 });
 
-test('the type card shows the code, name, group and all four axes', () => {
+test('the type card shows the name, group and all four axes, without the letter code', () => {
   const s = typeCardSpec(type);
-  assert.match(s.eyebrow, /EHTS/);
+  assert.doesNotMatch(JSON.stringify(s), /EHTS/);
   assert.match(s.eyebrow, /归园派/);
   assert.match(s.hero, /采菊人/);
   assert.equal(s.sentence, type.blurb);
   assert.equal(s.stats.length, 4);
   assert.deepEqual(findBannedCopy(JSON.stringify(s)), []);
+});
+
+test('with money off, no note on the card carries an amount', () => {
+  const plainGoal = summaryCardSpec({ ...summary, goal: { label: '年支出降到 60,000', plain: '年支出降到了目标' } });
+  assert.equal(plainGoal.note.main, '年支出降到了目标');
+  assert.equal(summaryCardSpec({ ...summary, goal: { label: '年支出降到 60,000', plain: '年支出降到了目标' }, privacy: { money: true, now: true } }).note.main, '年支出降到 60,000');
+  const lever = { action: '每月少花 10%（约 ¥600）', plain: '每月少花一成', gain: 1.4 };
+  const fifth = { main: '最后剩下 ¥120万 → ¥150万', detail: '钱都撑到 95 岁', amount: true };
+  const s = summaryCardSpec({ ...summary, fifth, lever });
+  assert.equal(s.note.main, '每月少花一成', 'a written life told in money gives way to the plain lever');
+  assert.equal(summaryCardSpec({ ...summary, fifth, lever, privacy: { money: true, now: true } }).note.main, fifth.main);
+});
+
+test('with the age hidden, nothing on the card lets it be worked out', () => {
+  const s = summaryCardSpec({ ...summary, years: [100, 200, 400, 300], privacy: { money: false, now: false } });
+  assert.ok(!s.stampLabels.includes('还要上的周一'), 'Mondays left give the work years');
+  assert.equal(s.mondays, null);
+  assert.deepEqual(s.lifeBars, [], 'a bar a year from today gives the age; the code falls back to plain bars');
+  assert.equal(s.route.fixedStop, true, 'the stop on the route sits at a fixed place');
+  const shown = summaryCardSpec({ ...summary, years: [100, 200, 400, 300] });
+  assert.ok(shown.stampLabels.includes('还要上的周一'));
+  assert.equal(shown.lifeBars.length, 4);
+});
+
+test('a worked example says so on the card', () => {
+  assert.equal(summaryCardSpec({ ...summary, example: true }).example, true);
+  assert.equal(summaryCardSpec(summary).example, false);
 });
