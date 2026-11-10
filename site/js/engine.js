@@ -51,13 +51,13 @@ export function fiNeed(p, t, E = p.retExp, r = p.r) {
   if (Pw <= 0) return Ew / swrFor(p, H);
   if (p.pAge <= a) return Math.max(Ew - Pw, 0) / swrFor(p, H);
   const b = Math.min(p.pAge - a, H);
-  let pv = 0;
-  // Social insurance paid by hand until the pension starts is work-currency money in today's terms.
-  const bridge = Ew + (p.selfPay ?? 0);
-  for (let k = 0; k < b; k++) pv += bridge / Math.pow(1 + r, k);
+  // Social insurance paid by hand until the pension starts is work-currency money in today's terms; it sits
+  // outside the cap, which only limits what the pension itself can save.
+  let pv = 0, paid = 0;
+  for (let k = 0; k < b; k++) { const d = Math.pow(1 + r, k); pv += Ew / d; paid += (p.selfPay ?? 0) / d; }
   if (b < H) pv += Math.max(Ew - Pw, 0) / swrFor(p, H - b) / Math.pow(1 + r, b);
   // A pension can only help: never ask for more than the same plan with no pension.
-  return Math.min(pv, Ew / swrFor(p, H));
+  return Math.min(pv, Ew / swrFor(p, H)) + paid;
 }
 
 export const savingsAt = (p, t, s0 = null) =>
@@ -266,7 +266,7 @@ export function coastNeed(p) {
 }
 
 export function dualAges(p) {
-  const bare = { ...p, pension: 0 };
+  const bare = { ...p, pension: 0, selfPay: 0 };
   const age = q => { const t = fwdSolve(q); return t === null ? null : q.age + t; };
   const withPension = age(p), withoutPension = age(bare);
   // How much earlier the pension makes the holiday, in fractional years.

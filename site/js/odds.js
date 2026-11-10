@@ -105,18 +105,23 @@ export function needLine(p, { target = ODDS, paths = DEFAULT_PATHS, seed = DEFAU
     // Spending and pension after the holiday are fixed at that year's currency drift, so between two currencies
     // every amount from year T on is the no-drift amount times drift^T. One walk without drift serves every year,
     // and each year's line is scaled by its drift afterwards.
-    const one = planFlows({ ...p, fxDrift: 0 }, 0, null);
+    const drift = T => (p.rCur === p.wCur ? 1 : Math.pow(1 + (p.fxDrift ?? 0) / 100, T));
+    const one = planFlows({ ...p, fxDrift: 0, selfPay: 0 }, 0, null);
+    // Self-pay is work-currency money that does not drift; it gets its own backward sum (before the pension
+    // starts the pension is 0, so the floor at zero never bites).
+    const fixed = planFlows({ ...p, retExp: 0, pension: 0, fxDrift: 0 }, 0, null);
     for (let i = 0; i < paths; i++) {
       const row = i * Y;
-      let need = 0;
+      let need = 0, sNeed = 0;
       for (let t = Y - 1; t >= 0; t--) {
-        need = (t > 0 && g[row + t - 1] - 1 <= HARD_FALL ? one.after[t] : one.full[t]) + need / g[row + t];
-        cols[t][i] = need;
+        const fall = t > 0 && g[row + t - 1] - 1 <= HARD_FALL;
+        need = (fall ? one.after[t] : one.full[t]) + need / g[row + t];
+        sNeed = (fall ? fixed.after[t] : fixed.full[t]) + sNeed / g[row + t];
+        cols[t][i] = need * drift(t) + sNeed;
       }
     }
-    const drift = T => (p.rCur === p.wCur ? 1 : Math.pow(1 + (p.fxDrift ?? 0) / 100, T));
     // A hair above the life at the quantile, so rounding in the walk forward never sinks that life.
-    const line = cols.map((c, T) => c.sort()[k] * drift(T) * (1 + 1e-9));
+    const line = cols.map((c, T) => c.sort()[k] * (1 + 1e-9));
     line.push(0);
     return line;
   });
@@ -193,7 +198,7 @@ export function extendRow(z, length, index, seed = DEFAULT_SEED) {
 }
 
 export function dualOdds(p) {
-  const bare = { ...p, pension: 0 };
+  const bare = { ...p, pension: 0, selfPay: 0 };
   const age = q => ageOf(q, oddsSolve(q));
   const withPension = age(p), withoutPension = age(bare);
   const a = oddsYears(p), b = oddsYears(bare);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildParams, monteCarlo, fwdSolve, fiNeed, planFlows } from '../site/js/engine.js';
+import { buildParams, monteCarlo, fwdSolve, fiNeed, planFlows, dualAges } from '../site/js/engine.js';
 import { ODDS, successAt, oddsSolve, oddsYears, oddsRuler, needLine, bwdOdds, decilePaths, dualOdds, extendRow } from '../site/js/odds.js';
 import { walkPath } from '../site/js/engine.js';
 
@@ -136,5 +136,29 @@ test('selfPay: spending from the pension age on is the same as without it', () =
   for (let t = 0; t <= p.life - p.age; t++) {
     if (p.age + t >= p.pAge) assert.equal(b.full[t], a.full[t], `t=${t}`);
     else assert.ok(b.full[t] > a.full[t], `t=${t}`);
+  }
+});
+
+test('selfPay: the need keeps rising with selfPay on a realistic plan (the pension cap does not clip it)', () => {
+  const q = s => base({ retExp: 72000, pension: 24000, assets: 200000, income: 144000, expense: 72000, selfPay: s });
+  const n = [0, 24000, 60000, 100000].map(s => fiNeed(q(s), 10));
+  for (let i = 1; i < n.length; i++) assert.ok(n[i] > n[i - 1], `step ${i}: ${n}`);
+});
+
+test('selfPay: the without-pension plan carries no self-pay', () => {
+  const p = base({ selfPay: 60000 });
+  const bare = base({ pension: 0, selfPay: 0 });
+  assert.equal(dualOdds(p).withoutPension, (oddsSolve(bare) === null ? null : bare.age + oddsSolve(bare)));
+  assert.equal(dualAges(p).withoutPension, dualAges(base()).withoutPension);
+});
+
+test('selfPay: starting the holiday with exactly the need line gives the target odds under currency drift', () => {
+  for (const fxDrift of [2, -2]) {
+    const p = base({ rCur: 'MYR', retExp: 60000, pension: 15000, selfPay: 40000, fxDrift });
+    const line = needLine(p);
+    for (const T of [5, 15, 25]) {
+      const s = successAt(p, T, null, { startAt: T, startAssets: line[T] });
+      assert.ok(Math.abs(s - 0.8) <= 0.01, `drift ${fxDrift} T=${T}: ${s}`);
+    }
   }
 });
