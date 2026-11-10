@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildParams, monteCarlo, fwdSolve, fiNeed, planFlows, dualAges } from '../site/js/engine.js';
 import { ODDS, successAt, oddsSolve, oddsYears, oddsRuler, needLine, bwdOdds, decilePaths, dualOdds, extendRow } from '../site/js/odds.js';
-import { walkPath } from '../site/js/engine.js';
+import { walkPath, growthFactors } from '../site/js/engine.js';
 
 const FX = { USD: 1, CNY: 6.6688, MYR: 4.08 };
 const base = (o = {}) => buildParams({
@@ -201,5 +201,32 @@ test('events: starting with exactly the need line gives the target odds, with an
   for (const T of [5, 15, 25]) {
     const s = successAt(q, T, null, { startAt: T, startAssets: line[T] });
     assert.ok(Math.abs(s - 0.8) <= 0.01, `same currency T=${T}: ${s}`);
+  }
+});
+
+test('events: the memo knows infl, even when r does not depend on it', () => {
+  const q = infl => base({ eq: 100, infl, events: [mort({ endAge: 60 })] });
+  const a = needLine(q(1.5))[10], b = needLine(q(6))[10];
+  assert.notEqual(a, b);
+  assert.ok(b < a);
+});
+
+test('events: in one currency the single backward walk equals a walk for each holiday year', () => {
+  const p = base({ selfPay: 30000, flexCut: 20, events: [mort({ amount: 30000, endAge: 45 }), { id: 'kids', amount: 20000, endAge: 55, nominal: false }] });
+  const Y = p.life - p.age, g = growthFactors(p), k = Math.ceil(0.8 * 2000) - 1;
+  const line = needLine(p);
+  for (let T = 0; T < Y; T++) {
+    const { full, after } = planFlows(p, T, null);
+    const c = new Float64Array(2000);
+    for (let i = 0; i < 2000; i++) {
+      let need = 0;
+      for (let t = Y - 1; t >= T; t--) {
+        const fall = t > 0 && g[i * Y + t - 1] - 1 <= -0.15;
+        need = (fall ? after[t] : full[t]) + need / g[i * Y + t];
+      }
+      c[i] = need;
+    }
+    const ref = c.sort()[k] * (1 + 1e-9);
+    assert.ok(Math.abs(line[T] - ref) <= 1e-9 * Math.max(1, ref), `T=${T}: ${line[T]} vs ${ref}`);
   }
 });

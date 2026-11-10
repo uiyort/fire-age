@@ -205,30 +205,33 @@ const emptyReal = { mortgage: { monthly: null, endYear: null }, kids: { count: n
 test('events: default state has an empty real block and no events', () => {
   const S = defaultState(DATA);
   assert.deepEqual(S.real, emptyReal);
-  assert.deepEqual(eventsOf(S, 2026), []);
+  assert.deepEqual(eventsOf(S, DATA, 2026), []);
   assert.deepEqual(toParams(S, DATA, 2026).events, []);
 });
 
 test('events: eventsOf turns a mortgage and children into events, and drops finished ones', () => {
   const S = withReal({ mortgage: { monthly: 3000, endYear: 2046 }, kids: { count: 2, age: 6, monthly: 1500 } });
-  assert.deepEqual(eventsOf(S, 2026), [
-    { id: 'mortgage', amount: 36000, endAge: 55, nominal: true },
+  assert.deepEqual(eventsOf(S, DATA, 2026), [
+    { id: 'mortgage', amount: 36000, endAge: 56, nominal: true },
     { id: 'kids', amount: 36000, endAge: 51, nominal: false },
   ]);
-  assert.deepEqual(toParams(S, DATA, 2026).events, eventsOf(S, 2026));
+  assert.deepEqual(toParams(S, DATA, 2026).events, eventsOf(S, DATA, 2026));
   assert.deepEqual(eventsOf(withReal({ mortgage: { monthly: 3000, endYear: null }, kids: { count: 2, age: null, monthly: 1500 } }), 2026), []);
-  assert.deepEqual(eventsOf(withReal({ mortgage: { monthly: 3000, endYear: 2026 }, kids: { count: 1, age: 22, monthly: 1500 } }), 2026), []);
+  assert.deepEqual(eventsOf(withReal({ mortgage: { monthly: 3000, endYear: 2025 }, kids: { count: 1, age: 22, monthly: 1500 } }), DATA, 2026), []);
+  // "until 2026" still counts this year's payments
+  assert.deepEqual(eventsOf(withReal({ mortgage: { monthly: 3000, endYear: 2026 }, kids: emptyReal.kids }, { age: 35.4 }), DATA, 2026),
+    [{ id: 'mortgage', amount: 36000, endAge: 36, nominal: true }]);
 });
 
 test('events: lifeIssue speaks up when the payments do not fit, and events are dropped', () => {
   const big = withReal({ mortgage: { monthly: 6000, endYear: 2046 }, kids: { count: 2, age: 6, monthly: 3000 } });
-  assert.equal(lifeIssue(big), '月供和孩子的花销加起来超过了每月支出，请检查这两处');
-  assert.deepEqual(eventsOf(big, 2026), []);
+  assert.equal(lifeIssue(big, DATA), '月供和孩子的花销加起来超过了每月支出，请检查这两处');
+  assert.deepEqual(eventsOf(big, DATA, 2026), []);
   const ret = withReal({ mortgage: { monthly: 6000, endYear: 2046 }, kids: { count: 1, age: 6, monthly: 3000 } }, { expense: 240000, retExp: 60000 });
-  assert.equal(lifeIssue(ret), '退休后每月想花里也要算上月供和孩子的花销');
-  assert.deepEqual(eventsOf(ret, 2026), []);
-  assert.equal(lifeIssue(withReal({ mortgage: { monthly: 3000, endYear: 2046 }, kids: { count: 1, age: 6, monthly: 1000 } })), '');
-  assert.equal(lifeIssue(defaultState(DATA)), '');
+  assert.equal(lifeIssue(ret, DATA), '退休后每月想花里也要算上月供和孩子的花销');
+  assert.deepEqual(eventsOf(ret, DATA, 2026), []);
+  assert.equal(lifeIssue(withReal({ mortgage: { monthly: 3000, endYear: 2046 }, kids: { count: 1, age: 6, monthly: 1000 } }), DATA), '');
+  assert.equal(lifeIssue(defaultState(DATA), DATA), '');
 });
 
 test('events: an old save has empty events, and a bad real block reads as empty', () => {
@@ -240,4 +243,29 @@ test('events: an old save has empty events, and a bad real block reads as empty'
     assert.deepEqual(S.real, emptyReal);
     assert.deepEqual(toParams(S, DATA, 2026).events, []);
   }
+});
+
+test('events: payments in the work currency are compared with retirement spending in the same currency', () => {
+  const real = { mortgage: { monthly: 2000, endYear: 2046 }, kids: { count: 1, age: 6, monthly: 1500 } };
+  const S = withReal(real, { expense: 144000, retExp: 72000 });
+  assert.equal(lifeIssue(S, DATA), '');
+  for (const code of ['US', 'DE', 'UK', 'AU', 'CA', 'SG', 'MY']) {
+    if (!DATA.countries[code]) continue;
+    const abroad = setRetireCountry(S, code, DATA);
+    const inWork = { ...abroad, retExp: Math.round(estimateRetireSpend(144000, 'CN', code, DATA)) };
+    assert.equal(lifeIssue(inWork, DATA), '', code);
+    assert.equal(eventsOf(inWork, DATA, 2026).length, 2, code);
+  }
+});
+
+test('events: moving the work country converts the monthly payments', () => {
+  const real = { mortgage: { monthly: 3000, endYear: 2046 }, kids: { count: 2, age: 6, monthly: 1500 } };
+  const S = withReal(real);
+  const moved = setWorkCountry(S, 'US', DATA);
+  const k = fx(DATA.countries.US.cur) / fx(DATA.countries.CN.cur);
+  assert.equal(moved.real.mortgage.monthly, Math.round(3000 * k));
+  assert.equal(moved.real.kids.monthly, Math.round(1500 * k));
+  assert.equal(moved.real.mortgage.endYear, 2046);
+  assert.equal(moved.real.kids.count, 2);
+  assert.deepEqual(setWorkCountry(defaultState(DATA), 'US', DATA).real, emptyReal);
 });

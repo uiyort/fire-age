@@ -56,21 +56,24 @@ function realItems(S) {
   };
 }
 
-export function lifeIssue(S) {
+// The payments are in the work currency; retExp is in the retirement currency, so it is converted before comparing.
+export function lifeIssue(S, data) {
   const { mortgage, kids } = realItems(S);
   const monthly = ((mortgage?.yearly ?? 0) + (kids?.yearly ?? 0)) / 12;
   if (monthly <= 0) return '';
   if (monthly > (S.expense ?? 0) / 12) return '月供和孩子的花销加起来超过了每月支出，请检查这两处';
-  if (monthly > (S.retExp ?? 0) / 12) return '退休后每月想花里也要算上月供和孩子的花销';
+  const retW = convert(S.retExp ?? 0, curOf(data, S.retC), curOf(data, S.workC), data);
+  if (monthly > retW / 12) return '退休后每月想花里也要算上月供和孩子的花销';
   return '';
 }
 
-export function eventsOf(S, thisYear = new Date().getFullYear()) {
-  if (lifeIssue(S)) return [];
+// "Until year Y" means the payments continue through year Y, so they stop at the start of the year after.
+export function eventsOf(S, data, thisYear = new Date().getFullYear()) {
+  if (lifeIssue(S, data)) return [];
   const { mortgage, kids } = realItems(S);
   const out = [];
-  if (mortgage) out.push({ id: 'mortgage', amount: mortgage.yearly, endAge: S.age + (mortgage.endYear - thisYear), nominal: true });
-  if (kids) out.push({ id: 'kids', amount: kids.yearly, endAge: S.age + (22 - kids.age), nominal: false });
+  if (mortgage) out.push({ id: 'mortgage', amount: mortgage.yearly, endAge: Math.round(S.age) + (mortgage.endYear - thisYear) + 1, nominal: true });
+  if (kids) out.push({ id: 'kids', amount: kids.yearly, endAge: Math.round(S.age) + (22 - kids.age), nominal: false });
   return out.filter(e => e.endAge > S.age);
 }
 
@@ -159,6 +162,10 @@ export function setWorkCountry(S, code, data) {
     if (S[id] !== null) moved[id] = Math.round(convert(S[id], from, to, data));
   }
   if (!S.touched.retExp) moved.retExp = Math.round(estimateRetireSpend(moved.expense ?? 0, code, S.retC, data));
+  // The payments are work-currency money, like the other work-currency fields.
+  const r = cleanReal(S.real);
+  const conv = v => (v === null ? null : Math.round(convert(v, from, to, data)));
+  moved.real = { mortgage: { ...r.mortgage, monthly: conv(r.mortgage.monthly) }, kids: { ...r.kids, monthly: conv(r.kids.monthly) } };
   moved.lastValid = { ...S.lastValid, ...localAssumptions(country) };
   moved.touched = Object.fromEntries(Object.entries(S.touched).filter(([id]) => !ASSUMPTION_FIELDS.includes(id)));
   return moved;
@@ -187,7 +194,7 @@ export function toParams(S, data, thisYear = new Date().getFullYear()) {
   raw.selfPension = Math.max(raw.selfPension, 0);
   raw.selfMedical = Math.max(raw.selfMedical, 0);
   raw.selfPay = S.workC === 'CN' && raw.pension > 0 ? (raw.selfPension + raw.selfMedical) * 12 : 0;
-  raw.events = eventsOf(S, thisYear);
+  raw.events = eventsOf(S, data, thisYear);
   return buildParams(raw, fx);
 }
 
