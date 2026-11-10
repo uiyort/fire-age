@@ -93,7 +93,7 @@ test.describe('professional view open to all', () => {
   test('a first visit opens it straight away, with no lock and a note on what it holds', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('#to-pro')).toHaveText('专业');
-    await expect(page.locator('#mode-note')).toHaveText('专业版：改收益、通胀等全部假设');
+    await expect(page.locator('#mode-note')).toHaveText('专业版：全部假设，以及房贷、孩子、养老金');
     await page.click('#to-pro');
     await expect(page.locator('#pro-form')).toBeVisible();
     await expect(page.locator('#tiles')).toBeVisible();
@@ -166,7 +166,7 @@ test.describe('UI review fixes', () => {
 
   test('the view note stays when the view changes, and names the other view', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('#mode-note')).toHaveText('专业版：改收益、通胀等全部假设');
+    await expect(page.locator('#mode-note')).toHaveText('专业版：全部假设，以及房贷、孩子、养老金');
     await page.click('#to-pro');
     await expect(page.locator('#mode-note')).toBeVisible();
     await expect(page.locator('#mode-note')).toHaveText('简单版：只填几个数');

@@ -75,13 +75,34 @@ export function headlineText({ mode, p, t, odds = null, eightAge = null, dual, d
 // A pension starts late, so for an early holiday it often moves the date by months, not years.
 function pensionNote(p, { withPension: w, withoutPension: wo, gain }) {
   if (!(p.pension > 0)) return '填上养老金，看看能提前多少。';
+  if (w === null && wo !== null) return `算上养老金和社保自缴，反而到不了八成把握；不算养老金 ${wo} 岁。`;
   if (w === null) return '算上养老金也还到不了八成把握。';
   if (wo === null) return `算上养老金 ${w} 岁放假；不算养老金还到不了。`;
   if (w === p.age && wo === p.age) return '现在就能放假，养老金是额外的保障。';
+  if (w > wo) return `算上养老金 ${w} 岁，比不算养老金的 ${wo} 岁还晚：放假后自缴的社保，比养老金帮上的忙还多。`;
   const months = Math.round((gain ?? 0) * 12);
   if (months >= 12) return `算上养老金 ${w} 岁 / 不算养老金 ${wo} 岁`;
   if (months < 1) return `养老金 ${p.pAge} 岁才开始领，对 ${w} 岁放假几乎没有影响。`;
   return `养老金 ${p.pAge} 岁才开始领，只让放假提前 ${months} 个月。`;
+}
+
+// The estimate under the pension field: the statutory age, the two parts and their sum, and the settings this tool made.
+// result comes from estimateFromForm (null until a birth month and a base are filled in).
+export function pensionEstimateHtml(result, { used = false } = {}) {
+  if (!result) return '<p class="fine">填上出生年月和当地的计发基数，这里就会出现估算。</p>';
+  const { st, est, years, claimAge } = result;
+  const age = `${st.years} 岁${st.months > 0 ? ` ${st.months} 个月` : ''}`;
+  const money = v => wholeMoney(Number.isFinite(v) ? v : 0, 'CNY');
+  const body = est.eligible
+    ? `<div class="pen-sum"><span>基础养老金 <b>${money(est.basic)}</b>/月</span><span>个人账户养老金 <b>${money(est.personal)}</b>/月</span><span>合计 <b>${money(est.monthly)}</b>/月</span></div>
+       <p class="fine">按累计缴费 ${years} 年算，今天的钱。法定领取年龄 ${age}，模型里按 ${claimAge} 岁开始领。</p>
+       ${used ? '<p class="fine pen-used">已填进上面的养老金和领取年龄。</p>' : '<button type="button" class="primary" data-pen-use>用这个结果</button>'}`
+    : `<p class="pen-short">累计缴费不满 ${est.minYears ?? '最低'} 年，不能按月领取，这里按 0 算。</p>
+       <p class="fine">法定领取年龄 ${age}。</p>`;
+  return `${body}<div class="pen-set"><b>本工具设定</b><ul>
+    <li>计发基数按今天的钱算，只跟物价涨；个人账户记账利率与通胀持平。</li>
+    <li>累计缴费年限默认“已缴年数 + 距领取的年数”，可以改。</li>
+    <li>领取年龄不是整岁时，向上取整岁放进模型，计发月数按已满的整岁查表。</li></ul></div>`;
 }
 
 export function statusPill(success) {

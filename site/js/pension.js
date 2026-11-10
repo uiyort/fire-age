@@ -40,6 +40,7 @@ export const PAYOUT_MONTHS = {
 };
 
 export function payoutMonths(age) {
+  if (typeof age !== 'number' || !Number.isFinite(age)) return null;
   const a = Math.min(70, Math.max(40, Math.floor(age)));
   return PAYOUT_MONTHS[a];
 }
@@ -50,13 +51,34 @@ export function claimAgeWhole({ years, months }) {
 }
 
 // Estimate in today's money. base = social average wage (editable), index = personal wage index.
-export function estimatePension({ base, index, years, paidYears, account, claimAge, claimYear }) {
-  const minYears = minContribYears(claimYear);
-  const eligible = years >= minYears;
-  const basic = base * (1 + index) / 2 * years * 0.01;
-  const future = base * index * 0.08 * 12 * Math.max(years - paidYears, 0);
-  const personal = (account + future) / payoutMonths(claimAge);
+export function estimatePension({ base, index, years, paidYears, account, claimAge, claimYear } = {}) {
+  const minYears = Number.isFinite(claimYear) ? minContribYears(claimYear) : null;
+  const none = { eligible: false, basic: 0, personal: 0, monthly: 0, minYears };
+  if (![base, index, years, claimAge, claimYear].every(Number.isFinite)) return none;
+  const months = payoutMonths(claimAge);
+  const y = Math.max(years, 0);
+  const paid = Number.isFinite(paidYears) ? paidYears : 0;
+  const eligible = y >= minYears;
+  const basic = base * (1 + index) / 2 * y * 0.01;
+  const future = base * index * 0.08 * 12 * Math.max(y - paid, 0);
+  const personal = ((Number.isFinite(account) ? account : 0) + future) / months;
   return { eligible, basic, personal, monthly: eligible ? basic + personal : 0, minYears };
+}
+
+// The estimate a form asks for: null until a birth month and a base are filled in. years left blank defaults to
+// the years already paid plus the whole years still to go before the statutory age (this tool's setting).
+export function estimateFromForm(pen, nowYear) {
+  const m = /^(\d{4})-(\d{2})$/.exec(pen?.birth ?? '');
+  if (!m || !(pen.base > 0)) return null;
+  const st = statutoryAge({ birthYear: Number(m[1]), birthMonth: Number(m[2]), kind: pen.kind });
+  if (!st) return null;
+  const claimAge = claimAgeWhole(st);
+  const paid = pen.paidYears > 0 ? pen.paidYears : 0;
+  const defaultYears = Math.max(paid + (st.claimYear - nowYear), 0);
+  const years = pen.years === null || pen.years === undefined ? defaultYears : pen.years;
+  const index = Number.isFinite(pen.index) ? pen.index : 1;
+  const est = estimatePension({ base: pen.base, index, years, paidYears: paid, account: pen.account ?? 0, claimAge, claimYear: st.claimYear });
+  return { st, claimAge, years, defaultYears, est, selfPay: selfPayDefault(pen.base) };
 }
 
 // Default self-paid monthly contribution for flexible workers: 20% of the 60% floor of the base.

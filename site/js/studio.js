@@ -60,7 +60,7 @@ function passInput(p, t, mc, type, persona, data) {
     years: mc.bands?.map(b => b[2]) ?? [],
     lever: personalLever(rankLevers(p, data, { retC: persona.retC, top: 6 }), p, v => money(Math.round(v), p.wCur)),
     odds: t === null ? '' : '八成把握',
-    assumptions: assumptionLine({ r: p.r, pension: p.pension }),
+    assumptions: assumptionLine({ r: p.r, pension: p.pension, selfPay: p.selfPay }),
     // Studio images are posted by the author: worked examples, never an invitation to search.
     search: false,
     example: true,

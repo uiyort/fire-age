@@ -6,6 +6,43 @@ const MONEY_FIELDS = ['assets', 'income', 'expense', 'retExp', 'pension', 'selfP
 const ASSUMPTION_FIELDS = ['infl', 'bondY', 'drag', 'pAge'];
 const NUMERIC_FIELDS = [...MONEY_FIELDS, 'selfPension', 'selfMedical', 'age', 'growth', 'life', 'pAge', 'tAge', 'eq', 'eqReal', 'bondY', 'infl', 'drag', 'fxDrift', 'swr', 'sigEq', 'sigBd', 'rho', 'flexCut'];
 
+// What the pension estimate asks for. Numbers may be blank; index defaults to 1 and stays between 0.6 and 3.
+export const PEN_DEFAULT = { birth: '', kind: 'm', paidYears: null, years: null, account: null, base: null, index: 1 };
+const PEN_KINDS = ['m', 'f55', 'f50'];
+const penNum = (v, max = Infinity) => {
+  if (v === null || v === undefined || String(v).trim() === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(Math.max(n, 0), max) : null;
+};
+export function cleanPen(raw) {
+  const t = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const index = penNum(t.index);
+  const base = penNum(t.base);
+  return {
+    birth: typeof t.birth === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(t.birth) ? t.birth : '',
+    kind: PEN_KINDS.includes(t.kind) ? t.kind : 'm',
+    paidYears: penNum(t.paidYears, 60),
+    years: penNum(t.years, 60),
+    account: penNum(t.account),
+    base: base > 0 ? base : null,
+    index: index === null ? 1 : Math.min(Math.max(index, 0.6), 3),
+  };
+}
+
+export const setPen = (S, change) => ({ ...S, pen: cleanPen({ ...S.pen, ...change }) });
+
+// "Use this result": the monthly estimate (yuan, today's money) becomes the yearly pension in the retirement
+// currency, the whole-year claim age becomes the pension age, and self-paid insurance gets its default if blank.
+export function applyPensionEstimate(S, { monthly, claimAge, selfPay }, data) {
+  const pension = Math.round(convert(monthly * 12, curOf(data, 'CN'), curOf(data, S.retC), data));
+  const next = { ...S, pension, pAge: claimAge, touched: { ...S.touched, pAge: true }, lastValid: { ...S.lastValid, pension, pAge: claimAge } };
+  if (S.selfPension === null || S.selfPension === undefined) {
+    next.selfPension = Math.round(selfPay);
+    next.lastValid.selfPension = next.selfPension;
+  }
+  return next;
+}
+
 const fxOf = (data, cur) => (cur === 'USD' ? 1 : data.fx[cur].value);
 const curOf = (data, code) => data.countries[code].cur;
 const convert = (v, fromCur, toCur, data) => v / fxOf(data, fromCur) * fxOf(data, toCur);
@@ -31,7 +68,7 @@ export function defaultState(data) {
   };
   return {
     view: 'simple', mode: 'fwd', workC: 'CN', retC: 'CN', dispCur: 'CNY',
-    autoSwr: true, touched: {}, notice: '', town: { name: '', monthly: null },
+    autoSwr: true, touched: {}, notice: '', town: { name: '', monthly: null }, pen: { ...PEN_DEFAULT },
     ...values,
     lastValid: Object.fromEntries(Object.entries(values).filter(([, v]) => v !== null)),
   };
@@ -102,6 +139,8 @@ export function toParams(S, data) {
   const fx = { USD: 1 };
   for (const [cur, field] of Object.entries(data.fx)) fx[cur] = field.value;
   // Self-paid pension and medical insurance (monthly inputs) only count in mainland China with a pension on file.
+  raw.selfPension = Math.max(raw.selfPension, 0);
+  raw.selfMedical = Math.max(raw.selfMedical, 0);
   raw.selfPay = S.workC === 'CN' && raw.pension > 0 ? (raw.selfPension + raw.selfMedical) * 12 : 0;
   return buildParams(raw, fx);
 }
@@ -139,7 +178,7 @@ export function loadState(data, storage) {
     // Assumptions nobody edited follow the current month's data rather than the saved copy.
     const local = localAssumptions(data.countries[saved.workC]);
     const fresh = Object.fromEntries(ASSUMPTION_FIELDS.filter(id => !touched[id]).map(id => [id, local[id]]));
-    return { ...base, ...saved, ...fresh, town: cleanTown(saved.town), dispCur: dispOk ? saved.dispCur : base.dispCur, lastValid: { ...base.lastValid, ...saved.lastValid, ...fresh }, touched };
+    return { ...base, ...saved, ...fresh, town: cleanTown(saved.town), pen: cleanPen(saved.pen), dispCur: dispOk ? saved.dispCur : base.dispCur, lastValid: { ...base.lastValid, ...saved.lastValid, ...fresh }, touched };
   } catch {
     return base;
   }

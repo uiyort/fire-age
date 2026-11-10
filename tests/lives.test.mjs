@@ -445,3 +445,13 @@ test('a written life told only in money says it has an amount, so a card without
   assert.equal(fifthBrief(story({ endAssets: 5770000 }), story({ endAssets: 1880000 }), D).amount, true);
   assert.equal(fifthBrief(story({ outcome: 'ruined', ruinAge: 71 }), story({ outcome: 'lasted' }), D).amount, undefined);
 });
+
+test('the pension line says so plainly when pension plus self-pay makes the holiday later than no pension', async () => {
+  const { headlineText } = await import('../site/js/views.js');
+  const p = toParams(setField(defaultState(DATA), 'pension', '36000'), DATA);
+  const note = dual => headlineText({ mode: 'fwd', p, t: 10, bwd: bwdSolve(p), dual, dispCur: 'CNY' }).note;
+  const later = note({ withPension: 47, withoutPension: 45, gain: -2 });
+  assert.match(later, /^算上养老金 47 岁，比不算养老金的 45 岁还晚/);
+  assert.ok(!/NaN|undefined|null/.test(later));
+  assert.match(note({ withPension: null, withoutPension: 45, gain: null }), /不算养老金 45 岁/);
+});

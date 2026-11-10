@@ -157,3 +157,42 @@ test('selfPay: zero without a pension, for old saves, and when working in the US
   us = setField(setField(setField(us, 'pension', '36000'), 'selfPension', '1200'), 'selfMedical', '300');
   assert.equal(toParams(us, DATA).selfPay, 0);
 });
+
+test('pen: defaults, old saves, and cleaning', async () => {
+  const { setPen } = await import('../site/js/state.js');
+  const d = defaultState(DATA);
+  assert.deepEqual(d.pen, { birth: '', kind: 'm', paidYears: null, years: null, account: null, base: null, index: 1 });
+  const old = loadState(DATA, { getItem: () => JSON.stringify({ workC: 'CN', retC: 'CN', dispCur: 'CNY', pension: 36000 }) });
+  assert.deepEqual(old.pen, d.pen);
+  const half = loadState(DATA, { getItem: () => JSON.stringify({ workC: 'CN', retC: 'CN', dispCur: 'CNY', pen: { birth: '1996-06', index: 'x', kind: 'zz' } }) });
+  assert.deepEqual(half.pen, { ...d.pen, birth: '1996-06' });
+  let s = setPen(d, { birth: '1996-06', paidYears: '8', account: '60000', base: '8000', index: '5' });
+  assert.deepEqual(s.pen, { birth: '1996-06', kind: 'm', paidYears: 8, years: null, account: 60000, base: 8000, index: 3 });
+  s = setPen(s, { index: '0.1', years: '10', birth: 'bad', kind: 'f50', paidYears: '' });
+  assert.equal(s.pen.index, 0.6);
+  assert.equal(s.pen.years, 10);
+  assert.equal(s.pen.birth, '');
+  assert.equal(s.pen.kind, 'f50');
+  assert.equal(s.pen.paidYears, null);
+  assert.equal(setPen(d, { index: '' }).pen.index, 1);
+});
+
+test('selfPay: a negative entry counts as zero', () => {
+  let s = setField(defaultState(DATA), 'pension', '36000');
+  s = setField(setField(s, 'selfPension', '-500'), 'selfMedical', '300');
+  assert.equal(toParams(s, DATA).selfPay, 3600);
+  assert.equal(toParams(s, DATA).selfPension, 0);
+});
+
+test('using a pension estimate writes the yearly pension in the retirement currency, the age, and the default self-pay', async () => {
+  const { applyPensionEstimate } = await import('../site/js/state.js');
+  let s = applyPensionEstimate(defaultState(DATA), { monthly: 5959, claimAge: 63, selfPay: 960 }, DATA);
+  assert.equal(s.pension, 71508);
+  assert.equal(s.pAge, 63);
+  assert.equal(s.selfPension, 960);
+  assert.equal(s.touched.pAge, true);
+  s = applyPensionEstimate(setField(defaultState(DATA), 'selfPension', '0'), { monthly: 5959, claimAge: 63, selfPay: 960 }, DATA);
+  assert.equal(s.selfPension, 0);
+  const my = applyPensionEstimate(setRetireCountry(defaultState(DATA), 'MY', DATA), { monthly: 5000, claimAge: 63, selfPay: 960 }, DATA);
+  assert.equal(my.pension, Math.round(60000 / fx('CNY') * fx('MYR')));
+});

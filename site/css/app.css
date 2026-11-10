@@ -445,3 +445,15 @@ body.intro .mode-note, body.intro .legend-note { display: none; }
 .town-row label { display: grid; gap: 4px; font-size: 13px; color: var(--ink-2); }
 .town-line { margin: 10px 0 0; font-weight: 700; }
 #town-result:empty { display: none; }
+.pen-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }
+.pen-grid label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--ink-2); min-width: 0; }
+.pen-grid input, .pen-grid select { width: 100%; min-width: 0; padding: 8px; font: inherit; font-size: 14px; }
+.pen-result { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.pen-sum { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--ink-2); }
+.pen-sum b { color: var(--ink); font-family: var(--f-mono); }
+.pen-short { margin: 0; font-weight: 700; color: var(--ink); font-size: 13px; }
+.pen-set { font-size: 12px; color: var(--ink-3); }
+.pen-set ul { margin: 2px 0 0; padding-left: 18px; }
+.pen-used { color: var(--ink-2); }
+.pen-result .fine { margin: 0; }
+#pen-age-s { grid-column: 1 / -1; margin: -4px 0 0; }

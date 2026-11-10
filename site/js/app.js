@@ -3,7 +3,8 @@ import DATA from './data-latest.js';
 import { DEFAULT_SEED, bwdSolve, monteCarlo, walkPath } from './engine.js';
 import { bwdOdds, decilePaths, dualOdds, extendRow, needLine, oddsRuler, oddsSolve, oddsYears, successAt } from './odds.js';
 import { hardestIndex, heroModel, holidayType, oddsText, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking, townPlan, cardPlace } from './holiday.js';
-import { commitField, defaultState, loadState, missingFields, saveState, safeStorage, setField, setRetireCountry, setTown, setWorkCountry, toParams } from './state.js';
+import { applyPensionEstimate, commitField, defaultState, loadState, missingFields, saveState, safeStorage, setField, setPen, setRetireCountry, setTown, setWorkCountry, toParams } from './state.js';
+import { estimateFromForm } from './pension.js';
 import { labPlan, lifeChoices, personalLever, rankLevers, impactOf, smallStep, tryRange } from './levers.js';
 import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody } from './scenario.js';
 import { PARAMS, PARAM_GROUPS } from './params.js';
@@ -13,7 +14,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { assumptionLine, renderCard, summaryCardSpec, typeCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
+  allTypesHtml, cardBody, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -155,6 +156,8 @@ const SIMPLE_FIELDS = [
   ] },
   { legend: '养老金（可以不填）', fields: [
     { id: 'pension', label: '预计每月养老金', unit: 'retire', monthly: true, step: 500, full: true },
+    { id: 'selfPension', label: '放假后每月自缴养老保险', unit: 'work', step: 100, min: 0, full: true, cnPension: true },
+    { id: 'selfMedical', label: '放假后每月自缴医保', unit: 'work', step: 100, min: 0, full: true, cnPension: true, note: '各地不同，缴满当地规定的年限后可以停，这里一直算到领取养老金那年。' },
     { id: 'tAge', elementId: 's-tage', label: '想几岁放假', unit: '岁', bwdOnly: true, full: true },
   ] },
 ];
@@ -177,6 +180,8 @@ const PRO_FIELDS = [
     { id: 'life', label: '规划到', unit: '岁' },
     { id: 'pension', label: '养老金/年', unit: 'retire', step: 1000 },
     { id: 'pAge', label: '领取年龄', unit: '岁' },
+    { id: 'selfPension', label: '放假后每月自缴养老保险', unit: 'work', step: 100, min: 0, full: true, cnPension: true },
+    { id: 'selfMedical', label: '放假后每月自缴医保', unit: 'work', step: 100, min: 0, full: true, cnPension: true, note: '各地不同，缴满当地规定的年限后可以停，这里一直算到领取养老金那年。' },
     { id: 'tAge', label: '目标放假年龄', unit: '岁', bwdOnly: true, full: true },
   ] },
   { legend: '收益假设', fields: [
@@ -204,10 +209,57 @@ function fieldHtml(prefix, f) {
   const unit = f.unit ? `<span class="u" data-unit="${f.unit}">${f.unit}</span>` : '';
   const control = f.select
     ? `<select id="${id}"></select>`
-    : `<input type="number" inputmode="decimal" id="${id}" step="${f.step ?? 1}">`;
-  const wrap = `<div class="${cls}"${f.bwdOnly ? ' data-bwd-only' : ''}><div class="lab"><label for="${id}">${f.label} ${unit}</label>${help}</div>${control}</div>`;
-  const split = id === 's-expense' ? SPLIT_HTML : '';
-  return (hasCard ? `${wrap}<div class="lcard" id="card-${f.id}" hidden></div>` : wrap) + split;
+    : `<input type="number" inputmode="decimal" id="${id}" step="${f.step ?? 1}"${f.min === undefined ? '' : ` min="${f.min}"`}>`;
+  const flags = `${f.bwdOnly ? ' data-bwd-only' : ''}${f.cnPension ? ' data-cn-pension' : ''}`;
+  const note = f.note ? `<p class="fine">${f.note}</p>` : '';
+  const wrap = `<div class="${cls}"${flags}><div class="lab"><label for="${id}">${f.label} ${unit}</label>${help}</div>${control}${note}</div>`;
+  const extra = id === 's-expense' ? SPLIT_HTML : f.id === 'pension' ? penFoldHtml(prefix) : '';
+  return (hasCard ? `${wrap}<div class="lcard" id="card-${f.id}" hidden></div>` : wrap) + extra;
+}
+
+// The pension estimate: a fold under the pension field, only for people who work in mainland China.
+const PEN_INPUTS = [
+  ['birth', 'birth', '出生年月', '<input type="month" id="pen-@-birth">'],
+  ['kind', 'kind', '类别', '<select id="pen-@-kind"><option value="m">男（原 60 岁退休）</option><option value="f55">女（原 55 岁退休）</option><option value="f50">女（原 50 岁退休）</option></select>'],
+  ['paidYears', 'paid', '已缴几年', '<input type="number" inputmode="decimal" id="pen-@-paid" step="1" min="0">'],
+  ['years', 'years', '到领取时累计缴费几年', '<input type="number" inputmode="decimal" id="pen-@-years" step="1" min="0">'],
+  ['account', 'account', '个人账户余额（元）', '<input type="number" inputmode="decimal" id="pen-@-account" step="1000" min="0">'],
+  ['base', 'base', '当地养老金计发基数（元/月）', '<input type="number" inputmode="decimal" id="pen-@-base" step="100" min="0">'],
+  ['index', 'index', '平均缴费指数（0.6 到 3）', '<input type="number" inputmode="decimal" id="pen-@-index" step="0.1" min="0.6" max="3">'],
+];
+function penFoldHtml(prefix) {
+  const grid = PEN_INPUTS.map(([, , name, input]) => `<label>${name}${input.replace('@', prefix)}</label>`).join('');
+  return `<details class="split pen" id="pen-fold-${prefix}" data-cn-only><summary>不知道？估一下</summary><div class="pen-grid">${grid}</div>
+    <p class="fine">计发基数在当地人社局网站，或 12333、国家社会保险公共服务平台查“养老金计发基数”。</p>
+    <div class="pen-result" id="pen-result-${prefix}"></div></details>${prefix === 's' ? '<p class="fine" id="pen-age-s" hidden></p>' : ''}`;
+}
+
+const penEstimate = () => estimateFromForm(S.pen, new Date().getFullYear());
+
+// Writes the estimate fields from state, then the result under each form; the person's own typing is left alone.
+function renderPen() {
+  const est = penEstimate();
+  for (const prefix of ['s', 'p']) {
+    for (const [key, short] of PEN_INPUTS) {
+      const el = $(`pen-${prefix}-${short}`);
+      if (!el || el === document.activeElement) continue;
+      el.value = S.pen[key] ?? '';
+    }
+    const years = $(`pen-${prefix}-years`);
+    if (years) years.placeholder = est ? `默认 ${est.defaultYears}` : '';
+    const out = $(`pen-result-${prefix}`);
+    if (!out) continue;
+    const used = Boolean(est) && est.est.eligible && (() => {
+      const q = applyPensionEstimate(S, { monthly: est.est.monthly, claimAge: est.claimAge, selfPay: est.selfPay }, DATA);
+      return q.pension === S.pension && q.pAge === S.pAge;
+    })();
+    out.innerHTML = pensionEstimateHtml(est, { used });
+  }
+  const age = $('pen-age-s');
+  if (age) {
+    age.hidden = !(S.pension > 0);
+    age.textContent = `领取年龄 ${S.pAge} 岁，专业版里可以改。`;
+  }
 }
 
 // Monthly spending is hard to guess as one number, so it can be added up from three parts.
@@ -270,13 +322,15 @@ function syncChrome(p) {
   document.querySelectorAll('[data-unit="work"]').forEach(e => { e.textContent = p.wCur; });
   document.querySelectorAll('[data-unit="retire"]').forEach(e => { e.textContent = p.rCur; });
   document.querySelectorAll('[data-bwd-only]').forEach(e => { e.hidden = S.mode !== 'bwd'; });
+  document.querySelectorAll('[data-cn-only]').forEach(e => { e.hidden = S.workC !== 'CN'; });
+  document.querySelectorAll('[data-cn-pension]').forEach(e => { e.hidden = !(S.workC === 'CN' && S.pension > 0); });
   document.querySelectorAll('.pro-only').forEach(e => { e.hidden = S.view !== 'pro'; });
   document.querySelectorAll('.simple-only').forEach(e => { e.hidden = S.view !== 'simple'; });
   $('simple-form').hidden = S.view !== 'simple';
   $('pro-form').hidden = S.view !== 'pro';
   $('solve-card').hidden = S.mode !== 'bwd';
   // The note names the other view, so it stays in place when the view changes.
-  $('mode-note').textContent = S.view === 'simple' ? '专业版：改收益、通胀等全部假设' : '简单版：只填几个数';
+  $('mode-note').textContent = S.view === 'simple' ? '专业版：全部假设，以及房贷、孩子、养老金' : '简单版：只填几个数';
   // The "example" label holds only while the numbers are still the examples.
   const start = defaultState(DATA);
   const example = ['age', 'assets', 'income', 'expense'].every(k => S[k] === start[k]);
@@ -324,6 +378,7 @@ function renderFast() {
 
   syncChrome(p);
   syncInputs();
+  renderPen();
   renderEstimate(p);
   const eightAge = t === null ? null : p.age + t;
   const { say, note } = headlineText({ mode: S.mode, p, t, odds, eightAge, dual, dispCur: cur, view: S.view });
@@ -651,6 +706,15 @@ const sumText = sum => {
 };
 function onInput(ev) {
   const el = ev.target;
+  if (el.closest?.('.pen')) {
+    const short = /^pen-[sp]-(\w+)$/.exec(el.id)?.[1];
+    const key = PEN_INPUTS.find(row => row[1] === short)?.[0];
+    if (!key) return;
+    S = setPen(S, { [key]: el.value });
+    saveState(S, storage);
+    renderPen();
+    return;
+  }
   if (el.closest?.('#expense-split')) {
     const parts = SPLIT_PARTS.map(([key]) => $(`split-${key}`).value);
     if (parts.every(v => v === '')) return;
@@ -795,7 +859,7 @@ function summaryInput() {
     lever: personalLever(rankLevers(p, DATA, { retC: S.retC, top: 6 }), p, v => money(Math.round(toDisplay(v, p, cur)), cur)),
     // Forward, the age is the 8-in-10 age; working backward, the card says the odds of the plan as it is.
     odds: !hero.reachable ? '' : mode === 'bwd' ? oddsText(hero.success) : '八成把握',
-    assumptions: assumptionLine({ r: p.r, pension: p.pension }),
+    assumptions: assumptionLine({ r: p.r, pension: p.pension, selfPay: p.selfPay }),
     privacy: { money: $('card-money').checked, now: $('card-now').checked },
   };
 }
@@ -844,6 +908,15 @@ function download(name, type, text) {
 }
 
 function onClick(ev) {
+  if (ev.target.closest?.('[data-pen-use]')) {
+    const est = penEstimate();
+    if (!est?.est.eligible) return;
+    S = applyPensionEstimate(S, { monthly: est.est.monthly, claimAge: est.claimAge, selfPay: est.selfPay }, DATA);
+    labValues = {};
+    countCalculation();
+    refresh();
+    return;
+  }
   if (ev.target.id === 'export-csv' || ev.target.id === 'export-json') {
     if (stopAtBlank()) return;
     track('export_data');
@@ -990,6 +1063,7 @@ function init() {
       if (!$('share-panel').hidden && flushSimulation()) showCard(cardSpec(), { scroll: false });
       return;
     }
+    if (ev.target.closest?.('.pen')) return;
     if (ev.target.tagName === 'SELECT') {
       onSelect(ev);
       return;

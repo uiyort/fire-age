@@ -90,3 +90,15 @@ test('volatility moves the holiday age, because the age is counted by the odds',
 test('every card has an impact description that does not crash', () => {
   for (const c of PARAMS) assert.ok(impactOf(p(), c.id).stepLabel, c.id);
 });
+
+test('a what-if that sets the pension to 0 also drops the self-paid insurance', async () => {
+  const { labPlan, tryParam } = await import('../site/js/levers.js');
+  let s = setField(defaultState(DATA), 'pension', '36000');
+  s = setField(setField(s, 'selfPension', '1000'), 'selfMedical', '200');
+  const p = toParams(s, DATA);
+  assert.equal(p.selfPay, 14400);
+  assert.equal(labPlan(p, { values: { pension: 0 } }).selfPay, 0);
+  assert.equal(labPlan(p, { values: { pension: 50000 } }).selfPay, 14400);
+  const bare = toParams(setField(defaultState(DATA), 'pension', ''), DATA);
+  assert.equal(tryParam(p, 'pension', 0).age, tryParam(bare, 'pension', 0).age);
+});

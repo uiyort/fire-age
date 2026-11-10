@@ -80,3 +80,59 @@ test('estimatePension', () => {
 test('selfPayDefault', () => {
   assert.equal(selfPayDefault(8000), 960);
 });
+
+test('statutoryAge: edge months and bad input', () => {
+  assert.equal(statutoryAge({ birthYear: 1976, birthMonth: 11, kind: 'm' }).claimYear, 2039);
+  assert.equal(statutoryAge({ birthYear: 1990, birthMonth: 13, kind: 'm' }), null);
+  assert.equal(statutoryAge({ birthYear: 1990, birthMonth: 0, kind: 'm' }), null);
+});
+
+test('payoutMonths returns null unless the age is a finite number', () => {
+  assert.equal(payoutMonths(null), null);
+  assert.equal(payoutMonths(undefined), null);
+  assert.equal(payoutMonths(NaN), null);
+  assert.equal(payoutMonths(Infinity), null);
+  assert.equal(payoutMonths(63), 117);
+});
+
+test('estimatePension: missing or non-finite inputs give a zero estimate, never NaN', () => {
+  const ok = { base: 8000, index: 1, years: 30, paidYears: 10, account: 100000, claimAge: 63, claimYear: 2053 };
+  for (const key of ['base', 'index', 'years', 'claimAge', 'claimYear']) {
+    for (const bad of [undefined, null, NaN, Infinity]) {
+      const r = estimatePension({ ...ok, [key]: bad });
+      assert.equal(r.eligible, false, `${key}=${bad}`);
+      assert.equal(r.monthly, 0);
+      assert.equal(r.basic, 0);
+      assert.equal(r.personal, 0);
+      assert.ok(r.minYears === null || Number.isFinite(r.minYears));
+    }
+  }
+  assert.equal(estimatePension({ ...ok, claimYear: null }).minYears, null);
+  assert.equal(estimatePension({ ...ok, base: null }).minYears, 20);
+});
+
+test('estimatePension: a missing paidYears or account counts as 0, negative years clamp to 0', () => {
+  const ok = { base: 8000, index: 1, years: 30, claimAge: 63, claimYear: 2053 };
+  const r = estimatePension({ ...ok, paidYears: undefined, account: undefined });
+  assert.ok(Number.isFinite(r.personal) && r.personal > 0);
+  assert.equal(r.personal, estimatePension({ ...ok, paidYears: 0, account: 0 }).personal);
+  const neg = estimatePension({ ...ok, years: -5, paidYears: 0, account: 0 });
+  assert.equal(neg.eligible, false);
+  assert.equal(neg.basic, 0);
+  assert.equal(neg.monthly, 0);
+});
+
+test('estimateFromForm: waits for a birth month and a base, and defaults the years', async () => {
+  const { estimateFromForm } = await import('../site/js/pension.js');
+  assert.equal(estimateFromForm({ birth: '', base: 8000, kind: 'm' }, 2026), null);
+  assert.equal(estimateFromForm({ birth: '1996-06', base: null, kind: 'm' }, 2026), null);
+  assert.equal(estimateFromForm({ birth: '1996-13', base: 8000, kind: 'm' }, 2026), null);
+  const r = estimateFromForm({ birth: '1996-06', kind: 'm', paidYears: 8, years: null, account: 60000, base: 8000, index: 1 }, 2026);
+  assert.equal(r.st.years, 63);
+  assert.equal(r.claimAge, 63);
+  assert.equal(r.defaultYears, 41);
+  assert.equal(r.est.eligible, true);
+  assert.equal(Math.round(r.est.basic), 3280);
+  assert.equal(r.selfPay, 960);
+  assert.equal(estimateFromForm({ birth: '1996-06', kind: 'm', paidYears: 8, years: 10, base: 8000, index: 1 }, 2026).est.eligible, false);
+});

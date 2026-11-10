@@ -342,3 +342,11 @@ test('a six-character typed town still fits on the share card', () => {
   const line = JSON.stringify(s);
   assert.ok(line.includes('一二三四五六'));
 });
+
+test('the third assumption item: no pension, pension without self-pay, pension with self-pay', () => {
+  assert.match(assumptionLine({ r: 0.029, pension: 0, selfPay: 0 }), /未算养老金 \/ 社保自缴$/);
+  assert.match(assumptionLine({ r: 0.029, pension: 36000, selfPay: 0 }), /含养老金 · 未算社保自缴$/);
+  assert.match(assumptionLine({ r: 0.029, pension: 36000, selfPay: 14400 }), /含养老金和社保自缴$/);
+  assert.match(assumptionLine({ r: 0.029, pension: 0, selfPay: 14400 }), /未算养老金 \/ 社保自缴$/);
+  assert.match(assumptionLine({ r: 0.029, pension: 36000 }), /含养老金 · 未算社保自缴$/);
+});

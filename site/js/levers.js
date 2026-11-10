@@ -2,7 +2,11 @@
 import { buildParams, fwdSolve, swrFor } from './engine.js';
 import { oddsSolve, oddsYears, successAt } from './odds.js';
 
-const rebuild = (p, changes) => buildParams({ ...p, ...changes }, p.fx);
+// A what-if with no pension has no self-paid insurance either: that cost only counts alongside a pension.
+const rebuild = (p, changes) => {
+  const q = { ...p, ...changes };
+  return buildParams(q.pension > 0 ? q : { ...q, selfPay: 0 }, p.fx);
+};
 
 function leverCandidates(p, data, retC) {
   const out = [

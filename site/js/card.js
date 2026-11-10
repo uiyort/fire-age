@@ -18,9 +18,9 @@ const GROUP_STAMPS = {
   环球派: { shape: 'ticket', ink: '#d9a8ff' },
 };
 
-// The assumptions a number on the card rests on, in three short items. A pension changes the third.
-export function assumptionLine({ r, pension }) {
-  const left = pension > 0 ? '含养老金 · 未算社保自缴' : '未算养老金 / 社保自缴';
+// The assumptions a number on the card rests on, in three short items. A pension, and self-paid insurance, change the third.
+export function assumptionLine({ r, pension, selfPay = 0 }) {
+  const left = !(pension > 0) ? '未算养老金 / 社保自缴' : selfPay > 0 ? '含养老金和社保自缴' : '含养老金 · 未算社保自缴';
   return `按今天的钱算 · 实际收益 ${pct(r, 1)}/年 · ${left}`;
 }
 
