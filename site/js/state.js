@@ -2,9 +2,9 @@
 import { buildParams, longRunInflation } from './engine.js';
 
 const STORAGE_KEY = 'fire-age-v1';
-const MONEY_FIELDS = ['assets', 'income', 'expense', 'retExp', 'pension'];
+const MONEY_FIELDS = ['assets', 'income', 'expense', 'retExp', 'pension', 'selfPension', 'selfMedical'];
 const ASSUMPTION_FIELDS = ['infl', 'bondY', 'drag', 'pAge'];
-const NUMERIC_FIELDS = [...MONEY_FIELDS, 'age', 'growth', 'life', 'pAge', 'tAge', 'eq', 'eqReal', 'bondY', 'infl', 'drag', 'fxDrift', 'swr', 'sigEq', 'sigBd', 'rho', 'flexCut'];
+const NUMERIC_FIELDS = [...MONEY_FIELDS, 'selfPension', 'selfMedical', 'age', 'growth', 'life', 'pAge', 'tAge', 'eq', 'eqReal', 'bondY', 'infl', 'drag', 'fxDrift', 'swr', 'sigEq', 'sigBd', 'rho', 'flexCut'];
 
 const fxOf = (data, cur) => (cur === 'USD' ? 1 : data.fx[cur].value);
 const curOf = (data, code) => data.countries[code].cur;
@@ -24,7 +24,7 @@ export function defaultState(data) {
     // Example numbers at an ordinary level, labelled as examples on the page: take-home ¥12,000 a month,
     // spending ¥6,000, ¥200,000 saved.
     age: 30, assets: 200000, income: 144000, expense: 72000, growth: 2,
-    retExp: 72000, life: 95, pension: null, tAge: 45,
+    retExp: 72000, life: 95, pension: null, tAge: 45, selfPension: null, selfMedical: null,
     eq: 60, eqReal: 5, fxDrift: 0, swr: 3.9,
     sigEq: 0.17, sigBd: 0.06, rho: 0.2, flexCut: 0,
     ...localAssumptions(data.countries.CN),
@@ -101,6 +101,8 @@ export function toParams(S, data) {
   }
   const fx = { USD: 1 };
   for (const [cur, field] of Object.entries(data.fx)) fx[cur] = field.value;
+  // Self-paid pension and medical insurance (monthly inputs) only count in mainland China with a pension on file.
+  raw.selfPay = S.workC === 'CN' && raw.pension > 0 ? (raw.selfPension + raw.selfMedical) * 12 : 0;
   return buildParams(raw, fx);
 }
 

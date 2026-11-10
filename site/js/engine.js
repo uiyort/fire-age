@@ -52,7 +52,9 @@ export function fiNeed(p, t, E = p.retExp, r = p.r) {
   if (p.pAge <= a) return Math.max(Ew - Pw, 0) / swrFor(p, H);
   const b = Math.min(p.pAge - a, H);
   let pv = 0;
-  for (let k = 0; k < b; k++) pv += Ew / Math.pow(1 + r, k);
+  // Social insurance paid by hand until the pension starts is work-currency money in today's terms.
+  const bridge = Ew + (p.selfPay ?? 0);
+  for (let k = 0; k < b; k++) pv += bridge / Math.pow(1 + r, k);
   if (b < H) pv += Math.max(Ew - Pw, 0) / swrFor(p, H - b) / Math.pow(1 + r, b);
   // A pension can only help: never ask for more than the same plan with no pension.
   return Math.min(pv, Ew / swrFor(p, H));
@@ -172,7 +174,7 @@ export function planFlows(p, retireT, s0) {
   for (let t = 0; t <= p.life - p.age; t++) {
     // Drift stops at retirement, matching fiNeed: the need is fixed in the year the holiday starts.
     const k = retireT == null ? t : Math.min(t, retireT);
-    gross.push(spendW(p, k, p.retExp));
+    gross.push(spendW(p, k, p.retExp) + (p.age + t < p.pAge ? (p.selfPay ?? 0) : 0));
     pens.push(p.age + t >= p.pAge ? pensW(p, k) : 0);
     sav.push(savingsAt(p, t, s0));
   }

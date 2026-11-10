@@ -138,3 +138,22 @@ test('the town the person types keeps six characters and survives old or broken 
   }
   assert.deepEqual(loadState(DATA, mem({ ...saved, town: { name: '大理', monthly: 4000 } })).town, { name: '大理', monthly: 4000 });
 });
+
+test('selfPay: monthly pension and medical payments become a yearly amount when working in China with a pension', () => {
+  let s = setField(defaultState(DATA), 'pension', '36000');
+  s = setField(s, 'selfPension', '1200');
+  s = setField(s, 'selfMedical', '300');
+  assert.equal(toParams(s, DATA).selfPay, 18000);
+  s = setField(s, 'selfMedical', '');
+  assert.equal(toParams(s, DATA).selfPay, 14400);
+});
+
+test('selfPay: zero without a pension, for old saves, and when working in the US', () => {
+  let s = setField(defaultState(DATA), 'selfPension', '1200');
+  assert.equal(toParams(s, DATA).selfPay, 0);
+  const store = { getItem: () => JSON.stringify({ workC: 'CN', retC: 'CN', dispCur: 'CNY', pension: 36000 }) };
+  assert.equal(toParams(loadState(DATA, store), DATA).selfPay, 0);
+  let us = setWorkCountry(defaultState(DATA), 'US', DATA);
+  us = setField(setField(setField(us, 'pension', '36000'), 'selfPension', '1200'), 'selfMedical', '300');
+  assert.equal(toParams(us, DATA).selfPay, 0);
+});

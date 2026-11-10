@@ -34,7 +34,7 @@ export function successAt(p, retireT, s0 = null, { paths = DEFAULT_PATHS, seed =
 }
 
 // Solves are asked for again and again while a page renders, so the answers are kept for the plans seen lately.
-const KEY_FIELDS = ['age', 'life', 'assets', 'income', 'expense', 'growth', 'retExp', 'pension', 'pAge', 'r', 'sigma', 'flexCut', 'fxDrift', 'rCur', 'wCur'];
+const KEY_FIELDS = ['age', 'life', 'assets', 'income', 'expense', 'growth', 'retExp', 'pension', 'pAge', 'selfPay', 'r', 'sigma', 'flexCut', 'fxDrift', 'rCur', 'wCur'];
 const memo = new Map();
 function remember(kind, p, extra, compute) {
   const key = `${kind}|${KEY_FIELDS.map(k => p[k]).join('|')}|${p.fx?.[p.rCur]}|${p.fx?.[p.wCur]}|${extra}`;

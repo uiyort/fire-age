@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildParams, monteCarlo, fwdSolve } from '../site/js/engine.js';
+import { buildParams, monteCarlo, fwdSolve, fiNeed, planFlows } from '../site/js/engine.js';
 import { ODDS, successAt, oddsSolve, oddsYears, oddsRuler, needLine, bwdOdds, decilePaths, dualOdds, extendRow } from '../site/js/odds.js';
 import { walkPath } from '../site/js/engine.js';
 
@@ -112,5 +112,29 @@ test('lives that run out are lined up by when they ran out, earliest first', () 
   for (const t of [11, 14, 16, 18]) {
     const ruined = decilePaths(p, t, null).filter(l => l.ruinAge !== null).map(l => l.ruinAge);
     assert.deepEqual(ruined, [...ruined].sort((a, b) => a - b), `t=${t}: ${ruined}`);
+  }
+});
+
+test('selfPay: zero changes nothing, positive raises the need and never moves the holiday earlier', () => {
+  const p0 = base(), z = base({ selfPay: 0 }), s = base({ selfPay: 24000 });
+  assert.equal(oddsSolve(z), oddsSolve(p0));
+  assert.equal(fiNeed(z, 10), fiNeed(p0, 10));
+  assert.equal(monteCarlo(z, 10).success, monteCarlo(p0, 10).success);
+  assert.ok(fiNeed(s, 10) > fiNeed(p0, 10));
+  assert.ok(oddsSolve(s) >= oddsSolve(p0));
+});
+
+test('selfPay: the odds cache does not mix runs with different selfPay', () => {
+  const a = oddsSolve(base({ selfPay: 0 }));
+  const b = oddsSolve(base({ selfPay: 24000 }));
+  assert.notEqual(a, b);
+});
+
+test('selfPay: spending from the pension age on is the same as without it', () => {
+  const a = planFlows(base(), 10), b = planFlows(base({ selfPay: 24000 }), 10);
+  const p = base();
+  for (let t = 0; t <= p.life - p.age; t++) {
+    if (p.age + t >= p.pAge) assert.equal(b.full[t], a.full[t], `t=${t}`);
+    else assert.ok(b.full[t] > a.full[t], `t=${t}`);
   }
 });
