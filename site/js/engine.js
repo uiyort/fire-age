@@ -132,8 +132,42 @@ function mulberry32(seed) {
 
 export const HARD_FALL = -0.15;
 
+// The standard normal draws of a simulation, path by path and year by year, in the order monteCarlo has always drawn them.
+// Kept for the few seeds in use, so every simulation with the same seed sees the same luck.
+const drawCache = new Map();
+export function normalDraws(paths, Y, seed) {
+  const key = `${paths}|${Y}|${seed}`;
+  let z = drawCache.get(key);
+  if (z) return z;
+  const rnd = mulberry32(seed);
+  z = new Float64Array(paths * Y);
+  for (let i = 0; i < z.length; i++) {
+    const u1 = rnd() || 1e-12, u2 = rnd();
+    z[i] = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  }
+  if (drawCache.size >= 6) drawCache.delete(drawCache.keys().next().value);
+  drawCache.set(key, z);
+  return z;
+}
+
+// Yearly growth factors for a portfolio with return r and volatility sigma. p.r is a geometric return,
+// so the median path compounds at exactly p.r.
+const growthCache = new Map();
+export function growthFactors(p, paths = DEFAULT_PATHS, seed = DEFAULT_SEED) {
+  const Y = p.life - p.age;
+  const key = `${paths}|${Y}|${seed}|${p.r}|${p.sigma}`;
+  let g = growthCache.get(key);
+  if (g) return g;
+  const z = normalDraws(paths, Y, seed), mu = Math.log(1 + p.r), s = p.sigma;
+  g = new Float64Array(z.length);
+  for (let i = 0; i < z.length; i++) g[i] = Math.exp(mu + s * z[i]);
+  if (growthCache.size >= 12) growthCache.delete(growthCache.keys().next().value);
+  growthCache.set(key, g);
+  return g;
+}
+
 // Yearly cash flows for a simulated plan. Spending after a hard fall can be cut by p.flexCut percent.
-function planFlows(p, retireT, s0) {
+export function planFlows(p, retireT, s0) {
   const gross = [], pens = [], sav = [];
   for (let t = 0; t <= p.life - p.age; t++) {
     // Drift stops at retirement, matching fiNeed: the need is fixed in the year the holiday starts.
@@ -144,13 +178,27 @@ function planFlows(p, retireT, s0) {
   }
   const cut = (p.flexCut ?? 0) / 100;
   const spendAt = (t, afterFall) => Math.max(gross[t] * (afterFall ? 1 - cut : 1) - pens[t], 0);
-  return { spendAt, sav };
+  // The same spending as arrays, for loops that run many lives: full spending, and spending after a hard fall.
+  const full = Float64Array.from(gross, (_, t) => spendAt(t, false));
+  const after = Float64Array.from(gross, (_, t) => spendAt(t, true));
+  return { spendAt, sav, full, after };
 }
 
 // One path of the same simulation monteCarlo runs: same draws, same order, same rules.
 export function lifePath(p, retireT, s0, seed) {
   const Y = p.life - p.age;
   const rnd = mulberry32(seed);
+  const z = new Float64Array(Y);
+  for (let t = 0; t < Y; t++) {
+    const u1 = rnd() || 1e-12, u2 = rnd();
+    z[t] = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  }
+  return { seed, ...walkPath(p, retireT, s0, z) };
+}
+
+// One life walked year by year through the given draws. z needs one draw for each year of the plan.
+export function walkPath(p, retireT, s0, z) {
+  const Y = p.life - p.age;
   const mu = Math.log(1 + p.r), s = p.sigma;
   const { spendAt, sav } = planFlows(p, retireT, s0);
   const years = [];
@@ -160,9 +208,7 @@ export function lifePath(p, retireT, s0, seed) {
       years.push({ t, age: p.age + t, assets: A, ret: null });
       break;
     }
-    const u1 = rnd() || 1e-12, u2 = rnd();
-    const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-    const gr = Math.exp(mu + s * z);
+    const gr = Math.exp(mu + s * z[t]);
     years.push({ t, age: p.age + t, assets: A, ret: gr - 1 });
     if (retireT != null && t >= retireT) {
       A -= spendAt(t, afterFall);
@@ -176,14 +222,12 @@ export function lifePath(p, retireT, s0, seed) {
     }
     afterFall = gr - 1 <= HARD_FALL;
   }
-  return { seed, retireT, years, ruinAge };
+  return { retireT, years, ruinAge };
 }
 
 export function monteCarlo(p, retireT, s0 = null, { paths = DEFAULT_PATHS, seed = DEFAULT_SEED } = {}) {
   const Y = p.life - p.age;
-  const rnd = mulberry32(seed);
-  // p.r is a geometric return, so the median path compounds at exactly p.r.
-  const mu = Math.log(1 + p.r), s = p.sigma;
+  const g = growthFactors(p, paths, seed);
   const cols = Array.from({ length: Y + 1 }, () => new Float64Array(paths));
   const { spendAt, sav } = planFlows(p, retireT, s0);
   let ok = 0;
@@ -192,9 +236,7 @@ export function monteCarlo(p, retireT, s0 = null, { paths = DEFAULT_PATHS, seed 
     for (let t = 0; t <= Y; t++) {
       cols[t][i] = A;
       if (t === Y) break;
-      const u1 = rnd() || 1e-12, u2 = rnd();
-      const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-      const gr = Math.exp(mu + s * z);
+      const gr = g[i * Y + t];
       if (retireT != null && t >= retireT) {
         A -= spendAt(t, afterFall);
         if (A < 0) { A = 0; alive = false; }
