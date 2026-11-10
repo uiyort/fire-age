@@ -70,7 +70,20 @@ function packText(lifestyle) {
   return lifestyle > 1 ? `比现在宽裕 ${lifestyle.toFixed(1)} 倍` : `只花现在的 ${percent(lifestyle)}`;
 }
 
-export function holidayType(p, data, { workC, retC, retireT }) {
+// One sentence on what this holiday is most exposed to. The first rule that fits wins; the table is on the method page.
+export function weakness(type, { success = null, pensionShare = 0 } = {}) {
+  const letters = type.code ?? '';
+  if (type.status?.id === 'waiting') return '按现在的节奏还到不了，最要紧的是让每个月能存下钱。';
+  if (success !== null && success < 0.8) return '把握还不到八成，最怕放假头几年就撞上大跌。';
+  if (pensionShare >= 0.5) return '一半以上的开销指望养老金，最怕领取年龄再推迟，或者待遇不如预期。';
+  if (letters[1] === 'A') return '换了地方生活，最怕汇率和当地物价一起涨，还有签证和医保。';
+  if (letters[2] === 'F') return '放假后花得比现在多，最怕花销只涨不降。';
+  if (letters[3] === 'G') return '钱主要靠老本，最怕放假前后遇上大跌。';
+  if (letters[0] === 'E') return '钱主要靠自己现攒，余量薄，最怕放假头五年就撞上大跌。';
+  return '靠一年一年攒到点，最怕中途收入断档。';
+}
+
+export function holidayType(p, data, { workC, retC, retireT, success = null }) {
   const backward = retireT !== undefined;
   const t = backward ? retireT : oddsSolve(p);
   const age = t === null ? null : p.age + t;
@@ -90,7 +103,9 @@ export function holidayType(p, data, { workC, retC, retireT }) {
     return { key: axis.key, name: axis.name, poles: axis.poles, letter, pole: axis.poles[letter], value };
   });
   const code = axes.map(a => a.letter).join('');
-  return { ...BY_CODE[code], axes, status: progress(p, t) };
+  const type = { ...BY_CODE[code], axes, status: progress(p, t) };
+  const pensionShare = p.retExp > 0 ? Math.min(p.pension / p.retExp, 1) : 0;
+  return { ...type, weakness: weakness(type, { success, pensionShare }) };
 }
 
 // The same plan in every place. Spending keeps its purchasing power; a pension moves at market exchange rates.

@@ -105,7 +105,7 @@ export function typeCardSpec(type, { search = true } = {}) {
   return {
     kind: 'type', size: [1080, 1440], brand: BRAND, searchHint: search ? SEARCH_HINT : '',
     // The emoji sits in the small line: drawn at the size of the name, it crowded the sentence below.
-    eyebrow: `${type.emoji} 我的放假类型 · ${type.group}`, hero: type.name, sentence: type.blurb,
+    eyebrow: `${type.emoji} 我的放假类型 · ${type.group}`, hero: type.name, sentence: type.blurb, weakness: type.weakness,
     stats: type.axes.map(axis => ({ label: axis.name, value: axis.pole })),
   };
 }
@@ -665,7 +665,11 @@ function renderPage(spec, canvas) {
   }
   sentencePx = Math.max(sentencePx, 44);
   const eyebrowPx = spec.eyebrow ? fitFontSize(measureAt(bold), spec.eyebrow, inner, 34, 22) : 0;
-  const blockH = (spec.eyebrow ? eyebrowPx + 44 : 0) + heroPx * 0.86 + sentenceLines.length * sentencePx * 1.35 + (sentenceLines.length ? 30 : 0);
+  // The weakness sits under the sentence in plain type, never smaller than 28px.
+  const weakPx = 30;
+  const weakLines = spec.weakness ? wrapText(t => measureAt(plain)(t, weakPx), `软肋：${spec.weakness}`, inner) : [];
+  const weakH = weakLines.length ? 28 + weakLines.length * weakPx * 1.5 : 0;
+  const blockH = (spec.eyebrow ? eyebrowPx + 44 : 0) + heroPx * 0.86 + sentenceLines.length * sentencePx * 1.35 + (sentenceLines.length ? 30 : 0) + weakH;
   const areaTop = ty + 130, areaBottom = tear - 50;
   let y = areaTop + Math.max((areaBottom - areaTop - blockH) / 2, 0);
   if (spec.eyebrow) {
@@ -681,6 +685,13 @@ function renderPage(spec, canvas) {
     y += sentencePx * 1.1;
     put(display(sentencePx), CREAM, line, left, y);
     y += sentencePx * 0.25;
+  }
+  if (weakLines.length) {
+    y += 28;
+    for (const line of weakLines) {
+      y += weakPx * 1.5;
+      put(plain(weakPx), CREAM_DIM, line, left, y);
+    }
   }
 
   // The stub: a title strip, the facts, and the foot.

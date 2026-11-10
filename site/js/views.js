@@ -369,7 +369,7 @@ export function typeHtml(type, lever) {
     return `<div class="axis"><span class="axis-name">${axis.name}</span><span class="poles">${poles}</span><span class="axis-value">${axis.value}</span></div>`;
   }).join('');
   return `<div class="type-head"><span class="type-emoji" aria-hidden="true">${type.emoji}</span><div class="type-title"><div class="type-name">${type.name} · ${type.group}</div></div><div class="type-tags"><span class="pill">${type.status.name}</span></div></div>
-    <p class="type-blurb">${type.blurb}</p><div class="axes">${axes}</div><p class="why">${type.status.why}</p>${next}`;
+    <p class="type-blurb">${type.blurb}</p><p class="type-weak">软肋：${type.weakness}</p><div class="axes">${axes}</div><p class="why">${type.status.why}</p>${next}`;
 }
 
 export function allTypesHtml() {

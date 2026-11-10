@@ -5,7 +5,7 @@ import DATA from '../site/js/data-latest.js';
 import { fiNeed, fiYears, fwdSolve, lifePath, monteCarlo } from '../site/js/engine.js';
 import { defaultState, setField, setRetireCountry, setWorkCountry, toParams } from '../site/js/state.js';
 import { rankLevers } from '../site/js/levers.js';
-import { AXES, GROUPS, TYPES, drawLives, holidayType, lifeStory, mondaysIn, placeRanking, workdaysIn } from '../site/js/holiday.js';
+import { AXES, GROUPS, TYPES, drawLives, holidayType, weakness, lifeStory, mondaysIn, placeRanking, workdaysIn } from '../site/js/holiday.js';
 import { allTypesHtml, livesSummary, storyHtml, typeHtml, variantsHtml } from '../site/js/views.js';
 
 test('a life that runs dry says fixed spending only when spending was fixed', () => {
@@ -267,4 +267,58 @@ test('the all-types list shows no code as text', () => {
 test('the variants table says how Lean and Fat differ from the English-speaking usage', () => {
   const p = person().p;
   assert.ok(variantsHtml({ p, dispCur: 'CNY' }).includes('英文圈的 Lean / Fat 多按绝对金额分'));
+});
+
+const WEAK = {
+  waiting: '按现在的节奏还到不了，最要紧的是让每个月能存下钱。',
+  thin: '把握还不到八成，最怕放假头几年就撞上大跌。',
+  pension: '一半以上的开销指望养老金，最怕领取年龄再推迟，或者待遇不如预期。',
+  far: '换了地方生活，最怕汇率和当地物价一起涨，还有签证和医保。',
+  rich: '放假后花得比现在多，最怕花销只涨不降。',
+  capital: '钱主要靠老本，最怕放假前后遇上大跌。',
+  early: '钱主要靠自己现攒，余量薄，最怕放假头五年就撞上大跌。',
+  rest: '靠一年一年攒到点，最怕中途收入断档。',
+};
+const ty = (code, status = 'onway') => ({ code, status: { id: status } });
+
+test('weakness: each of the eight rules fires on its own', () => {
+  assert.equal(weakness(ty('EATS', 'waiting'), { success: 0.1, pensionShare: 0.9 }), WEAK.waiting);
+  assert.equal(weakness(ty('EATS'), { success: 0.79, pensionShare: 0.9 }), WEAK.thin);
+  assert.equal(weakness(ty('EATS'), { success: 0.8, pensionShare: 0.5 }), WEAK.pension);
+  assert.equal(weakness(ty('EATS'), { success: null, pensionShare: 0.49 }), WEAK.far);
+  assert.equal(weakness(ty('EHFS')), WEAK.rich);
+  assert.equal(weakness(ty('LHTG')), WEAK.capital);
+  assert.equal(weakness(ty('EHTS')), WEAK.early);
+  assert.equal(weakness(ty('LHTS')), WEAK.rest);
+});
+
+test('weakness: the order holds when several rules apply', () => {
+  assert.equal(weakness(ty('EATS'), { pensionShare: 0.6 }), WEAK.pension, '3 before 4');
+  assert.equal(weakness(ty('LAFG')), WEAK.far, '4 before 5 and 6');
+  assert.equal(weakness(ty('EHFG')), WEAK.rich, '5 before 6');
+  assert.equal(weakness(ty('EHTG')), WEAK.capital, '6 before 7');
+  assert.equal(weakness(ty('LHTS', 'waiting'), { success: 0.2 }), WEAK.waiting, '1 before 2');
+});
+
+test('weakness: holidayType carries it, from the odds and the pension share that were passed in', () => {
+  const { p, workC, retC } = person();
+  assert.equal(holidayType(p, DATA, { workC, retC, retireT: 10, success: 0.5 }).weakness, WEAK.thin);
+  const reliant = holidayType({ ...p, pension: p.retExp * 0.8 }, DATA, { workC, retC, retireT: 10, success: 0.9 });
+  assert.equal(reliant.weakness, WEAK.pension);
+  const zero = holidayType({ ...p, retExp: 0, pension: 1000 }, DATA, { workC, retC, retireT: 10, success: 0.9 });
+  assert.notEqual(zero.weakness, WEAK.pension, 'no spending means no share');
+});
+
+test('all 16 types have a non-empty weakness without a digit, and the page shows it', () => {
+  for (const t of TYPES) {
+    for (const status of ['onway', 'waiting']) for (const opts of [{}, { success: 0.5 }, { pensionShare: 0.7 }]) {
+      const w = weakness({ ...t, status: { id: status } }, opts);
+      assert.ok(w.length > 0);
+      assert.ok(!/\d/.test(w), w);
+      assert.deepEqual(findBannedCopy(w), []);
+    }
+  }
+  const type = typeOf(person());
+  assert.ok(type.weakness);
+  assert.match(typeHtml(type), new RegExp(`软肋：${type.weakness}`));
 });

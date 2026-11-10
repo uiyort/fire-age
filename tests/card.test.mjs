@@ -4,7 +4,7 @@ import { assumptionLine, barcodeBars, lifeBars, summaryCardSpec, placeCardSpec, 
 import { findBannedCopy } from '../scripts/lint-copy.mjs';
 
 const type = {
-  code: 'EHTS', name: '采菊人', emoji: '🌼', group: '归园派', blurb: '早早收工，回家种花。',
+  code: 'EHTS', name: '采菊人', emoji: '🌼', group: '归园派', blurb: '早早收工，回家种花。', weakness: '靠一年一年攒到点，最怕中途收入断档。',
   axes: [{ name: '启程', letter: 'E', pole: '早班', value: '43 岁' }, { name: '目的地', letter: 'H', pole: '在地', value: '中国大陆' }, { name: '行李', letter: 'T', pole: '轻装', value: '40%' }, { name: '路费', letter: 'S', pole: '现攒', value: '30%' }],
 };
 const hero = { reachable: true, startAge: 30, holidayAge: 43, endAge: 95, workYears: 13, holidayYears: 52, mondays: 678, people: 7, months: 50, fund: { share: 0.14 } };
@@ -76,7 +76,7 @@ test('the odds sit with the age, and the assumptions are spelled out', () => {
 test('the type-only card has no numbers at all', () => {
   const s = typeCardSpec(type);
   assert.deepEqual(s.size, [1080, 1440]);
-  assert.ok(!/\d/.test(JSON.stringify({ e: s.eyebrow, h: s.hero, t: s.sentence, st: s.stats, l: s.lines })), JSON.stringify(s));
+  assert.ok(!/\d/.test(JSON.stringify({ e: s.eyebrow, h: s.hero, t: s.sentence, w: s.weakness, st: s.stats, l: s.lines })), JSON.stringify(s));
   assert.match(s.hero, /采菊人/);
 });
 
@@ -305,6 +305,7 @@ test('the type card shows the name, group and all four axes, without the letter 
   assert.match(s.eyebrow, /归园派/);
   assert.match(s.hero, /采菊人/);
   assert.equal(s.sentence, type.blurb);
+  assert.equal(s.weakness, type.weakness);
   assert.equal(s.stats.length, 4);
   assert.deepEqual(findBannedCopy(JSON.stringify(s)), []);
 });

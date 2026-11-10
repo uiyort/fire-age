@@ -313,9 +313,9 @@ function renderFast() {
   // Working backward, every life walks the plan as it is: the saving that gives 8 in 10 is told, not assumed.
   const s0 = null;
   const target = needLine(p);
-  const type = holidayType(p, DATA, { workC: S.workC, retC: S.retC, ...(S.mode === 'bwd' ? { retireT: bwd.n } : {}) });
   // The odds of the plan as it is, right away: the full simulation for the chart follows a moment later.
   const success = retireT === null ? null : successAt(p, retireT, s0);
+  const type = holidayType(p, DATA, { workC: S.workC, retC: S.retC, success, ...(S.mode === 'bwd' ? { retireT: bwd.n } : {}) });
   latest = { ...(latest ?? {}), view: S.view, mode: S.mode, p, t, retireT, s0, years: oddsYears(p), dual, bwd, odds, levers, small, target, type, success, ruler: S.mode === 'bwd' ? null : oddsRuler(p), dataVersion: DATA.version, dispCur: cur };
 
   syncChrome(p);

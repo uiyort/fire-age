@@ -23,7 +23,7 @@ export function personaResult(persona, data) {
   const need = needLine(p)[t ?? 0];
   // The life told is the hardest of the ten parallel lives, as on the page.
   const story = lifeStory(decilePaths(p, t, null)[0], p, need);
-  const type = holidayType(p, data, { workC: persona.workC, retC: persona.retC });
+  const type = holidayType(p, data, { workC: persona.workC, retC: persona.retC, success: mc.success });
   return {
     label: persona.label,
     workplace: data.countries[persona.workC].name,
