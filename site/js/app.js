@@ -258,7 +258,7 @@ function renderPen() {
   const age = $('pen-age-s');
   if (age) {
     age.hidden = !(S.pension > 0);
-    age.textContent = `领取年龄 ${S.pAge} 岁，专业版里可以改。`;
+    age.textContent = `领取年龄 ${S.pAge ?? S.lastValid.pAge} 岁，专业版里可以改。`;
   }
 }
 

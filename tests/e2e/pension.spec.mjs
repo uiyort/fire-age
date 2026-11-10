@@ -53,4 +53,16 @@ test.describe('the pension estimate', () => {
     await page.goto('/');
     await expect(page.locator('#s-selfPension')).toHaveAttribute('min', '0');
   });
+
+  test('a cleared claim age shows the age the model uses, never null', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#to-pro').click();
+    await page.fill('#p-pension', '36000');
+    await page.fill('#p-pAge', '');
+    await page.locator('#to-simple').click();
+    const line = page.locator('#pen-age-s');
+    await expect(line).toBeVisible();
+    await expect(line).toHaveText(/^领取年龄 \d+ 岁/);
+    await expect(line).not.toContainText(/null|undefined|NaN/);
+  });
 });
