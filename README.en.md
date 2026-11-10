@@ -4,7 +4,7 @@ A financial independence and early retirement calculator that teaches as you use
 
 [中文](README.md)
 
-Live site: https://fire-age.pages.dev
+Live site: https://fire-age.com
 
 ## What it does
 

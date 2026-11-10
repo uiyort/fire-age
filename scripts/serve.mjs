@@ -25,6 +25,8 @@ const types = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
 };
 
 createServer(async (req, res) => {
@@ -34,13 +36,22 @@ createServer(async (req, res) => {
     res.writeHead(403).end();
     return;
   }
+  const headers = name => ({
+    'content-type': types[extname(name)] ?? 'application/octet-stream',
+    ...(csp ? { 'content-security-policy': csp } : {}),
+  });
+  // Like Cloudflare Pages: /method serves method.html, and an unknown path gets 404.html with status 404.
+  for (const name of extname(file) ? [file] : [file, `${file}.html`]) {
+    try {
+      const body = await readFile(name);
+      res.writeHead(200, headers(name)).end(body);
+      return;
+    } catch {
+      // Try the next name.
+    }
+  }
   try {
-    const body = await readFile(file);
-    res.writeHead(200, {
-      'content-type': types[extname(file)] ?? 'application/octet-stream',
-      ...(csp ? { 'content-security-policy': csp } : {}),
-    });
-    res.end(body);
+    res.writeHead(404, headers('404.html')).end(await readFile(join(root, '404.html')));
   } catch {
     res.writeHead(404).end('Not found');
   }

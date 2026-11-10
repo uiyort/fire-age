@@ -12,7 +12,8 @@ test('no page loads a script, stylesheet or font from another origin', () => {
   for (const f of pages) {
     const html = readFileSync(f, 'utf8');
     assert.ok(!/<script[^>]+src=["']https?:/i.test(html), f);
-    assert.ok(!/<link[^>]+href=["']https?:/i.test(html), f);
+    // A canonical link names this page's own address and loads nothing.
+    assert.ok(!/<link(?![^>]*rel="canonical")[^>]+href=["']https?:/i.test(html), f);
     assert.ok(!/fonts\.googleapis|fonts\.gstatic/i.test(html), f);
   }
   assert.ok(!/@import|url\(["']?https?:/i.test(readFileSync('site/css/app.css', 'utf8')));

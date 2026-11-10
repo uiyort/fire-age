@@ -4,7 +4,7 @@
 
 [English](README.en.md)
 
-线上地址：https://fire-age.pages.dev
+线上地址：https://fire-age.com
 
 ## 它能做什么
 
