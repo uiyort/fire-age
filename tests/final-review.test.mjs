@@ -80,3 +80,47 @@ test('final review 1: a town spend below the items leaves the items out of that 
   assert.ok(enough.age < townPlan(bare, 4000).age);
   assert.ok(!townHtml({ name: '大理', monthly: 4000 }, enough, p).includes('没有算'));
 });
+
+// ---- 9: a cut after a bad year cuts only the living spending ----
+import { buildParams, planFlows } from '../site/js/engine.js';
+import { needLine, successAt } from '../site/js/odds.js';
+const FX = { USD: 1, CNY: 6.6688, MYR: 4.08 };
+const mortgage = { id: 'mortgage', amount: 30000, endAge: 45, nominal: true };
+const kids = { id: 'kids', amount: 20000, endAge: 55, nominal: false };
+const cutPlan = (o = {}) => buildParams({
+  age: 30, life: 95, assets: 500000, income: 300000, expense: 120000, growth: 2,
+  retExp: 120000, pension: 36000, pAge: 63, tAge: 45, eq: 60, eqReal: 5, bondY: 1.65,
+  infl: 1.5, drag: 0.2, fxDrift: 0, swr: 3.9, autoSwr: true, sigEq: 0.17, sigBd: 0.06,
+  rho: 0.2, wCur: 'CNY', rCur: 'CNY', flexCut: 20, selfPay: 30000, events: [mortgage, kids], ...o }, FX);
+
+test('final review 9: the bad-year cut leaves self-pay and the mortgage payment whole', () => {
+  const p = cutPlan();
+  const { full, after } = planFlows(p, 0, null);
+  const paid = t => 30000 * Math.pow(1.015, -t);
+  // Age 35: mortgage and children running, self-pay before the pension.
+  assert.ok(Math.abs(after[5] - ((120000 - 30000) * 0.8 + paid(5) + 30000)) < 1e-6, String(after[5]));
+  assert.ok(Math.abs(full[5] - (120000 - 30000 + paid(5) + 30000)) < 1e-6);
+  // Age 60: both ended, still self-paying.
+  assert.ok(Math.abs(after[30] - ((120000 - 30000 - 20000) * 0.8 + 30000)) < 1e-6, String(after[30]));
+  // Age 70: the pension has started, no self-pay.
+  assert.ok(Math.abs(after[40] - ((120000 - 50000) * 0.8 - 36000)) < 1e-6, String(after[40]));
+  // With no cut nothing changes.
+  const flat = planFlows(cutPlan({ flexCut: 0 }), 0, null);
+  for (const t of [5, 30, 40]) assert.equal(flat.after[t], flat.full[t]);
+});
+
+test('final review 9: starting with exactly the holiday line still gives 8 in 10 with a cut, a mortgage and self-pay', () => {
+  const plans = [
+    cutPlan(),
+    cutPlan({ rCur: 'MYR', retExp: 60000, pension: 15000, fxDrift: 2 }),
+    cutPlan({ events: [] }),
+    cutPlan({ events: [], rCur: 'MYR', retExp: 60000, pension: 15000, fxDrift: -2 }),
+  ];
+  for (const p of plans) {
+    const line = needLine(p);
+    for (const T of [5, 15, 25]) {
+      const s = successAt(p, T, null, { startAt: T, startAssets: line[T] });
+      assert.ok(Math.abs(s - 0.8) < 1e-9, `${p.rCur} events ${p.events.length} T=${T}: ${s}`);
+    }
+  }
+});

@@ -195,21 +195,39 @@ export function growthFactors(p, paths = DEFAULT_PATHS, seed = DEFAULT_SEED) {
   return g;
 }
 
-// Yearly cash flows for a simulated plan. Spending after a hard fall can be cut by p.flexCut percent.
+// The part of the items' change in year t that can be cut after a bad year (children's costs and any item that
+// has ended) and the mortgage payment still due, which is fixed. The mortgage sits in spending at face value.
+function itemParts(p, t) {
+  let living = 0, due = 0;
+  for (const e of p.events ?? []) {
+    if (!e.nominal) living += p.age + t >= e.endAge ? -e.amount : 0;
+    else {
+      living -= e.amount;
+      if (p.age + t < e.endAge) due += e.amount * Math.pow(1 + p.infl / 100, -t);
+    }
+  }
+  return { living, due };
+}
+
+// Yearly cash flows for a simulated plan. Spending after a hard fall can be cut by p.flexCut percent; the cut
+// falls on the living spending only, not on self-paid insurance or a mortgage payment still due.
 export function planFlows(p, retireT, s0) {
-  const gross = [], pens = [], sav = [];
+  const spend = [], fixed = [], pens = [], sav = [];
   for (let t = 0; t <= p.life - p.age; t++) {
     // Drift stops at retirement, matching fiNeed: the need is fixed in the year the holiday starts.
     const k = retireT == null ? t : Math.min(t, retireT);
-    gross.push(Math.max(spendW(p, k, p.retExp) + (p.age + t < p.pAge ? (p.selfPay ?? 0) : 0) + eventDelta(p, t), 0));
+    const { living, due } = itemParts(p, t);
+    // spend + fixed is the year's spending: spendW + self-pay + eventDelta.
+    spend.push(spendW(p, k, p.retExp) + living);
+    fixed.push((p.age + t < p.pAge ? (p.selfPay ?? 0) : 0) + due);
     pens.push(p.age + t >= p.pAge ? pensW(p, k) : 0);
     sav.push(savingsAt(p, t, s0));
   }
   const cut = (p.flexCut ?? 0) / 100;
-  const spendAt = (t, afterFall) => Math.max(gross[t] * (afterFall ? 1 - cut : 1) - pens[t], 0);
+  const spendAt = (t, afterFall) => Math.max(spend[t] * (afterFall ? 1 - cut : 1) + fixed[t] - pens[t], 0);
   // The same spending as arrays, for loops that run many lives: full spending, and spending after a hard fall.
-  const full = Float64Array.from(gross, (_, t) => spendAt(t, false));
-  const after = Float64Array.from(gross, (_, t) => spendAt(t, true));
+  const full = Float64Array.from(spend, (_, t) => spendAt(t, false));
+  const after = Float64Array.from(spend, (_, t) => spendAt(t, true));
   return { spendAt, sav, full, after };
 }
 
