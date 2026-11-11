@@ -225,7 +225,7 @@ test('events: eventsOf turns a mortgage and children into events, and drops fini
 
 test('events: lifeIssue speaks up when the payments do not fit, and events are dropped', () => {
   const big = withReal({ mortgage: { monthly: 6000, endYear: 2046 }, kids: { count: 2, age: 6, monthly: 3000 } });
-  assert.equal(lifeIssue(big, DATA), '月供和孩子的花销加起来超过了每月支出，请检查这两处');
+  assert.equal(lifeIssue(big, DATA), '月供和孩子的花销加起来达到或超过了每月支出，请检查这两处');
   assert.deepEqual(eventsOf(big, DATA, 2026), []);
   const ret = withReal({ mortgage: { monthly: 6000, endYear: 2046 }, kids: { count: 1, age: 6, monthly: 3000 } }, { expense: 240000, retExp: 60000 });
   assert.equal(lifeIssue(ret, DATA), '退休后每月想花里也要算上月供和孩子的花销');
@@ -236,7 +236,7 @@ test('events: lifeIssue speaks up when the payments do not fit, and events are d
 
 test('events: items equal to the spending are an issue too', () => {
   const eq = withReal({ mortgage: { monthly: 10000, endYear: 2046 }, kids: emptyReal.kids });
-  assert.equal(lifeIssue(eq, DATA), '月供和孩子的花销加起来超过了每月支出，请检查这两处');
+  assert.equal(lifeIssue(eq, DATA), '月供和孩子的花销加起来达到或超过了每月支出，请检查这两处');
   const ret = withReal({ mortgage: { monthly: 5000, endYear: 2046 }, kids: emptyReal.kids }, { retExp: 60000 });
   assert.equal(lifeIssue(ret, DATA), '退休后每月想花里也要算上月供和孩子的花销');
 });
@@ -250,7 +250,7 @@ test('lifeSummary: null without items; end year, kids flag, spending after, low 
   // an item that already ended is not an event
   assert.equal(lifeSummary(withReal({ mortgage: { monthly: 3000, endYear: 2025 }, kids: emptyReal.kids }), DATA, 2026), null);
   // 25% edge of 10000: 2500 is not low, 2499 is
-  const edge = (retExp) => lifeSummary(withReal({ mortgage: { monthly: 3000, endYear: 2046 }, kids: emptyReal.kids }, { retExp }), DATA, 2026);
+  const edge = (retExp) => lifeSummary(withReal({ mortgage: { monthly: 3000, endYear: 2046 }, kids: emptyReal.kids }, { retExp, touched: { retExp: true } }), DATA, 2026);
   assert.equal(edge(66000).afterMonthly, 2500);
   assert.equal(edge(66000).low, false);
   assert.equal(edge(65988).afterMonthly, 2499);
@@ -265,9 +265,17 @@ test('lifeSummary: the retirement currency differs from the work currency', () =
   const s = lifeSummary(S, DATA, 2026);
   assert.equal(s.afterMonthly, Math.round((600000 - thb) / 12));
   assert.equal(s.low, false);
-  const tiny = lifeSummary({ ...S, retExp: Math.round(thb + 12) }, DATA, 2026);
+  const tiny = lifeSummary({ ...S, retExp: Math.round(thb + 12), touched: { retExp: true } }, DATA, 2026);
   assert.equal(tiny.afterMonthly, 1);
   assert.equal(tiny.low, true);
+});
+
+test('lifeSummary: low only fires when the person typed retirement spending', () => {
+  const real = { mortgage: { monthly: 12000, endYear: 2045 }, kids: emptyReal.kids };
+  const auto = withReal(real, { expense: 180000, retExp: 180000 });
+  assert.equal(lifeSummary(auto, DATA, 2026).low, false);
+  const typed = lifeSummary({ ...auto, touched: { retExp: true } }, DATA, 2026);
+  assert.equal(typed.low, true);
 });
 
 test('events: an old save has empty events, and a bad real block reads as empty', () => {

@@ -71,7 +71,7 @@ export function lifeIssue(S, data) {
   const { mortgage, kids } = realItems(S);
   const monthly = ((mortgage?.yearly ?? 0) + (kids?.yearly ?? 0)) / 12;
   if (monthly <= 0) return '';
-  if (monthly >= (S.expense ?? 0) / 12) return '月供和孩子的花销加起来超过了每月支出，请检查这两处';
+  if (monthly >= (S.expense ?? 0) / 12) return '月供和孩子的花销加起来达到或超过了每月支出，请检查这两处';
   const retW = convert(S.retExp ?? 0, curOf(data, S.retC), curOf(data, S.workC), data);
   if (monthly >= retW / 12) return '退休后每月想花里也要算上月供和孩子的花销';
   return '';
@@ -110,7 +110,7 @@ export function lifeSummary(S, data, thisYear = new Date().getFullYear()) {
     mortgageEnd: events.some(e => e.id === 'mortgage') ? mortgage.endYear : null,
     kidsTo22: events.some(e => e.id === 'kids'),
     afterMonthly,
-    low: convert(afterMonthly, ret, work, data) < (S.expense ?? 0) / 12 * 0.25,
+    low: !!S.touched?.retExp && convert(afterMonthly, ret, work, data) < (S.expense ?? 0) / 12 * 0.25,
   };
 }
 
