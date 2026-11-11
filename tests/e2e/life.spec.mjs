@@ -157,11 +157,14 @@ test.describe('mortgage and children', () => {
     await addMortgage(page);
     await page.locator('#places-fold > summary').click();
     await page.fill('#town-name', '大理');
-    await page.fill('#town-monthly', '3000');
     const line = page.locator('#town-result');
+    // A spend that holds the mortgage gives an age, so the check below can tell an age from none.
+    await page.fill('#town-monthly', '12000');
+    await expect(line).toHaveText(/\d+ 岁放假/);
+    await page.fill('#town-monthly', '3000');
     await expect(line).toContainText('比月供和孩子的花销还少');
     // The sentence asks to add the items back; it gives no age.
-    await expect(line).not.toHaveText(/d+ 岁/);
+    await expect(line).not.toHaveText(/\d+ 岁/);
   });
 
   test('entries that are ignored say so, and the inputs take whole numbers', async ({ page }) => {
