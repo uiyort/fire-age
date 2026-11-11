@@ -18,6 +18,7 @@ test.describe('mortgage and children', () => {
     await expect(page.locator('#life-mortgage')).toBeHidden();
     await expect(page.locator('#life-tag')).toBeHidden();
 
+    await expect(page.locator('#simple-form input:visible, #simple-form select:visible')).toHaveCount(7);
     const before = await ageOf(page);
     expect(before).toBeGreaterThan(0);
     await fold.locator('summary').click();
@@ -60,5 +61,40 @@ test.describe('mortgage and children', () => {
     expect(await page.locator('#life-fold').evaluate(el => el.open)).toBe(false);
     await page.locator('#life-tag').click();
     expect(await page.locator('#life-fold').evaluate(el => el.open)).toBe(true);
+  });
+
+  test('entries that are ignored say so, and the inputs take whole numbers', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#life-fold summary').click();
+    await expect(page.locator('#life-kids')).toHaveAttribute('min', '1');
+    await expect(page.locator('#life-kid-age')).toHaveAttribute('max', '22');
+    await expect(page.locator('#life-kid-age')).toHaveAttribute('step', '1');
+    await expect(page.locator('#life-mortgage-end')).toHaveAttribute('min', String(new Date().getFullYear()));
+    await page.fill('#life-kids', '1');
+    await page.fill('#life-kid-age', '25');
+    await page.fill('#life-kid-monthly', '2000');
+    await expect(page.locator('#life-issue')).toHaveText('孩子已满 22 岁，这一项不再计入。');
+    await expect(page.locator('#life-tag')).toBeHidden();
+    await page.fill('#life-kid-age', '5');
+    await expect(page.locator('#life-issue')).toBeHidden();
+    await page.fill('#life-mortgage', '4000');
+    await page.fill('#life-mortgage-end', '2020');
+    await expect(page.locator('#life-issue')).toHaveText('这一年已经过了，月供不再计入。');
+  });
+
+  test('the new tag does not restyle the hardest-life pill', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#lives-fold summary').click();
+    const pill = page.locator('.pill.life-tag').first();
+    await expect(pill).toBeVisible();
+    const style = () => pill.evaluate(el => { const c = getComputedStyle(el); return { border: c.borderTopColor, margin: c.marginLeft }; });
+    const base = await style();
+    expect(base.margin).toBe('6px');
+    await page.locator('#life-fold summary').click();
+    await page.fill('#life-mortgage', '4000');
+    await page.fill('#life-mortgage-end', '2045');
+    await expect(page.locator('#life-tag')).toBeVisible();
+    expect(await style()).toEqual(base);
+    expect(base.border).not.toBe(await page.locator('#life-tag').evaluate(el => getComputedStyle(el).borderTopColor));
   });
 });

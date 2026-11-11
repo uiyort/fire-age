@@ -46,7 +46,7 @@
     <main class="layout">
       <section class="headline" aria-live="polite">
         <div id="headline"></div>
-        <button type="button" class="life-tag" id="life-tag" hidden></button>
+        <button type="button" class="life-included-tag" id="life-tag" hidden></button>
         <div class="hero-grid simple-only">
           <div class="hero" id="hero"></div>
           <div class="type-block" id="type-section">
@@ -75,9 +75,9 @@
           <p class="sub">这些已经算在上面的每月支出里。到期以后，支出相应减少。</p>
           <div class="pen-grid life-grid">
             <label><span>月供，每月 <span class="u" data-unit="work">CNY</span></span><input type="number" inputmode="decimal" id="life-mortgage" min="0" step="500" autocomplete="off"></label>
-            <label>还到哪年（含这一年）<input type="number" inputmode="numeric" id="life-mortgage-end" min="2000" step="1" autocomplete="off" placeholder="比如 2045"></label>
-            <label>孩子几个<input type="number" inputmode="numeric" id="life-kids" min="0" step="1" autocomplete="off"></label>
-            <label>最小的孩子几岁<input type="number" inputmode="numeric" id="life-kid-age" min="0" step="1" autocomplete="off"></label>
+            <label>还到哪年（含这一年）<input type="number" inputmode="numeric" id="life-mortgage-end" min="2026" step="1" autocomplete="off" placeholder="比如 2045"></label>
+            <label>孩子几个<input type="number" inputmode="numeric" id="life-kids" min="1" step="1" autocomplete="off"></label>
+            <label>最小的孩子几岁<input type="number" inputmode="numeric" id="life-kid-age" min="0" max="22" step="1" autocomplete="off"></label>
             <label><span>每个孩子每月花多少 <span class="u" data-unit="work">CNY</span></span><input type="number" inputmode="decimal" id="life-kid-monthly" min="0" step="500" autocomplete="off"></label>
           </div>
           <p class="fine life-issue" id="life-issue" role="status" hidden></p>

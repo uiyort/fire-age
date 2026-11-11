@@ -459,6 +459,6 @@ body.intro .mode-note, body.intro .legend-note { display: none; }
 #pen-age-s { grid-column: 1 / -1; margin: -4px 0 0; }
 
 .life-grid label { justify-content: flex-end; }
-.life-tag { align-self: flex-start; margin: 4px 0 0; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink-2); font: inherit; font-size: 13px; cursor: pointer; }
-.life-tag[hidden], .life-issue[hidden] { display: none; }
+.life-included-tag { align-self: flex-start; margin: 4px 0 0; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink-2); font: inherit; font-size: 13px; cursor: pointer; }
+.life-included-tag[hidden], .life-issue[hidden] { display: none; }
 .life-issue { color: var(--warn, #b45309); margin: 6px 0; }

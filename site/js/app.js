@@ -427,7 +427,14 @@ function renderLife() {
     const el = $(id);
     if (el && el !== document.activeElement) el.value = S.real[part][field] ?? '';
   }
-  const issue = lifeIssue(S, DATA);
+  const year = new Date().getFullYear();
+  $('life-mortgage-end').min = String(year);
+  const { mortgage: m, kids: k } = S.real;
+  const dropped = [];
+  if (m.monthly > 0 && m.endYear !== null && m.endYear < year) dropped.push('这一年已经过了，月供不再计入。');
+  if (k.monthly > 0 && k.count === 0) dropped.push('孩子数是 0，孩子的花销不再计入。');
+  else if (k.count > 0 && k.monthly > 0 && k.age !== null && k.age >= 22) dropped.push('孩子已满 22 岁，这一项不再计入。');
+  const issue = lifeIssue(S, DATA) || dropped.join('');
   $('life-issue').hidden = !issue;
   $('life-issue').textContent = issue;
   const n = eventsOf(S, DATA).length;
