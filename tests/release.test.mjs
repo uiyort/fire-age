@@ -4,6 +4,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { findBannedCopy } from '../scripts/lint-copy.mjs';
 import { summarizeProbes } from '../scripts/check-cn.mjs';
+import { TYPES, GROUPS, weakness } from '../site/js/holiday.js';
 
 const walk = d => readdirSync(d).flatMap(f => { const p = join(d, f); return statSync(p).isDirectory() ? walk(p) : [p]; });
 const pages = walk('site').filter(f => f.endsWith('.html'));
@@ -54,4 +55,11 @@ test('the mainland check passes on most probes within 3 seconds', () => {
 test('required open-source files exist and no secrets are tracked', () => {
   for (const f of ['LICENSE', 'README.md', 'README.en.md', 'docs/method.md', 'docs/data-sources.md', 'docs/deploy.md']) assert.ok(existsSync(f), f);
   assert.ok(readFileSync('.gitignore', 'utf8').includes('.dev.vars'));
+});
+
+test('type copy never promises investment returns', () => {
+  const banned = ['复利', '钱生钱', '替你上班'];
+  const copy = [...GROUPS.map(g => g.blurb), ...TYPES.flatMap(t => [t.name, t.blurb, weakness(t), weakness(t, { success: 0.6 }), weakness(t, { pensionShare: 0.6 }), weakness({ ...t, status: { id: 'waiting' } })])];
+  assert.equal(TYPES.length, 16);
+  for (const text of copy) for (const w of banned) assert.ok(!text.includes(w), `${w} in ${text}`);
 });
