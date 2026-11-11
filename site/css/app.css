@@ -462,3 +462,8 @@ body.intro .mode-note, body.intro .legend-note { display: none; }
 .life-included-tag { align-self: flex-start; margin: 4px 0 0; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink-2); font: inherit; font-size: 13px; cursor: pointer; }
 .life-included-tag[hidden], .life-issue[hidden] { display: none; }
 .life-issue { color: var(--warn, #b45309); margin: 6px 0; }
+/* The mortgage and children fold reads as one more line under monthly spending, like the split above it. */
+.life-fold > .sub { margin-top: 6px; }
+.life-after { margin: 8px 0 0; font-size: 13px; font-weight: 700; color: var(--ink); }
+.life-after[hidden], .life-gain[hidden], .split-life[hidden] { display: none; }
+.split-life { display: block; margin: 6px 0 0; padding: 0; border: 0; background: transparent; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer; text-align: left; }

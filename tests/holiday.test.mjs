@@ -3,7 +3,7 @@ import { oddsSolve, oddsYears } from '../site/js/odds.js';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
 import { townPlan, cardPlace } from '../site/js/holiday.js';
-import { townHtml } from '../site/js/views.js';
+import { lifeAfterText, lifeGainText, lifeTagText, townHtml } from '../site/js/views.js';
 import { fiNeed, fiYears, fwdSolve, lifePath, monteCarlo } from '../site/js/engine.js';
 import { defaultState, setField, setRetireCountry, setWorkCountry, toParams } from '../site/js/state.js';
 import { rankLevers } from '../site/js/levers.js';
@@ -352,4 +352,17 @@ test('a town the person typed wins the card slot only when it gains something', 
   assert.deepEqual(cardPlace(rows, { name: '大理', monthly: 3000 }, { gain: 0.01 }), { name: '泰国', gain: 4 });
   assert.deepEqual(cardPlace(rows, { name: '', monthly: 3000 }, { gain: 2 }), { name: '泰国', gain: 4 });
   assert.equal(cardPlace([{ name: 'A', years: 3, current: true }], { name: '', monthly: null }, null), null);
+});
+
+test('the tag, the spending after the items end and the gain are told in plain words', () => {
+  const both = { mortgageEnd: 2045, kidsTo22: true, afterMonthly: 7500, low: false };
+  assert.equal(lifeTagText(both, 'CNY'), '已算：房贷到 2045、孩子到 22 岁 · 之后每月约 ¥7,500 ›');
+  assert.equal(lifeTagText({ ...both, kidsTo22: false }, 'CNY'), '已算：房贷到 2045 · 之后每月约 ¥7,500 ›');
+  assert.equal(lifeTagText({ ...both, mortgageEnd: null }, 'THB'), '已算：孩子到 22 岁 · 之后每月约 THB 7,500 ›');
+  assert.equal(lifeAfterText(both, 'CNY'), '到期后，退休后每月约花 ¥7,500。');
+  assert.equal(lifeAfterText({ ...both, afterMonthly: 500, low: true }, 'CNY'), '到期后，退休后每月约花 ¥500。比现在少很多。如果退休后每月想花里没有包含月供和孩子，请把它们加回去。');
+  assert.equal(lifeGainText(null), '');
+  assert.equal(lifeGainText({ years: 3 }), '算上到期，比不算早 3 年放假。');
+  assert.equal(lifeGainText({ years: 0 }), '算上到期，放假年龄没变。');
+  assert.equal(lifeGainText({ unreachableWithout: true }), '不算到期的话，按现在的计划到不了。');
 });

@@ -38,9 +38,9 @@ test.describe('the pension estimate', () => {
     await expect(page.locator('#s-selfPension')).toBeHidden();
   });
 
-  test('the professional form has the estimate too, and the mode note names the pension', async ({ page }) => {
+  test('the professional form has the estimate too, and the mode note names the assumptions', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('#mode-note')).toHaveText('专业版：全部假设，以及房贷、孩子、养老金');
+    await expect(page.locator('#mode-note')).toHaveText('专业版：改收益、通胀等全部假设');
     await page.locator('#to-pro').click();
     await expect(page.locator('#pen-fold-p')).toBeVisible();
     await page.locator('#pen-fold-p summary').click();

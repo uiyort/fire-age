@@ -68,20 +68,23 @@
           <summary>改我的数字</summary>
           <form id="simple-form" autocomplete="off"></form>
           <form id="pro-form" autocomplete="off" hidden></form>
+          <details class="split life-fold" id="life-fold">
+            <summary>有房贷或孩子？到期后开销会降</summary>
+            <p class="sub">月供和孩子的花销，算在每月支出里，也算在退休后每月想花里。到期以后，这部分自动减掉。</p>
+            <div class="pen-grid life-grid">
+              <label><span>月供，每月 <span class="u" data-unit="work">CNY</span></span><input type="number" inputmode="decimal" id="life-mortgage" min="0" step="500" autocomplete="off"></label>
+              <label>还到哪年（含这一年）<input type="number" inputmode="numeric" id="life-mortgage-end" min="2026" step="1" autocomplete="off" placeholder="比如 2045"></label>
+              <label>孩子几个<input type="number" inputmode="numeric" id="life-kids" min="1" step="1" autocomplete="off"></label>
+              <label>最小的孩子几岁<input type="number" inputmode="numeric" id="life-kid-age" min="0" max="22" step="1" autocomplete="off"></label>
+              <label><span>每个孩子每月花多少 <span class="u" data-unit="work">CNY</span></span><input type="number" inputmode="decimal" id="life-kid-monthly" min="0" step="500" autocomplete="off"></label>
+            </div>
+            <p class="fine life-issue" id="life-issue" role="status" hidden></p>
+            <p class="life-after" id="life-after" role="status" hidden></p>
+            <p class="fine life-gain" id="life-gain" hidden></p>
+            <p class="fine">月供按固定金额算，物价上涨后它的实际负担逐年变轻。孩子的花销算到 22 岁。更细的安排（几个孩子年龄不同、兼职收入）会在后面的版本里加。</p>
+            <p class="fine">没算：给孩子买房或婚嫁、赡养父母、出国读书、提前还款或利率变化。</p>
+          </details>
           <div class="estimate" id="estimate"></div>
-        </details>
-        <details class="card fold" id="life-fold">
-          <summary>有房贷或孩子？加上再算</summary>
-          <p class="sub">这些已经算在上面的每月支出里。到期以后，支出相应减少。</p>
-          <div class="pen-grid life-grid">
-            <label><span>月供，每月 <span class="u" data-unit="work">CNY</span></span><input type="number" inputmode="decimal" id="life-mortgage" min="0" step="500" autocomplete="off"></label>
-            <label>还到哪年（含这一年）<input type="number" inputmode="numeric" id="life-mortgage-end" min="2026" step="1" autocomplete="off" placeholder="比如 2045"></label>
-            <label>孩子几个<input type="number" inputmode="numeric" id="life-kids" min="1" step="1" autocomplete="off"></label>
-            <label>最小的孩子几岁<input type="number" inputmode="numeric" id="life-kid-age" min="0" max="22" step="1" autocomplete="off"></label>
-            <label><span>每个孩子每月花多少 <span class="u" data-unit="work">CNY</span></span><input type="number" inputmode="decimal" id="life-kid-monthly" min="0" step="500" autocomplete="off"></label>
-          </div>
-          <p class="fine life-issue" id="life-issue" role="status" hidden></p>
-          <p class="fine">月供按固定金额算，物价上涨后它的实际负担逐年变轻。孩子的花销算到 22 岁。更细的安排（几个孩子年龄不同、兼职收入）会在后面的版本里加。</p>
         </details>
         <p class="missing-note" id="missing-note" role="status" hidden></p>
         <div class="goal-row start-row"><button type="button" class="ghost fill" id="start-calc" hidden>算出我的放假年龄</button></div>

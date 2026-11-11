@@ -419,6 +419,25 @@ export function townHtml(town, plan, p) {
   return `<p class="town-line">${where}：${plan.age} 岁放假${move}（八成把握）。</p>`;
 }
 
+// The tag under the big age: what is counted and what is spent each month once it has ended (retirement currency).
+export function lifeTagText(sum, cur) {
+  const parts = [sum.mortgageEnd !== null ? `房贷到 ${sum.mortgageEnd}` : '', sum.kidsTo22 ? '孩子到 22 岁' : ''].filter(Boolean);
+  return `已算：${parts.join('、')} · 之后每月约 ${wholeMoney(sum.afterMonthly, cur)} ›`;
+}
+
+// Inside the fold, so a spend typed without the mortgage and children shows up as far too little.
+export function lifeAfterText(sum, cur) {
+  const low = sum.low ? '比现在少很多。如果退休后每月想花里没有包含月供和孩子，请把它们加回去。' : '';
+  return `到期后，退休后每月约花 ${wholeMoney(sum.afterMonthly, cur)}。${low}`;
+}
+
+// What counting the end of the items changes; told only inside the fold, never beside the big age.
+export function lifeGainText(gain) {
+  if (!gain) return '';
+  if (gain.unreachableWithout) return '不算到期的话，按现在的计划到不了。';
+  return gain.years >= 1 ? `算上到期，比不算早 ${gain.years} 年放假。` : '算上到期，放假年龄没变。';
+}
+
 // The title of the folded section carries its number: how much earlier the earliest place is than the current one.
 export function placesTitle(rows) {
   const best = rows[0], here = rows.find(r => r.current);

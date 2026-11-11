@@ -2,8 +2,8 @@
 import DATA from './data-latest.js';
 import { DEFAULT_SEED, bwdSolve, monteCarlo, walkPath } from './engine.js';
 import { bwdOdds, decilePaths, dualOdds, extendRow, needLine, oddsRuler, oddsSolve, oddsYears, successAt } from './odds.js';
-import { hardestIndex, heroModel, holidayType, oddsText, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking, townPlan, cardPlace } from './holiday.js';
-import { applyPensionEstimate, commitField, defaultState, eventsOf, lifeIssue, loadState, missingFields, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setTown, setWorkCountry, toParams } from './state.js';
+import { hardestIndex, heroModel, holidayType, oddsText, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking, townPlan, cardPlace, withoutItemsGain } from './holiday.js';
+import { applyPensionEstimate, commitField, defaultState, lifeIssue, lifeSummary, loadState, missingFields, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setTown, setWorkCountry, toParams } from './state.js';
 import { estimateFromForm } from './pension.js';
 import { labPlan, lifeChoices, personalLever, rankLevers, impactOf, smallStep, tryRange } from './levers.js';
 import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody } from './scenario.js';
@@ -14,7 +14,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { assumptionLine, renderCard, summaryCardSpec, typeCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
+  allTypesHtml, cardBody, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, lifeAfterText, lifeGainText, lifeTagText, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -267,7 +267,10 @@ const SPLIT_PARTS = [['rent', '房租或房贷'], ['food', '吃饭'], ['other', 
 const SPLIT_NOTE = '三项加起来，自动填进每月支出。';
 const SPLIT_HTML = `<details class="split" id="expense-split"><summary>每月花多少说不准？拆开来加</summary><div class="split-row">${
   SPLIT_PARTS.map(([key, name]) => `<label>${name}<input type="number" inputmode="decimal" id="split-${key}" step="100" min="0"></label>`).join('')
-}</div><p class="fine" id="split-note">${SPLIT_NOTE}</p></details>`;
+}</div><button type="button" class="split-life" id="split-life" hidden>房贷会还完？填上还到哪年 ›</button><p class="fine" id="split-note">${SPLIT_NOTE}</p></details>`;
+
+// A rent or mortgage in the parts may end one day, so it points at the fold where the end year goes.
+const showSplitLife = () => { $('split-life').hidden = !(Number($('split-rent').value) > 0); };
 
 // Typing straight into monthly spending makes the parts stale, so they are cleared rather than left disagreeing.
 function clearSplit() {
@@ -275,6 +278,7 @@ function clearSplit() {
   if (parts.every(el => el.value === '')) return;
   parts.forEach(el => { el.value = ''; });
   $('split-note').textContent = SPLIT_NOTE;
+  showSplitLife();
 }
 
 function buildForm(el, prefix, groups) {
@@ -318,7 +322,26 @@ function syncInputs() {
   $('p-swr').disabled = S.autoSwr;
 }
 
+// The fold sits under the spending field of the form on screen. It is one node, moved only when the view
+// changes, so its inputs keep their values and typing keeps its focus.
+function placeFold() {
+  const fold = $('life-fold');
+  const anchor = S.view === 'simple' ? $('expense-split') : $('p-expense').closest('.f');
+  if (fold.previousElementSibling !== anchor) anchor.after(fold);
+}
+
+// The tag sits under the big age in the simple view and under the headline in the professional one. The hero is
+// redrawn whole, which drops the tag, so it is put back after every redraw.
+const lifeTag = $('life-tag');
+function placeTag() {
+  const big = S.view === 'simple' ? $('hero').querySelector('.hero-big') : null;
+  if (big) big.after(lifeTag);
+  else if (S.view === 'simple') $('hero').prepend(lifeTag);
+  else $('headline').after(lifeTag);
+}
+
 function syncChrome(p) {
+  placeFold();
   document.querySelectorAll('[data-unit="work"]').forEach(e => { e.textContent = p.wCur; });
   document.querySelectorAll('[data-unit="retire"]').forEach(e => { e.textContent = p.rCur; });
   // The town box reads its spend in the retirement currency; abroad, the towns are not 国内.
@@ -332,7 +355,7 @@ function syncChrome(p) {
   $('pro-form').hidden = S.view !== 'pro';
   $('solve-card').hidden = S.mode !== 'bwd';
   // The note names the other view, so it stays in place when the view changes.
-  $('mode-note').textContent = S.view === 'simple' ? '专业版：全部假设，以及房贷、孩子、养老金' : '简单版：只填几个数';
+  $('mode-note').textContent = S.view === 'simple' ? '专业版：改收益、通胀等全部假设' : '简单版：只填几个数';
   // The "example" label holds only while the numbers are still the examples.
   const start = defaultState(DATA);
   const example = ['age', 'assets', 'income', 'expense'].every(k => S[k] === start[k]);
@@ -355,7 +378,7 @@ function renderEstimate(p) {
   if (!typing) {
     $('estimate').innerHTML = `<div class="f"><div class="lab"><label for="s-retexp">退休后每月想花 <span class="u">${p.rCur}</span></label></div>
       <input type="number" inputmode="decimal" id="s-retexp" step="500" value="${S.retExp === null ? '' : Math.round(S.retExp / 12)}"></div>
-      <p class="fine">估算值，请按你计划的实际生活改写。</p>
+      <p class="fine">估算值，请按你计划的实际生活改写。${p.events.length ? '要包含月供和孩子，到期会自动减掉。' : ''}</p>
       <p class="fine mix-note">组合按股票 ${p.eq}% / 债券 ${100 - p.eq}% 估算（常见的基准组合，不是建议），扣掉通胀后约 ${pct(p.r, 1)}/年。<a href="sources.html">数据来源</a>，专业模式可以改。</p>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}`;
   }
 }
@@ -389,7 +412,8 @@ function renderFast() {
   $('tiles').innerHTML = tilesHtml({ mode: S.mode, p, t, bwd, mc: latest.mc, dispCur: cur, target });
   renderHero();
   if (S.mode === 'bwd') $('solves').innerHTML = solvesHtml({ p, bwd, odds, dispCur: cur });
-  $('type-now').innerHTML = typeHtml(type);
+  // The type is told for the plan as it is; spending that ends can move both the age and the type.
+  $('type-now').innerHTML = typeHtml(type) + (p.events.length ? '<p class="fine">算上到期支出，放假可能更早，类型也可能跟着变。</p>' : '');
   document.querySelectorAll('.type-cell').forEach(cell => cell.classList.toggle('mine', cell.dataset.code === type.code));
   const reached = S.mode === 'fwd' && t === 0;
   $('levers').innerHTML = leversHtml(levers, p, { pro: S.view === 'pro', small, dispCur: cur, reached });
@@ -423,7 +447,7 @@ const LIFE_INPUTS = [
   ['life-mortgage', 'mortgage', 'monthly'], ['life-mortgage-end', 'mortgage', 'endYear'],
   ['life-kids', 'kids', 'count'], ['life-kid-age', 'kids', 'age'], ['life-kid-monthly', 'kids', 'monthly'],
 ];
-// The fold's inputs, the warning under them and the tag under the big age; typing is left alone.
+// The fold's inputs, the warning and the lines under them, and the tag under the big age; typing is left alone.
 function renderLife() {
   for (const [id, part, field] of LIFE_INPUTS) {
     const el = $(id);
@@ -439,9 +463,16 @@ function renderLife() {
   const issue = lifeIssue(S, DATA) || dropped.join('');
   $('life-issue').hidden = !issue;
   $('life-issue').textContent = issue;
-  const n = eventsOf(S, DATA).length;
-  $('life-tag').hidden = n === 0;
-  $('life-tag').textContent = `已含 ${n} 项真实生活`;
+  const sum = lifeSummary(S, DATA, year);
+  const cur = latest.p.rCur;
+  lifeTag.hidden = !sum;
+  lifeTag.textContent = sum ? lifeTagText(sum, cur) : '';
+  $('life-after').hidden = !sum;
+  $('life-after').textContent = sum ? lifeAfterText(sum, cur) : '';
+  // One more solve, without the items, for the comparison inside the fold.
+  const gain = sum ? lifeGainText(withoutItemsGain(latest.p)) : '';
+  $('life-gain').hidden = !gain;
+  $('life-gain').textContent = gain;
 }
 
 function renderTown() {
@@ -456,6 +487,7 @@ function renderHero() {
   const success = latest.success;
   latest.hero = heroModel({ mode, p, t, bwd, success, need: target[retireT ?? 0], ruler: mode === 'bwd' ? null : ruler });
   $('hero').innerHTML = heroHtml(latest.hero, { p, dispCur: cur });
+  placeTag();
   $('sticky-result').innerHTML = stickyHtml(latest.hero, { p, dispCur: cur, success, pro: S.view === 'pro' });
   const riskLead = S.view === 'pro'
     ? (success === null ? '按计划没有放假年份，不计算成功率。' : `2,000 次模拟，成功率 ${pct(success, 0)}，按本工具假设。`)
@@ -753,6 +785,7 @@ function onInput(ev) {
     return;
   }
   if (el.closest?.('#expense-split')) {
+    showSplitLife();
     const parts = SPLIT_PARTS.map(([key]) => $(`split-${key}`).value);
     if (parts.every(v => v === '')) return;
     const expense = $('s-expense');
@@ -946,8 +979,15 @@ function download(name, type, text) {
 
 function onClick(ev) {
   if (ev.target.closest?.('#life-tag')) {
+    $('inputs-box').open = true;
     $('life-fold').open = true;
     $('life-fold').scrollIntoView({ block: 'start', behavior: 'smooth' });
+    return;
+  }
+  if (ev.target.id === 'split-life') {
+    $('inputs-box').open = true;
+    $('life-fold').open = true;
+    $('life-mortgage').focus();
     return;
   }
   if (ev.target.closest?.('[data-pen-use]')) {
