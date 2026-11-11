@@ -410,10 +410,12 @@ const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<':
 export function townHtml(town, plan, p) {
   if (!town?.name || !(town.monthly > 0)) return '';
   const where = `在${escapeHtml(town.name)}每月花 ${wholeMoney(town.monthly, p.rCur)}`;
-  if (plan.age === null) return `<p class="town-line">${where}：按这个花销还到不了。</p>`;
+  // A spend below the mortgage and children's costs cannot hold them, so this line leaves them out and says so.
+  const left = plan.ignored ? '这里填的比月供和孩子的花销还少，这一行没有算这两项。' : '';
+  if (plan.age === null) return `<p class="town-line">${where}：按这个花销还到不了。${left}</p>`;
   const years = Math.round(Math.abs(plan.gain) * 10) / 10;
   const move = plan.gain === null || years === 0 ? '' : plan.gain > 0 ? `，早 ${years} 年` : `，晚 ${years} 年`;
-  return `<p class="town-line">${where}：${plan.age} 岁放假${move}（八成把握）。</p>`;
+  return `<p class="town-line">${where}：${plan.age} 岁放假${move}（八成把握）。${left}</p>`;
 }
 
 // The title of the folded section carries its number: how much earlier the earliest place is than the current one.

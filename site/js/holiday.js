@@ -88,7 +88,9 @@ export function holidayType(p, data, { workC, retC, retireT, success = null }) {
   const t = backward ? retireT : oddsSolve(p);
   const age = t === null ? null : p.age + t;
   const priceRatio = data.countries[retC].priceLevel.value / data.countries[workC].priceLevel.value;
-  const lifestyle = p.expense > 0 ? conv(p.retExp, p.rCur, p.wCur, p.fx) / priceRatio / p.expense : Infinity;
+  // The items (a mortgage, children) do not follow local prices, so only the rest is compared at today's prices.
+  const items = itemsOf(p);
+  const lifestyle = p.expense > 0 ? (Math.max(conv(p.retExp, p.rCur, p.wCur, p.fx) - items, 0) / priceRatio + items) / p.expense : Infinity;
   const atHoliday = t === null ? 0 : backward ? needLine(p)[t] : assetsAt(p, t);
   const capitalShare = atHoliday > 0 ? Math.min(p.assets * Math.pow(1 + p.r, t) / atHoliday, 1) : 0;
 
@@ -108,11 +110,17 @@ export function holidayType(p, data, { workC, retC, retireT, success = null }) {
   return { ...type, weakness: weakness(type, { success, pensionShare }) };
 }
 
+// Yearly amount (work currency) of the spending that ends at a known age, which the model removes at full value.
+const itemsOf = p => (p.events ?? []).reduce((total, e) => total + e.amount, 0);
+
 // The same plan in every place. Spending keeps its purchasing power; a pension moves at market exchange rates.
+// The items (a mortgage, children) are money of their own: they move at market rates and are not scaled by prices.
 export function placeRanking(p, data, retC) {
   const here = data.countries[retC].priceLevel.value;
+  const items = itemsOf(p), itemsHere = conv(items, p.wCur, p.rCur, p.fx);
   const rows = Object.entries(data.countries).map(([code, c]) => {
-    const retExp = conv(p.retExp, p.rCur, c.cur, p.fx) * c.priceLevel.value / here;
+    const retExp = code === retC ? p.retExp
+      : Math.max(conv(p.retExp - itemsHere, p.rCur, c.cur, p.fx) * c.priceLevel.value / here, 0) + conv(items, p.wCur, c.cur, p.fx);
     const pension = conv(p.pension, p.rCur, c.cur, p.fx);
     const q = buildParams({ ...p, rCur: c.cur, retExp, pension }, p.fx);
     const t = oddsSolve(q);
@@ -125,12 +133,16 @@ export function placeRanking(p, data, retC) {
 }
 
 // The same plan with the spending the person typed for one town, a month's worth in the retirement currency.
+// The typed spend is a total that holds the items; one smaller than the items cannot, so, as for 退休后每月想花,
+// the items are left out of that line (ignored: true) instead of pushing its spending below zero.
 export function townPlan(p, monthly) {
   const none = { age: null, years: null, gain: null };
   if (!(Number(monthly) > 0)) return none;
-  const q = buildParams({ ...p, retExp: Number(monthly) * 12 }, p.fx);
+  const retExp = Number(monthly) * 12;
+  const ignored = (p.events ?? []).length > 0 && retExp < conv(itemsOf(p), p.wCur, p.rCur, p.fx);
+  const q = buildParams({ ...p, retExp, ...(ignored ? { events: [] } : {}) }, p.fx);
   const t = oddsSolve(q), years = oddsYears(q), now = oddsYears(p);
-  return { age: t === null ? null : p.age + t, years, gain: years === null || now === null ? null : now - years };
+  return { age: t === null ? null : p.age + t, years, gain: years === null || now === null ? null : now - years, ignored };
 }
 
 // The card names a place that gained at least a month: the town the person typed first, else the best overseas place.

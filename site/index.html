@@ -105,10 +105,10 @@
         <details class="card fold" id="places-fold">
           <summary id="places-title">换个地方放假</summary>
           <div id="places-card">
-            <h3 class="town-title">国内换个城市，或者回老家</h3>
+            <h3 class="town-title" id="town-title">国内换个城市，或者回老家</h3>
             <div class="town-row">
               <label>地名<input id="town-name" type="text" maxlength="6" autocomplete="off" placeholder="比如大理"></label>
-              <label>每月花销<input id="town-monthly" type="number" inputmode="decimal" min="0" autocomplete="off" placeholder="比如 4000"></label>
+              <label><span>每月花销 <span class="u" data-unit="retire">CNY</span></span><input id="town-monthly" type="number" inputmode="decimal" min="0" autocomplete="off" placeholder="比如 4000"></label>
             </div>
             <div id="town-result" aria-live="polite"></div>
             <p class="fine">花销请自己估，本工具不提供各城市的参考值。</p>

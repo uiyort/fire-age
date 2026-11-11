@@ -321,6 +321,8 @@ function syncInputs() {
 function syncChrome(p) {
   document.querySelectorAll('[data-unit="work"]').forEach(e => { e.textContent = p.wCur; });
   document.querySelectorAll('[data-unit="retire"]').forEach(e => { e.textContent = p.rCur; });
+  // The town box reads its spend in the retirement currency; abroad, the towns are not 国内.
+  $('town-title').textContent = S.retC === 'CN' ? '国内换个城市，或者回老家' : '换个城市，或者回老家';
   document.querySelectorAll('[data-bwd-only]').forEach(e => { e.hidden = S.mode !== 'bwd'; });
   document.querySelectorAll('[data-cn-only]').forEach(e => { e.hidden = S.workC !== 'CN'; });
   document.querySelectorAll('[data-cn-pension]').forEach(e => { e.hidden = !(S.workC === 'CN' && S.pension > 0); });
@@ -745,7 +747,7 @@ function onInput(ev) {
     const row = LIFE_INPUTS.find(r => r[0] === el.id);
     if (!row) return;
     labValues = {};
-    S = setReal(S, row[1], row[2], el.value);
+    S = setReal(S, row[1], row[2], el.value, DATA);
     saveState(S, storage);
     refresh();
     return;

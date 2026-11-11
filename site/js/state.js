@@ -45,7 +45,12 @@ export function cleanReal(raw) {
   const t = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   return { mortgage: group(t.mortgage, ['monthly', 'endYear']), kids: group(t.kids, ['count', 'age', 'monthly']) };
 }
-export const setReal = (S, part, field, rawText) => ({ ...S, real: cleanReal({ ...S.real, [part]: { ...S.real?.[part], [field]: rawText } }) });
+// The automatic retirement spending holds the items at their own value, so with data it is estimated again.
+export function setReal(S, part, field, rawText, data = null) {
+  const next = { ...S, real: cleanReal({ ...S.real, [part]: { ...S.real?.[part], [field]: rawText } }) };
+  if (data && !S.touched?.retExp) next.retExp = Math.round(estimateRetireSpend(next.expense ?? 0, next.workC, next.retC, data, itemsYearly(next)));
+  return next;
+}
 
 // Yearly amounts of the two items, or null while an item is not filled in.
 function realItems(S) {
@@ -69,12 +74,22 @@ export function lifeIssue(S, data) {
 
 // "Until year Y" means the payments continue through year Y, so they stop at the start of the year after.
 export function eventsOf(S, data, thisYear = new Date().getFullYear()) {
-  if (lifeIssue(S, data)) return [];
+  return lifeIssue(S, data) ? [] : itemEvents(S, thisYear);
+}
+
+function itemEvents(S, thisYear) {
   const { mortgage, kids } = realItems(S);
   const out = [];
   if (mortgage) out.push({ id: 'mortgage', amount: mortgage.yearly, endAge: Math.round(S.age) + (mortgage.endYear - thisYear) + 1, nominal: true });
   if (kids) out.push({ id: 'kids', amount: kids.yearly, endAge: Math.round(S.age) + (22 - kids.age), nominal: false });
   return out.filter(e => e.endAge > S.age);
+}
+
+// The yearly amount (work currency) of the items still running, as the automatic estimate holds them apart.
+// Items larger than the whole spending are dropped by the model, so the estimate does not hold them apart either.
+export function itemsYearly(S, thisYear = new Date().getFullYear()) {
+  const sum = itemEvents(S, thisYear).reduce((total, e) => total + e.amount, 0);
+  return sum > (S.expense ?? 0) ? 0 : sum;
 }
 
 export const setPen = (S, change) => ({ ...S, pen: cleanPen({ ...S.pen, ...change }) });
@@ -122,10 +137,13 @@ export function defaultState(data) {
   };
 }
 
-export function estimateRetireSpend(annualExpense, workC, retC, data) {
+// Spending that follows local prices is scaled by the price ratio; the items (a mortgage, children; yearly, work
+// currency) stay what they are and move at the market rate, so the amount removed when one ends is the amount held.
+export function estimateRetireSpend(annualExpense, workC, retC, data, items = 0) {
   if (workC === retC) return annualExpense;
   const ratio = data.countries[retC].priceLevel.value / data.countries[workC].priceLevel.value;
-  return convert(annualExpense, curOf(data, workC), curOf(data, retC), data) * ratio;
+  const from = curOf(data, workC), to = curOf(data, retC);
+  return convert(Math.max(annualExpense - items, 0), from, to, data) * ratio + convert(items, from, to, data);
 }
 
 // commit: false is for values still being typed, which must not become the fallback for a blank field.
@@ -138,7 +156,7 @@ export function setField(S, id, rawText, data, { commit = true } = {}) {
   if (id === 'retExp') return { ...next, touched: { ...S.touched, retExp: true }, notice: '' };
   if (id === 'expense' && !S.touched.retExp) {
     const spent = value ?? 0;
-    next.retExp = data ? Math.round(estimateRetireSpend(spent, S.workC, S.retC, data)) : spent;
+    next.retExp = data ? Math.round(estimateRetireSpend(spent, S.workC, S.retC, data, itemsYearly(next))) : spent;
   }
   return next;
 }
@@ -161,11 +179,11 @@ export function setWorkCountry(S, code, data) {
   for (const id of ['assets', 'income', 'expense']) {
     if (S[id] !== null) moved[id] = Math.round(convert(S[id], from, to, data));
   }
-  if (!S.touched.retExp) moved.retExp = Math.round(estimateRetireSpend(moved.expense ?? 0, code, S.retC, data));
   // The payments are work-currency money, like the other work-currency fields.
   const r = cleanReal(S.real);
   const conv = v => (v === null ? null : Math.round(convert(v, from, to, data)));
   moved.real = { mortgage: { ...r.mortgage, monthly: conv(r.mortgage.monthly) }, kids: { ...r.kids, monthly: conv(r.kids.monthly) } };
+  if (!S.touched.retExp) moved.retExp = Math.round(estimateRetireSpend(moved.expense ?? 0, code, S.retC, data, itemsYearly(moved)));
   moved.lastValid = { ...S.lastValid, ...localAssumptions(country) };
   moved.touched = Object.fromEntries(Object.entries(S.touched).filter(([id]) => !ASSUMPTION_FIELDS.includes(id)));
   return moved;
@@ -178,7 +196,7 @@ export function setRetireCountry(S, code, data) {
   if (S.touched.retExp) {
     moved.notice = `退休地已改为${data.countries[code].name}，你手动填写的退休支出没有变，请按当地货币和花费调整。`;
   } else {
-    moved.retExp = Math.round(estimateRetireSpend(S.expense ?? 0, S.workC, code, data));
+    moved.retExp = Math.round(estimateRetireSpend(S.expense ?? 0, S.workC, code, data, itemsYearly(S)));
   }
   return moved;
 }

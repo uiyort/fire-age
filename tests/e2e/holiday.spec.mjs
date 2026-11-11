@@ -541,3 +541,17 @@ test('a typed town shows the age it gives and goes away when the spend is cleare
   await page.getByRole('button', { name: /卡片|放假卡/ }).click();
   expect(errors).toEqual([]);
 });
+
+test('the town spend carries the retirement currency, and abroad the town heading drops 国内', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#places-fold > summary').click();
+  const label = page.locator('label:has(#town-monthly)');
+  await expect(label.locator('[data-unit="retire"]')).toHaveText('CNY');
+  await expect(page.locator('#town-title')).toHaveText('国内换个城市，或者回老家');
+  await page.selectOption('#s-ret', 'TH');
+  await expect(label.locator('[data-unit="retire"]')).toHaveText('THB');
+  await expect(page.locator('#town-title')).toHaveText('换个城市，或者回老家');
+  await page.fill('#town-name', '清迈');
+  await page.fill('#town-monthly', '20000');
+  await expect(page.locator('#town-result')).toContainText('THB');
+});
