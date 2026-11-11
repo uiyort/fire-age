@@ -3,7 +3,7 @@ import DATA from './data-latest.js';
 import { DEFAULT_SEED, bwdSolve, monteCarlo, walkPath } from './engine.js';
 import { bwdOdds, decilePaths, dualOdds, extendRow, needLine, oddsRuler, oddsSolve, oddsYears, successAt } from './odds.js';
 import { hardestIndex, heroModel, holidayType, oddsText, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking, townPlan, cardPlace } from './holiday.js';
-import { applyPensionEstimate, commitField, defaultState, loadState, missingFields, saveState, safeStorage, setField, setPen, setRetireCountry, setTown, setWorkCountry, toParams } from './state.js';
+import { applyPensionEstimate, commitField, defaultState, eventsOf, lifeIssue, loadState, missingFields, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setTown, setWorkCountry, toParams } from './state.js';
 import { estimateFromForm } from './pension.js';
 import { labPlan, lifeChoices, personalLever, rankLevers, impactOf, smallStep, tryRange } from './levers.js';
 import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody } from './scenario.js';
@@ -379,6 +379,7 @@ function renderFast() {
   syncChrome(p);
   syncInputs();
   renderPen();
+  renderLife();
   renderEstimate(p);
   const eightAge = t === null ? null : p.age + t;
   const { say, note } = headlineText({ mode: S.mode, p, t, odds, eightAge, dual, dispCur: cur, view: S.view });
@@ -414,6 +415,24 @@ function slowParts() {
       () => { $('sensitivity').innerHTML = sensitivityHtml(p, PARAMS); },
     ] : []),
   ];
+}
+
+const LIFE_INPUTS = [
+  ['life-mortgage', 'mortgage', 'monthly'], ['life-mortgage-end', 'mortgage', 'endYear'],
+  ['life-kids', 'kids', 'count'], ['life-kid-age', 'kids', 'age'], ['life-kid-monthly', 'kids', 'monthly'],
+];
+// The fold's inputs, the warning under them and the tag under the big age; typing is left alone.
+function renderLife() {
+  for (const [id, part, field] of LIFE_INPUTS) {
+    const el = $(id);
+    if (el && el !== document.activeElement) el.value = S.real[part][field] ?? '';
+  }
+  const issue = lifeIssue(S, DATA);
+  $('life-issue').hidden = !issue;
+  $('life-issue').textContent = issue;
+  const n = eventsOf(S, DATA).length;
+  $('life-tag').hidden = n === 0;
+  $('life-tag').textContent = `已含 ${n} 项真实生活`;
 }
 
 function renderTown() {
@@ -715,6 +734,15 @@ function onInput(ev) {
     renderPen();
     return;
   }
+  if (el.closest?.('#life-fold')) {
+    const row = LIFE_INPUTS.find(r => r[0] === el.id);
+    if (!row) return;
+    labValues = {};
+    S = setReal(S, row[1], row[2], el.value);
+    saveState(S, storage);
+    refresh();
+    return;
+  }
   if (el.closest?.('#expense-split')) {
     const parts = SPLIT_PARTS.map(([key]) => $(`split-${key}`).value);
     if (parts.every(v => v === '')) return;
@@ -908,6 +936,11 @@ function download(name, type, text) {
 }
 
 function onClick(ev) {
+  if (ev.target.closest?.('#life-tag')) {
+    $('life-fold').open = true;
+    $('life-fold').scrollIntoView({ block: 'start', behavior: 'smooth' });
+    return;
+  }
   if (ev.target.closest?.('[data-pen-use]')) {
     const est = penEstimate();
     if (!est?.est.eligible) return;

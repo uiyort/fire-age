@@ -337,7 +337,7 @@ h3 { font-family: var(--f-display); font-weight: 900; font-size: 16px; margin: 1
 
 .results { gap: 28px; }
 .zone { display: flex; flex-direction: column; gap: 10px; min-width: 0; scroll-margin-top: 96px; }
-#share-section, #headline { scroll-margin-top: 96px; }
+#share-section, #headline, #life-fold { scroll-margin-top: 96px; }
 .zone-title { font-size: 24px; margin: 0; }
 .zone-lead { margin: -6px 0 2px; font-size: 15px; font-weight: 700; color: var(--accent); }
 .zone-lead:empty { display: none; }
@@ -457,3 +457,8 @@ body.intro .mode-note, body.intro .legend-note { display: none; }
 .pen-used { color: var(--ink-2); }
 .pen-result .fine { margin: 0; }
 #pen-age-s { grid-column: 1 / -1; margin: -4px 0 0; }
+
+.life-grid label { justify-content: flex-end; }
+.life-tag { align-self: flex-start; margin: 4px 0 0; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink-2); font: inherit; font-size: 13px; cursor: pointer; }
+.life-tag[hidden], .life-issue[hidden] { display: none; }
+.life-issue { color: var(--warn, #b45309); margin: 6px 0; }
