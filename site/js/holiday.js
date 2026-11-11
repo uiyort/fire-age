@@ -147,7 +147,7 @@ export function townPlan(p, monthly) {
 
 // The card names a place that gained at least a month: the town the person typed first, else the best overseas place.
 export function cardPlace(rows, town, plan) {
-  if (town?.name && plan?.gain >= 0.05) return { name: town.name, gain: plan.gain };
+  if (town?.name && plan?.gain >= 0.05) return { name: town.name, gain: plan.gain, town: true };
   const best = rows[0], here = rows.find(r => r.current);
   const gain = best && best.years !== null && here?.years != null ? here.years - best.years : 0;
   return gain >= 0.05 ? { name: best.name, gain } : null;

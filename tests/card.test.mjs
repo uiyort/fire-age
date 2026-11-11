@@ -167,6 +167,16 @@ test('the summary card carries one note at most, the most personal one, as a lab
   assert.equal(summaryCardSpec(summary).note, null);
 });
 
+test('a typed town that gains something comes before the lever, and is not called the same money', () => {
+  const lever = { action: '每月多存 ¥1,250', gain: 1.4 };
+  const town = { name: '大理', gain: 2.5, town: true };
+  assert.deepEqual(summaryCardSpec({ ...summary, place: town, lever }).note, { label: '换个地方', main: '去大理放假', detail: '早 2.5 年' });
+  assert.equal(summaryCardSpec({ ...summary, place: town, lever, goal: '储蓄率到 45%' }).note.label, '小目标达成');
+  // The best overseas place keeps its place after the lever, and its label.
+  assert.equal(summaryCardSpec({ ...summary, place: { name: '泰国', gain: 4.3 }, lever }).note.label, '提前的办法');
+  assert.equal(summaryCardSpec({ ...summary, place: { name: '泰国', gain: 4.3 } }).note.label, '同样的钱');
+});
+
 test('a lever that makes the holiday reachable says the age', () => {
   assert.deepEqual(summaryCardSpec({ ...summary, lever: { action: '每月多存 ¥1,250', unlockAge: 58 } }).note, { label: '提前的办法', main: '每月多存 ¥1,250', detail: '就能在 58 岁放假' });
 });

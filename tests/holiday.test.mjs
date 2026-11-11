@@ -348,7 +348,7 @@ test('a typed town name is escaped and its sentence names the age and the direct
 
 test('a town the person typed wins the card slot only when it gains something', () => {
   const rows = [{ name: '泰国', years: 5, current: false }, { name: '中国大陆', years: 9, current: true }];
-  assert.deepEqual(cardPlace(rows, { name: '大理', monthly: 3000 }, { gain: 2 }), { name: '大理', gain: 2 });
+  assert.deepEqual(cardPlace(rows, { name: '大理', monthly: 3000 }, { gain: 2 }), { name: '大理', gain: 2, town: true });
   assert.deepEqual(cardPlace(rows, { name: '大理', monthly: 3000 }, { gain: 0.01 }), { name: '泰国', gain: 4 });
   assert.deepEqual(cardPlace(rows, { name: '', monthly: 3000 }, { gain: 2 }), { name: '泰国', gain: 4 });
   assert.equal(cardPlace([{ name: 'A', years: 3, current: true }], { name: '', monthly: null }, null), null);

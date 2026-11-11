@@ -70,6 +70,8 @@ export function summaryCardSpec({ mode, type, hero, monthlyText, enough, place, 
     note = { label: '你写的人生', tag: '已改签', main: fifth.main, detail: fifth.detail, change: m ? { prefix: m[1], was: m[2], now: m[3] } : null };
   }
   else if (goalText) note = { label: '小目标达成', main: goalText, detail: '' };
+  // A town the person typed is their own plan, so it comes before the lever; its spend was typed, not the same money.
+  else if (place?.town) note = { label: '换个地方', main: `去${place.name}放假`, detail: `早 ${trimYears(place.gain)} 年` };
   else if (lever) note = { label: '提前的办法', main: money || !lever.plain ? lever.action : lever.plain, detail: lever.unlockAge ? `就能在 ${lever.unlockAge} 岁放假` : `早 ${trimYears(lever.gain)} 年放假` };
   else if (place) note = { label: '同样的钱', main: `去${place.name}放假`, detail: `早 ${trimYears(place.gain)} 年` };
   return {
