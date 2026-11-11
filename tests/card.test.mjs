@@ -68,6 +68,8 @@ test('the odds sit with the age, and the assumptions are spelled out', () => {
   const s = summaryCardSpec({ ...summary, odds: '八成把握', assumptions: assumptionLine({ r: 0.029, pension: 0 }) });
   assert.equal(s.odds, '八成把握');
   assert.equal(assumptionLine({ r: 0.029, pension: 0 }), '按今天的钱算 · 实际收益 2.9%/年 · 未算养老金 / 社保自缴');
+  assert.equal(assumptionLine({ r: 0.029, pension: 0, events: [] }), '按今天的钱算 · 实际收益 2.9%/年 · 未算养老金 / 社保自缴');
+  assert.equal(assumptionLine({ r: 0.029, pension: 0, events: [{ id: 'mortgage' }] }), '按今天的钱算 · 实际收益 2.9%/年 · 未算养老金 / 社保自缴 · 含到期支出');
   assert.equal(assumptionLine({ r: 0.0286, pension: 36000 }), '按今天的钱算 · 实际收益 2.9%/年 · 含养老金 · 未算社保自缴');
   assert.match(s.assumptions, /按本工具假设模拟，方法见网页『计算方法』$/);
   assert.equal(summaryCardSpec(summary).assumptions, '');

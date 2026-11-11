@@ -896,7 +896,7 @@ function summaryInput() {
     lever: personalLever(rankLevers(p, DATA, { retC: S.retC, top: 6 }), p, v => money(Math.round(toDisplay(v, p, cur)), cur)),
     // Forward, the age is the 8-in-10 age; working backward, the card says the odds of the plan as it is.
     odds: !hero.reachable ? '' : mode === 'bwd' ? oddsText(hero.success) : '八成把握',
-    assumptions: assumptionLine({ r: p.r, pension: p.pension, selfPay: p.selfPay }),
+    assumptions: assumptionLine({ r: p.r, pension: p.pension, selfPay: p.selfPay, events: p.events }),
     privacy: { money: $('card-money').checked, now: $('card-now').checked },
   };
 }

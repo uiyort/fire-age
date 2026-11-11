@@ -134,15 +134,24 @@ export function placeRanking(p, data, retC) {
 
 // The same plan with the spending the person typed for one town, a month's worth in the retirement currency.
 // The typed spend is a total that holds the items; one smaller than the items cannot, so, as for 退休后每月想花,
-// the items are left out of that line (ignored: true) instead of pushing its spending below zero.
+// no age is solved for that line (ignored: true) rather than guess at the items.
 export function townPlan(p, monthly) {
   const none = { age: null, years: null, gain: null };
   if (!(Number(monthly) > 0)) return none;
   const retExp = Number(monthly) * 12;
-  const ignored = (p.events ?? []).length > 0 && retExp < conv(itemsOf(p), p.wCur, p.rCur, p.fx);
-  const q = buildParams({ ...p, retExp, ...(ignored ? { events: [] } : {}) }, p.fx);
+  if ((p.events ?? []).length > 0 && retExp < conv(itemsOf(p), p.wCur, p.rCur, p.fx)) return { ...none, ignored: true };
+  const q = buildParams({ ...p, retExp }, p.fx);
   const t = oddsSolve(q), years = oddsYears(q), now = oddsYears(p);
-  return { age: t === null ? null : p.age + t, years, gain: years === null || now === null ? null : now - years, ignored };
+  return { age: t === null ? null : p.age + t, years, gain: years === null || now === null ? null : now - years, ignored: false };
+}
+
+// Whole years by which the holiday comes earlier with the items (a mortgage, children) than without them.
+export function withoutItemsGain(p) {
+  if (!(p.events ?? []).length) return null;
+  const withItems = oddsYears(p);
+  if (withItems === null) return null;
+  const without = oddsYears(buildParams({ ...p, events: [] }, p.fx));
+  return without === null ? { unreachableWithout: true } : { years: Math.round(without - withItems) };
 }
 
 // The card names a place that gained at least a month: the town the person typed first, else the best overseas place.

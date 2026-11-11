@@ -31,7 +31,7 @@ test.describe('mortgage and children', () => {
 
     await page.fill('#life-kids', '1');
     await page.fill('#life-kid-age', '5');
-    await page.fill('#life-kid-monthly', '2000');
+    await page.fill('#life-kid-monthly', '1500');
     await expect(page.locator('#life-tag')).toHaveText('已含 2 项真实生活');
     const withBoth = await ageOf(page);
     expect(withBoth).toBeLessThanOrEqual(before);
@@ -48,7 +48,7 @@ test.describe('mortgage and children', () => {
     await page.locator('#to-pro').click();
     await expect(page.locator('#life-tag')).toHaveText('已含 2 项真实生活');
     await expect(page.locator('#life-mortgage')).toHaveValue('4000');
-    await expect(page.locator('#life-kid-monthly')).toHaveValue('2000');
+    await expect(page.locator('#life-kid-monthly')).toHaveValue('1500');
     await expect(page.locator('#sticky-result .sticky-age')).toContainText(`${withBoth}`);
   });
 
@@ -72,7 +72,7 @@ test.describe('mortgage and children', () => {
     await expect(page.locator('#life-mortgage-end')).toHaveAttribute('min', String(new Date().getFullYear()));
     await page.fill('#life-kids', '1');
     await page.fill('#life-kid-age', '25');
-    await page.fill('#life-kid-monthly', '2000');
+    await page.fill('#life-kid-monthly', '1500');
     await expect(page.locator('#life-issue')).toHaveText('孩子已满 22 岁，这一项不再计入。');
     await expect(page.locator('#life-tag')).toBeHidden();
     await page.fill('#life-kid-age', '5');

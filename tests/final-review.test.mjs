@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
 import { conv, eventDelta } from '../site/js/engine.js';
 import { oddsSolve } from '../site/js/odds.js';
-import { holidayType, placeRanking, townPlan } from '../site/js/holiday.js';
+import { cardPlace, holidayType, placeRanking, townPlan, withoutItemsGain } from '../site/js/holiday.js';
 import { townHtml } from '../site/js/views.js';
 import { defaultState, estimateRetireSpend, setField, setReal, setRetireCountry, toParams } from '../site/js/state.js';
 
@@ -71,9 +71,12 @@ test('final review 1: a town spend below the items leaves the items out of that 
   const bare = plan(defaultState(DATA));
   const town = townPlan(p, 2000);
   assert.equal(town.ignored, true);
-  assert.equal(town.age, townPlan(bare, 2000).age);
-  assert.equal(town.age, 39);
-  assert.match(townHtml({ name: '大理', monthly: 2000 }, town, p), /没有算这两项/);
+  assert.deepEqual(town, { age: null, years: null, gain: null, ignored: true });
+  assert.equal(townHtml({ name: '大理', monthly: 2000 }, town, p), '<p class="town-line">在大理每月花 ¥2,000：比月供和孩子的花销还少。把月供和孩子算进这里的花销，再看几岁能放假。</p>');
+  assert.ok(!townHtml({ name: '大理', monthly: 2000 }, town, p).includes('这一行没有算'));
+  // The card never names such a town: it falls back to the best overseas place, or none.
+  assert.equal(cardPlace([{ name: 'X', years: 10, current: true }], { name: '大理' }, town), null);
+  assert.deepEqual(cardPlace([{ name: '泰国', years: 5 }, { name: '中国', years: 10, current: true }], { name: '大理' }, town), { name: '泰国', gain: 5 });
   // A spend that holds the items keeps them.
   const enough = townPlan(p, 4000);
   assert.equal(enough.ignored, false);
@@ -168,4 +171,12 @@ test('final review 8: below the minimum years, the page says the pension above i
   const held = pensionEstimateHtml(r, { held: true });
   assert.match(held, /累计缴费不满 \d+ 年，不能按月领取。上面的养老金还是之前填的，要按 0 算请清空它。/);
   assert.ok(!held.includes('这里按 0 算'));
+});
+
+test('without-items gain: years the holiday comes earlier with the items than without', () => {
+  const p = plan(withMortgage());
+  const g = withoutItemsGain(p);
+  assert.ok(Number.isInteger(g.years) && g.years >= 0, JSON.stringify(g));
+  assert.equal(withoutItemsGain(plan(defaultState(DATA))), null);
+  assert.equal(withoutItemsGain({ ...p, savings: 0, income: 1 }), null);
 });

@@ -19,9 +19,9 @@ const GROUP_STAMPS = {
 };
 
 // The assumptions a number on the card rests on, in three short items. A pension, and self-paid insurance, change the third.
-export function assumptionLine({ r, pension, selfPay = 0 }) {
+export function assumptionLine({ r, pension, selfPay = 0, events = [] }) {
   const left = !(pension > 0) ? '未算养老金 / 社保自缴' : selfPay > 0 ? '含养老金和社保自缴' : '含养老金 · 未算社保自缴';
-  return `按今天的钱算 · 实际收益 ${pct(r, 1)}/年 · ${left}`;
+  return `按今天的钱算 · 实际收益 ${pct(r, 1)}/年 · ${left}${events.length > 0 ? ' · 含到期支出' : ''}`;
 }
 
 // One image, shaped like a boarding pass to the holiday. At most one extra line, the most personal available.

@@ -71,9 +71,9 @@ export function lifeIssue(S, data) {
   const { mortgage, kids } = realItems(S);
   const monthly = ((mortgage?.yearly ?? 0) + (kids?.yearly ?? 0)) / 12;
   if (monthly <= 0) return '';
-  if (monthly > (S.expense ?? 0) / 12) return '月供和孩子的花销加起来超过了每月支出，请检查这两处';
+  if (monthly >= (S.expense ?? 0) / 12) return '月供和孩子的花销加起来超过了每月支出，请检查这两处';
   const retW = convert(S.retExp ?? 0, curOf(data, S.retC), curOf(data, S.workC), data);
-  if (monthly > retW / 12) return '退休后每月想花里也要算上月供和孩子的花销';
+  if (monthly >= retW / 12) return '退休后每月想花里也要算上月供和孩子的花销';
   return '';
 }
 
@@ -97,6 +97,23 @@ export function itemsYearly(S, thisYear = new Date().getFullYear()) {
   return sum > (S.expense ?? 0) ? 0 : sum;
 }
 
+// What the status line under the inputs says: when the items end, and what retirement spending is left after they do.
+// afterMonthly is in the retirement currency, today's money; low means under a quarter of today's monthly spending.
+export function lifeSummary(S, data, thisYear = new Date().getFullYear()) {
+  const events = eventsOf(S, data, thisYear);
+  if (!events.length) return null;
+  const { mortgage } = realItems(S);
+  const work = curOf(data, S.workC), ret = curOf(data, S.retC);
+  const running = events.reduce((total, e) => total + e.amount, 0);
+  const afterMonthly = Math.round(((S.retExp ?? 0) - convert(running, work, ret, data)) / 12);
+  return {
+    mortgageEnd: events.some(e => e.id === 'mortgage') ? mortgage.endYear : null,
+    kidsTo22: events.some(e => e.id === 'kids'),
+    afterMonthly,
+    low: convert(afterMonthly, ret, work, data) < (S.expense ?? 0) / 12 * 0.25,
+  };
+}
+
 export const setPen = (S, change) => ({ ...S, pen: cleanPen({ ...S.pen, ...change }) });
 
 // "Use this result": the monthly estimate (yuan, today's money) becomes the yearly pension in the retirement
@@ -113,7 +130,7 @@ export function applyPensionEstimate(S, { monthly, claimAge, selfPay }, data) {
 
 const fxOf = (data, cur) => (cur === 'USD' ? 1 : data.fx[cur].value);
 const curOf = (data, code) => data.countries[code].cur;
-const convert = (v, fromCur, toCur, data) => v / fxOf(data, fromCur) * fxOf(data, toCur);
+const convert = (v, fromCur, toCur, data) => (fromCur === toCur ? v : v / fxOf(data, fromCur) * fxOf(data, toCur));
 
 function localAssumptions(country) {
   return {
