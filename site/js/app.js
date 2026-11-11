@@ -219,7 +219,7 @@ function fieldHtml(prefix, f) {
 
 // The pension estimate: a fold under the pension field, only for people who work in mainland China.
 const PEN_INPUTS = [
-  ['birth', 'birth', '出生年月', '<input type="month" id="pen-@-birth">'],
+  ['birth', 'birth', '出生年月', '<input type="month" id="pen-@-birth" placeholder="1996-06">'],
   ['kind', 'kind', '类别', '<select id="pen-@-kind"><option value="m">男（原 60 岁退休）</option><option value="f55">女（原 55 岁退休）</option><option value="f50">女（原 50 岁退休）</option></select>'],
   ['paidYears', 'paid', '已缴几年', '<input type="number" inputmode="decimal" id="pen-@-paid" step="1" min="0">'],
   ['years', 'years', '到领取时累计缴费几年', '<input type="number" inputmode="decimal" id="pen-@-years" step="1" min="0">'],
@@ -253,7 +253,7 @@ function renderPen() {
       const q = applyPensionEstimate(S, { monthly: est.est.monthly, claimAge: est.claimAge, selfPay: est.selfPay }, DATA);
       return q.pension === S.pension && q.pAge === S.pAge;
     })();
-    out.innerHTML = pensionEstimateHtml(est, { used });
+    out.innerHTML = pensionEstimateHtml(est, { used, held: S.pension > 0 });
   }
   const age = $('pen-age-s');
   if (age) {

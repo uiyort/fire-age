@@ -14,12 +14,17 @@ const penNum = (v, max = Infinity) => {
   const n = Number(v);
   return Number.isFinite(n) ? Math.min(Math.max(n, 0), max) : null;
 };
+// A birth month typed by hand as "1996-6" reads as "1996-06".
+const cleanBirth = v => {
+  const m = typeof v === 'string' ? /^(\d{4})-(\d{1,2})$/.exec(v.trim()) : null;
+  return m && Number(m[2]) >= 1 && Number(m[2]) <= 12 ? `${m[1]}-${m[2].padStart(2, '0')}` : '';
+};
 export function cleanPen(raw) {
   const t = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   const index = penNum(t.index);
   const base = penNum(t.base);
   return {
-    birth: typeof t.birth === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(t.birth) ? t.birth : '',
+    birth: cleanBirth(t.birth),
     kind: PEN_KINDS.includes(t.kind) ? t.kind : 'm',
     paidYears: penNum(t.paidYears, 60),
     years: penNum(t.years, 60),
@@ -209,8 +214,10 @@ export function toParams(S, data, thisYear = new Date().getFullYear()) {
   const fx = { USD: 1 };
   for (const [cur, field] of Object.entries(data.fx)) fx[cur] = field.value;
   // Self-paid pension and medical insurance (monthly inputs) only count in mainland China with a pension on file.
-  raw.selfPension = Math.max(raw.selfPension, 0);
-  raw.selfMedical = Math.max(raw.selfMedical, 0);
+  // A saved value that is not a number counts as 0.
+  const own = v => (Number.isFinite(Number(v)) ? Math.max(Number(v), 0) : 0);
+  raw.selfPension = own(raw.selfPension);
+  raw.selfMedical = own(raw.selfMedical);
   raw.selfPay = S.workC === 'CN' && raw.pension > 0 ? (raw.selfPension + raw.selfMedical) * 12 : 0;
   raw.events = eventsOf(S, data, thisYear);
   return buildParams(raw, fx);
@@ -221,7 +228,7 @@ const cleanTown = t => {
   const raw = t && typeof t === 'object' && !Array.isArray(t) ? t : {};
   const monthly = Number(raw.monthly);
   return {
-    name: typeof raw.name === 'string' ? [...raw.name].slice(0, TOWN_NAME_MAX).join('') : '',
+    name: typeof raw.name === 'string' ? [...raw.name.trim()].slice(0, TOWN_NAME_MAX).join('') : '',
     monthly: raw.monthly !== null && raw.monthly !== '' && Number.isFinite(monthly) && monthly > 0 ? monthly : null,
   };
 };

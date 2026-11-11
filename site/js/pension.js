@@ -74,7 +74,8 @@ export function estimateFromForm(pen, nowYear) {
   if (!st) return null;
   const claimAge = claimAgeWhole(st);
   const paid = pen.paidYears > 0 ? pen.paidYears : 0;
-  const defaultYears = Math.max(paid + (st.claimYear - nowYear), 0);
+  // Past the claim year there are no years to go, so the default is never below the years already paid.
+  const defaultYears = paid + Math.max(st.claimYear - nowYear, 0);
   const years = pen.years === null || pen.years === undefined ? defaultYears : pen.years;
   const index = Number.isFinite(pen.index) ? pen.index : 1;
   const est = estimatePension({ base: pen.base, index, years, paidYears: paid, account: pen.account ?? 0, claimAge, claimYear: st.claimYear });

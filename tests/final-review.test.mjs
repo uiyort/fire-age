@@ -124,3 +124,48 @@ test('final review 9: starting with exactly the holiday line still gives 8 in 10
     }
   }
 });
+
+// ---- 4 to 8: small fixes ----
+import { cleanPen, loadState, setTown } from '../site/js/state.js';
+import { estimateFromForm } from '../site/js/pension.js';
+import { pensionEstimateHtml } from '../site/js/views.js';
+
+test('final review 4: a town name of spaces is empty, and a name is trimmed', () => {
+  assert.equal(setTown(defaultState(DATA), { name: '   ' }).town.name, '');
+  assert.equal(setTown(defaultState(DATA), { name: '  大理 ' }).town.name, '大理');
+});
+
+test('final review 5: a birth month with one digit is read as two', () => {
+  assert.equal(cleanPen({ birth: '1996-6' }).birth, '1996-06');
+  assert.equal(cleanPen({ birth: '1996-06' }).birth, '1996-06');
+  assert.equal(cleanPen({ birth: '1996-11' }).birth, '1996-11');
+  for (const bad of ['1996-0', '1996-13', '1996-006', '96-6', 'abc']) assert.equal(cleanPen({ birth: bad }).birth, '', bad);
+});
+
+test('final review 6: someone past the claim year is not shown fewer years than they paid', () => {
+  const pen = { ...cleanPen({ birth: '1960-01', kind: 'm', base: 8000, paidYears: 30 }) };
+  const r = estimateFromForm(pen, 2026);
+  assert.equal(r.defaultYears, 30);
+  const young = estimateFromForm(cleanPen({ birth: '1996-06', kind: 'm', base: 8000, paidYears: 5 }), 2026);
+  assert.equal(young.defaultYears, 5 + young.st.claimYear - 2026);
+});
+
+test('final review 7: a saved self-pay that is not a number counts as 0', () => {
+  const S = { ...defaultState(DATA), pension: 36000, selfPension: 'abc', selfMedical: 'x' };
+  const p = toParams(S, DATA, YEAR);
+  assert.equal(p.selfPay, 0);
+  const store = { getItem: () => JSON.stringify({ ...defaultState(DATA), pension: 36000, selfPension: 'abc', selfMedical: 300 }) };
+  const q = toParams(loadState(DATA, store), DATA, YEAR);
+  assert.ok(Number.isFinite(q.selfPay), String(q.selfPay));
+  assert.equal(q.selfPay, 300 * 12);
+});
+
+test('final review 8: below the minimum years, the page says the pension above is still the earlier one', () => {
+  const r = estimateFromForm(cleanPen({ birth: '1996-06', kind: 'm', base: 8000, paidYears: 1, years: 5 }), 2026);
+  assert.equal(r.est.eligible, false);
+  const plain = pensionEstimateHtml(r);
+  assert.match(plain, /这里按 0 算/);
+  const held = pensionEstimateHtml(r, { held: true });
+  assert.match(held, /累计缴费不满 \d+ 年，不能按月领取。上面的养老金还是之前填的，要按 0 算请清空它。/);
+  assert.ok(!held.includes('这里按 0 算'));
+});

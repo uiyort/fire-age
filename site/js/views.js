@@ -88,7 +88,8 @@ function pensionNote(p, { withPension: w, withoutPension: wo, gain }) {
 
 // The estimate under the pension field: the statutory age, the two parts and their sum, and the settings this tool made.
 // result comes from estimateFromForm (null until a birth month and a base are filled in).
-export function pensionEstimateHtml(result, { used = false } = {}) {
+// held: the pension field above still holds an earlier figure.
+export function pensionEstimateHtml(result, { used = false, held = false } = {}) {
   if (!result) return '<p class="fine">填上出生年月和当地的计发基数，这里就会出现估算。</p>';
   const { st, est, years, claimAge } = result;
   const age = `${st.years} 岁${st.months > 0 ? ` ${st.months} 个月` : ''}`;
@@ -97,7 +98,7 @@ export function pensionEstimateHtml(result, { used = false } = {}) {
     ? `<div class="pen-sum"><span>基础养老金 <b>${money(est.basic)}</b>/月</span><span>个人账户养老金 <b>${money(est.personal)}</b>/月</span><span>合计 <b>${money(est.monthly)}</b>/月</span></div>
        <p class="fine">按累计缴费 ${years} 年算，今天的钱。法定领取年龄 ${age}，模型里按 ${claimAge} 岁开始领。</p>
        ${used ? '<p class="fine pen-used">已填进上面的养老金和领取年龄。</p>' : '<button type="button" class="primary" data-pen-use>用这个结果</button>'}`
-    : `<p class="pen-short">累计缴费不满 ${est.minYears ?? '最低'} 年，不能按月领取，这里按 0 算。</p>
+    : `<p class="pen-short">累计缴费不满 ${est.minYears ?? '最低'} 年，不能按月领取${held ? '。上面的养老金还是之前填的，要按 0 算请清空它。' : '，这里按 0 算。'}</p>
        <p class="fine">法定领取年龄 ${age}。</p>`;
   return `${body}<div class="pen-set"><b>本工具设定</b><ul>
     <li>计发基数按今天的钱算，只跟物价涨；个人账户记账利率与通胀持平。</li>
