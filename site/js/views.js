@@ -779,3 +779,18 @@ export function storyHtml(story, { p, dispCur }) {
 }
 
 export { bwdSolve };
+
+// The state at the right of a form group's header: ✕ N for the stops shown in it, else 示例, ＋ for an empty optional
+// group, 默认 / 已改 N for the assumptions; the two assumption groups also say which data month they stand on.
+export function groupStatusHtml(st, { version }) {
+  const stops = st.blank + st.block;
+  const data = st.changed === null ? '' : ` <span class="grp-data">${version} 数据</span>`;
+  if (stops > 0) {
+    const parts = [st.block ? `拦住 ${st.block} 处` : '', st.blank ? `待填 ${st.blank} 处` : ''].filter(Boolean).join('，');
+    return `<span class="grp-x" aria-label="${parts}">✕ ${stops}</span>${data}`;
+  }
+  if (st.example) return '示例';
+  if (st.empty) return '<button type="button" class="grp-plus" aria-label="可以不填，点此填写">＋</button>';
+  if (st.changed !== null) return `${st.changed === 0 ? '默认' : `已改 ${st.changed}`}${data}`;
+  return '';
+}

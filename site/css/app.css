@@ -369,8 +369,15 @@ h3 { font-family: var(--f-display); font-weight: 900; font-size: 16px; margin: 1
 .places-more > .place { margin-top: 10px; }
 .mode-note { margin: 0; flex-basis: 100%; }
 @media (min-width: 900px) { .mode-note { flex-basis: auto; } }
-body.intro .mode-note, body.intro .legend-note { display: none; }
-.legend-note { font-weight: 400; font-size: 12px; letter-spacing: 0; margin-left: 6px; }
+body.intro .mode-note { display: none; }
+/* Group headers: the name at the left, the state at the right. */
+.inputs legend, .grp-legend { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; letter-spacing: 0; color: var(--ink); font-weight: 700; margin: 0; }
+.grp-legend { grid-column: 1 / -1; }
+.grp-legend label { font: inherit; color: inherit; }
+.grp-status { font-size: 13px; font-weight: 400; color: var(--ink-3); white-space: nowrap; }
+.grp-x { display: inline-block; font-weight: 700; line-height: 1.2; padding: 2px 10px; border-radius: 999px; background: var(--bad); color: #fff; }
+.grp-data { font-size: 11px; font-family: var(--f-mono); color: var(--ink-3); }
+.grp-plus { font: inherit; font-size: 18px; line-height: 1; color: var(--accent); background: none; border: 0; padding: 2px 8px; cursor: pointer; }
 .split { grid-column: 1 / -1; margin: -4px 0 6px; font-size: 13px; }
 .split summary { cursor: pointer; color: var(--accent); margin-top: 0; }
 .split-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }
@@ -439,7 +446,7 @@ button.link { font: inherit; padding: 0; border: 0; background: transparent; col
 
 /* Touch screens: every control is at least 44px tall, the size a thumb hits reliably. */
 @media (pointer: coarse) {
-  .ghost, .seg button, .zone-nav a, .chk, .card-kind label { min-height: 44px; }
+  .ghost, .seg button, .zone-nav a, .chk, .card-kind label, .grp-plus { min-height: 44px; }
   .ghost, .seg button, .zone-nav a { display: inline-flex; align-items: center; justify-content: center; }
   .chk input { width: 20px; height: 20px; }
   .fold > summary { padding-block: 10px; }

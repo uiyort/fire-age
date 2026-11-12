@@ -94,7 +94,7 @@ test('the page still calculates with storage blocked', async ({ page }) => {
 test('spending can be added up from rent, food and the rest', async ({ page }) => {
   await page.goto('/');
   await page.locator('#inputs-box').evaluate(d => { d.open = true; });
-  await expect(page.locator('#simple-form')).toContainText('示例，改成你的');
+  await expect(page.locator('[data-grp="now"]').first()).toHaveText('示例');
   const before = await page.locator('#headline').innerText();
   await page.locator('#expense-split > summary').click();
   await page.fill('#split-rent', '3000');

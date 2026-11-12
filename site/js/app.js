@@ -3,7 +3,7 @@ import DATA from './data-latest.js';
 import { DEFAULT_SEED, bwdSolve, monteCarlo, walkPath } from './engine.js';
 import { bwdOdds, decilePaths, dualOdds, extendRow, needLine, oddsRuler, oddsSolve, oddsYears, successAt } from './odds.js';
 import { hardestIndex, heroModel, holidayType, oddsText, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking, townPlan, cardPlace, withoutItemsGain } from './holiday.js';
-import { FIELD_LABEL, FIELD_ORDER, LIMITS, applyPensionEstimate, cleanReal, cleanSplit, commitField, defaultState, loadState, problems, resetRetExp, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setSplit, setTown, setWorkCountry, splitOn, storyRows, toParams, unsplit } from './state.js';
+import { FIELD_LABEL, FIELD_ORDER, LIMITS, applyPensionEstimate, cleanReal, cleanSplit, commitField, defaultState, groupStates, loadState, problems, resetRetExp, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setSplit, setTown, setWorkCountry, splitOn, storyRows, toParams, unsplit } from './state.js';
 import { estimateFromForm } from './pension.js';
 import { labPlan, lifeChoices, personalLever, rankLevers, impactOf, smallStep, tryRange } from './levers.js';
 import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody } from './scenario.js';
@@ -14,7 +14,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { assumptionLine, renderCard, summaryCardSpec, typeCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, leversHtml, lifeGainText, lifeTagText, fieldLineHtml, fieldLinesHtml, fixesHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
+  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, leversHtml, lifeGainText, lifeTagText, fieldLineHtml, fieldLinesHtml, fixesHtml, groupStatusHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -144,17 +144,17 @@ function markPlayed(id) {
 }
 
 const SIMPLE_FIELDS = [
-  { legend: '现在', note: '示例，改成你的', fields: [
+  { legend: '现在', grp: 'now', fields: [
     { id: 'age', label: '年龄', unit: '岁' },
     { id: 'assets', label: '已有存款和投资', unit: 'work', step: 10000 },
     { id: 'income', label: '每月到手收入', unit: 'work', monthly: true, step: 1000 },
     { id: 'expense', label: '每月支出', unit: 'work', monthly: true, step: 500 },
   ] },
-  { legend: '在哪里', fields: [
+  { legend: '在哪里', grp: 'where', fields: [
     { id: 'work', label: '现在生活的地方', select: 'work' },
     { id: 'ret', label: '想在哪里退休', select: 'retire' },
   ] },
-  { legend: '养老金（可以不填）', fields: [
+  { legend: '养老金', grp: 'pension', fields: [
     { id: 'pension', label: '预计每月养老金', unit: 'retire', monthly: true, step: 500, full: true },
     { id: 'selfPension', label: '放假后每月自缴养老保险', unit: 'work', step: 100, min: 0, full: true, cnPension: true },
     { id: 'selfMedical', label: '放假后每月自缴医保', unit: 'work', step: 100, min: 0, full: true, cnPension: true, note: '各地不同，缴满当地规定的年限后可以停，这里一直算到领取养老金那年。' },
@@ -163,19 +163,19 @@ const SIMPLE_FIELDS = [
 ];
 
 const PRO_FIELDS = [
-  { legend: '地区与币种', fields: [
+  { legend: '地区与币种', grp: 'region', fields: [
     { id: 'work', label: '工作/储蓄地', select: 'work' },
     { id: 'ret', label: '退休地', select: 'retire' },
     { id: 'disp', label: '显示币种', select: 'currency', full: true },
   ] },
-  { legend: '现在', fields: [
+  { legend: '现在', grp: 'now', fields: [
     { id: 'age', label: '年龄', unit: '岁' },
     { id: 'assets', label: '可投资资产', unit: 'work', step: 10000 },
     { id: 'income', label: '税后年收入', unit: 'work', step: 10000 },
     { id: 'expense', label: '当前年支出', unit: 'work', step: 5000 },
     { id: 'growth', label: '收入实际增长', unit: '%', step: 0.5, full: true },
   ] },
-  { legend: '退休后', fields: [
+  { legend: '退休后', grp: 'retire', fields: [
     { id: 'retExp', label: '年支出', unit: 'retire', step: 5000 },
     { id: 'life', label: '规划到', unit: '岁' },
     { id: 'pension', label: '养老金/年', unit: 'retire', step: 1000 },
@@ -184,7 +184,7 @@ const PRO_FIELDS = [
     { id: 'selfMedical', label: '放假后每月自缴医保', unit: 'work', step: 100, min: 0, full: true, cnPension: true, note: '各地不同，缴满当地规定的年限后可以停，这里一直算到领取养老金那年。' },
     { id: 'tAge', label: '目标放假年龄', unit: '岁', bwdOnly: true, full: true },
   ] },
-  { legend: '收益假设', fields: [
+  { legend: '收益假设', grp: 'returns', fields: [
     { id: 'eq', label: '股票占比', unit: '%', step: 5 },
     { id: 'eqReal', label: '股票实际收益', unit: '%', step: 0.1 },
     { id: 'bondY', label: '10 年国债', unit: '%', step: 0.05 },
@@ -193,7 +193,7 @@ const PRO_FIELDS = [
     { id: 'fxDrift', label: '退休币升值', unit: '%', step: 0.1 },
     { id: 'swr', label: '安全提取率', unit: '%', step: 0.1 },
   ] },
-  { legend: '风险假设', fields: [
+  { legend: '风险假设', grp: 'risk', fields: [
     { id: 'sigEq', label: '股票波动率', unit: '小数', step: 0.01 },
     { id: 'sigBd', label: '债券波动率', unit: '小数', step: 0.01 },
     { id: 'rho', label: '股债相关性', unit: '−1 到 1', step: 0.05 },
@@ -323,7 +323,7 @@ function syncSplit() {
 }
 
 function buildForm(el, prefix, groups) {
-  el.innerHTML = groups.map(g => `<fieldset><legend>${g.legend}${g.note ? ` <span class="legend-note">${g.note}</span>` : ''}</legend>${g.fields.map(f => fieldHtml(prefix, f)).join('')}</fieldset>`).join('');
+  el.innerHTML = groups.map(g => `<fieldset><legend>${g.legend}<span class="grp-status" data-grp="${g.grp}"></span></legend>${g.fields.map(f => fieldHtml(prefix, f)).join('')}</fieldset>`).join('');
 }
 
 function fillCountrySelects() {
@@ -406,10 +406,6 @@ function syncChrome(p) {
   $('solve-card').hidden = S.mode !== 'bwd';
   // The note names the other view, so it stays in place when the view changes.
   $('mode-note').textContent = S.view === 'simple' ? '专业版：改收益、通胀等全部假设' : '简单版：只填几个数';
-  // The "example" label holds only while the numbers are still the examples.
-  const start = defaultState(DATA);
-  const example = ['age', 'assets', 'income', 'expense'].every(k => S[k] === start[k]);
-  document.querySelectorAll('.legend-note').forEach(e => { e.hidden = !example; });
   for (const [id, on] of [['to-fwd', S.mode === 'fwd'], ['to-bwd', S.mode === 'bwd'], ['to-simple', S.view === 'simple'], ['to-pro', S.view === 'pro']]) {
     $(id).setAttribute('aria-pressed', String(on));
   }
@@ -431,16 +427,19 @@ function renderEstimate(p) {
     </div><label class="chk"><input type="checkbox" id="p-autoswr"${S.autoSwr ? ' checked' : ''}> 提取率按退休年限自动调整</label>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}`);
     placeRetLines();
     renderLines();
+    syncGroups();
     return;
   }
   const typing = document.activeElement?.id === 's-retexp';
   if (!typing) {
-    setEstimate(`<div class="f"><div class="lab"><label for="s-retexp">退休后每月想花 <span class="u">${p.rCur}</span></label>${EST_BACK}</div>
+    setEstimate(`<h3 class="grp-legend"><label for="s-retexp">退休后每月想花</label><span class="grp-status" data-grp="retire"></span></h3>
+      <div class="f"><div class="lab"><span class="u">${p.rCur}</span>${EST_BACK}</div>
       <span class="f-box">${EST_PRE}<input type="number" inputmode="decimal" id="s-retexp" step="500" placeholder="0" value="${S.retExp === null ? '' : Math.round(S.retExp / 12)}"></span></div>
       <p class="fine mix-note">组合按股票 ${p.eq}% / 债券 ${100 - p.eq}% 估算（常见的基准组合，不是建议），扣掉通胀后约 ${pct(p.r, 1)}/年。<a href="sources.html">数据来源</a>，专业模式可以改。</p>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}`);
   }
   placeRetLines();
   renderLines();
+  syncGroups();
 }
 
 function renderFast() {
@@ -819,6 +818,26 @@ function markProblems(list) {
   }
   markedNow = list;
   renderLines();
+  syncGroups();
+}
+
+// The state at the right of each group header of the view on screen: ✕ N counts the stops marked now (never one still
+// being typed), the rest reads the numbers. Redrawn only when it changes, so a button under the pointer stays.
+function syncGroups() {
+  const states = groupStates(S, markedNow, DATA);
+  for (const el of document.querySelectorAll('.grp-status')) {
+    if ($('pro-form').contains(el) !== (S.view === 'pro')) continue;
+    const html = groupStatusHtml(states[el.dataset.grp], { version: DATA.version });
+    if (el.innerHTML !== html) el.innerHTML = html;
+  }
+}
+
+// 我的数字: the numbers opened, at the first group with a ✕ shown, else at the top of the form.
+function goToNumbers() {
+  $('inputs-box').open = true;
+  const x = document.querySelector(S.view === 'pro' ? '#pro-form .grp-x' : '#simple-form .grp-x, #estimate .grp-x');
+  const head = x?.closest('fieldset, .grp-legend') ?? $(S.view === 'pro' ? 'pro-form' : 'simple-form');
+  head.scrollIntoView({ block: 'start' });
 }
 
 // ---- The lines under the fields and the exit buttons. A stop is drawn red only once it is marked; a stop that waits
@@ -1313,6 +1332,15 @@ function onClick(ev) {
   }
   if (ev.target.closest?.('[data-needs-result]') && stopAtProblem()) {
     ev.preventDefault();
+    return;
+  }
+  if (ev.target.closest?.('#nav-numbers')) {
+    ev.preventDefault();
+    goToNumbers();
+    return;
+  }
+  if (ev.target.closest?.('.grp-plus')) {
+    goToField('pension');
     return;
   }
   const fixButton = ev.target.closest?.('[data-fix]');

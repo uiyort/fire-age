@@ -221,6 +221,30 @@ export function formGroupOf(row, view) {
   return row in map ? map[row] : row;
 }
 
+// What each form group's header says: the stops in it (counted by kind), whether it still holds the examples, whether
+// an optional group is empty, and how many assumptions the person changed.
+const FORM_GROUPS = ['now', 'where', 'pension', 'retire', 'region', 'returns', 'risk', 'sim'];
+const RETURN_FIELDS = ['eq', 'eqReal', 'fxDrift'];
+const RISK_FIELDS = ['sigEq', 'sigBd', 'rho', 'flexCut'];
+const LOCAL_FIELDS = ['bondY', 'infl', 'drag'];
+export function groupStates(S, list, data) {
+  const view = S.view === 'pro' ? 'pro' : 'simple';
+  const out = Object.fromEntries(FORM_GROUPS.map(g => [g, { blank: 0, block: 0, example: false, empty: false, changed: null }]));
+  for (const q of list) {
+    const g = q.kind === 'blank' || q.kind === 'block' ? formGroupOf(q.row, view) : null;
+    if (g && out[g]) out[g][q.kind] += 1;
+  }
+  const start = defaultState(data);
+  out.now.example = view === 'simple' && ['age', 'assets', 'income', 'expense'].every(k => S[k] === start[k]) && !splitOn(S);
+  out.pension.empty = !(S.pension > 0);
+  const local = localAssumptions(data.countries[S.workC] ?? data.countries.CN);
+  const differs = (k, base) => (S[k] !== base[k] ? 1 : 0);
+  const sum = (keys, base) => keys.reduce((n, k) => n + differs(k, base), 0);
+  out.returns.changed = sum(RETURN_FIELDS, start) + sum(LOCAL_FIELDS, local) + (S.autoSwr ? 0 : 1);
+  out.risk.changed = sum(RISK_FIELDS, start);
+  return out;
+}
+
 const SIMPLE_LABEL = {
   age: '年龄', assets: '已有存款和投资', income: '每月到手收入', expense: '每月支出', retExp: '退休后每月想花', pension: '预计每月养老金',
   selfPension: '放假后每月自缴养老保险', selfMedical: '放假后每月自缴医保', tAge: '想几岁放假',

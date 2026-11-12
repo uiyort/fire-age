@@ -1,7 +1,7 @@
 // The views helpers that draw the stopped result and, in later tasks, the lines under the fields.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chipText, heldHeadHtml, heldHeroHtml, splitLineHtml, stickyHtml, relText, fieldLinesHtml, fieldLineHtml, fixesHtml, lifeTagText, pensionEstimateHtml } from '../site/js/views.js';
+import { chipText, heldHeadHtml, heldHeroHtml, splitLineHtml, stickyHtml, relText, fieldLinesHtml, fieldLineHtml, fixesHtml, lifeTagText, pensionEstimateHtml, groupStatusHtml } from '../site/js/views.js';
 import DATA from '../site/js/data-latest.js';
 import { defaultState, storyRows, problems, resetRetExp } from '../site/js/state.js';
 
@@ -168,4 +168,14 @@ test('resetRetExp: 改回估算 makes retirement spending the estimate again, A4
   const back = resetRetExp(typed, DATA);
   assert.deepEqual([back.retExp, back.touched.retExp, back.lastValid.retExp], [180000, false, 180000]);
   assert.ok(!problems(back, DATA, 2026).some(q => q.rule === 'A4'));
+});
+
+test('groupStatusHtml: ✕ N first, then 示例, ＋, 默认 / 已改 N with the data month', () => {
+  const s = o => ({ blank: 0, block: 0, example: false, empty: false, changed: null, ...o });
+  assert.match(groupStatusHtml(s({ block: 1, blank: 1, example: true }), { version: '2026-11' }), /aria-label="拦住 1 处，待填 1 处">✕ 2</);
+  assert.equal(strip(groupStatusHtml(s({ example: true }), { version: '2026-11' })), '示例');
+  assert.match(groupStatusHtml(s({ empty: true }), { version: '2026-11' }), /aria-label="可以不填，点此填写">＋</);
+  assert.equal(strip(groupStatusHtml(s({ changed: 0 }), { version: '2026-11' })), '默认 2026-11 数据');
+  assert.equal(strip(groupStatusHtml(s({ changed: 1 }), { version: '2026-11' })), '已改 1 2026-11 数据');
+  assert.equal(groupStatusHtml(s(), { version: '2026-11' }), '');
 });

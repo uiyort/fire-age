@@ -462,3 +462,36 @@ test('the professional view: yearly lines, ≈ and 改回估算 beside 年支出
   await expect(page.locator('.chip')).toHaveCount(0);
   await noScroll(page);
 });
+
+test('group headers carry the state of their entries', async ({ page }) => {
+  await page.goto('/');
+  const now = page.locator('[data-grp="now"]').first();
+  await expect(now).toHaveText('示例');
+  await expect(page.locator('#simple-form')).not.toContainText('示例，改成你的');
+  await expect(page.locator('#simple-form')).not.toContainText('（可以不填）');
+  await page.locator('[data-grp="pension"] .grp-plus').click();
+  await expect(page.locator('#s-pension')).toBeFocused();
+  await page.fill('#s-age', '120'); await page.locator('#s-age').press('Tab');
+  await expect(now.locator('.grp-x')).toHaveText('✕ 1');
+  await expect(now.locator('.grp-x')).toHaveAttribute('aria-label', '拦住 1 处');
+});
+
+test('我的数字 leads the second row and opens the numbers at the first group with ✕', async ({ page }) => {
+  await page.goto('/');
+  const links = page.locator('.zone-nav a');
+  await expect(links).toHaveText(['我的数字', '怎么提前', '撑得住吗', '参数', '放假卡']);
+  const tops = await links.evaluateAll(as => as.map(a => a.getBoundingClientRect().top));
+  expect(new Set(tops).size).toBe(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+  await page.evaluate(() => { document.getElementById('inputs-box').open = false; });
+  await page.locator('#nav-numbers').click();
+  expect(await page.locator('#inputs-box').evaluate(el => el.open)).toBe(true);
+});
+
+test('the professional assumption groups say 默认 until changed, with the data month', async ({ page }) => {
+  await page.goto('/'); await page.click('#to-pro');
+  const ret = page.locator('#pro-form [data-grp="returns"]');
+  await expect(ret).toContainText(/默认.*\d{4}-\d{2} 数据/);
+  await page.fill('#p-eq', '70'); await page.locator('#p-eq').press('Tab');
+  await expect(ret).toContainText('已改 1');
+});

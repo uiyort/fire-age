@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
-import { defaultState, loadState, problems, setField, setSplit, unsplit, splitOn, cleanSplit, itemsYearly, setWorkCountry, setRetireCountry, num } from '../site/js/state.js';
+import { defaultState, loadState, problems, setField, setSplit, unsplit, splitOn, cleanSplit, itemsYearly, setWorkCountry, setRetireCountry, num, groupStates } from '../site/js/state.js';
 
 const real = (m = {}, k = {}) => ({ mortgage: { monthly: null, endYear: null, ...m }, kids: { count: null, age: null, monthly: null, ...k } });
 const S0 = o => ({ ...defaultState(DATA), ...o });
@@ -432,4 +432,17 @@ test('a saved split is the spending: a save whose total is not the parts × 12 l
   assert.equal(loadState(DATA, store({ ...S, split: { rent: -500, food: null, other: null, before: 72000 } })).expense, -6000);
   // A save that is not split keeps its own total.
   assert.equal(loadState(DATA, store({ ...defaultState(DATA), expense: 12345 })).expense, 12345);
+});
+
+test('groupStates: example, plus, counts, and changed assumptions', () => {
+  const S = defaultState(DATA);
+  const st = groupStates(S, problems(S, DATA, 2026), DATA);
+  assert.equal(st.now.example, true); assert.equal(st.pension.empty, true); assert.equal(st.now.block + st.now.blank, 0);
+  const bad = S0({ expense: 84000, real: real(M), retExp: null });
+  const st2 = groupStates(bad, problems(bad, DATA, 2026), DATA);
+  assert.deepEqual([st2.now.block, st2.retire.blank], [1, 1]); assert.equal(st2.now.example, false);
+  const pro = S0({ view: 'pro', eq: 70, autoSwr: false });
+  assert.equal(groupStates(pro, [], DATA).returns.changed, 2);
+  assert.equal(groupStates({ ...S, view: 'pro' }, [], DATA).risk.changed, 0);
+  assert.equal(groupStates(S0({ mode: 'bwd', tAge: 25 }), problems(S0({ mode: 'bwd', tAge: 25 }), DATA, 2026), DATA).pension.block, 1);
 });

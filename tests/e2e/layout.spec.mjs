@@ -182,8 +182,8 @@ test.describe('UI review fixes', () => {
   test('the example label goes once the numbers are the person\'s own', async ({ page }) => {
     await page.goto('/');
     await page.evaluate(() => { document.getElementById('inputs-box').open = true; });
-    await expect(page.locator('#simple-form .legend-note')).toBeVisible();
+    await expect(page.locator('#simple-form [data-grp="now"]')).toHaveText('示例');
     await page.fill('#s-assets', '350000');
-    await expect(page.locator('#simple-form .legend-note')).toBeHidden();
+    await expect(page.locator('#simple-form [data-grp="now"]')).toHaveText('');
   });
 });
