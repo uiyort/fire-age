@@ -222,7 +222,8 @@ test('ledgerHtml pro: two currencies show the drift and the cross-country estima
 test('ledgerHtml pro held: a stop in ① cuts there; a ③ input cuts at the r row; spending below 0 says so', () => {
   const a3 = { ...S, view: 'pro', expense: 84000 };
   const held = strip(ledgerHtml({ rows: storyRows(a3, DATA, 2026, null), list: problems(a3, DATA, 2026), plan: null, state: 'held', view: 'pro', mode: 'fwd', p: null, dispCur: 'CNY' }));
-  for (const x of ['└ 其中月供 90,000/年 ≥ 当前年支出 84,000 ✕ ›', '= 年储蓄 —', '⇒ ② 要有 —', '⇒ ③ 放假年龄 —']) assert.ok(held.includes(x), x);
+  for (const x of ['└ 其中月供 90,000/年 ≥ 当前年支出 84,000 ✕ ›', '= 年储蓄 —', '⇒ 放假线 —', '⇒ ③ 放假年龄 —']) assert.ok(held.includes(x), x);
+  assert.ok(!held.includes('② 要有'));   // fix round 1: in pro the line is 放假线
   assert.ok(!held.includes('退休后年支出'));
   const eq = { ...S, view: 'pro', eq: 150 };
   const three = strip(ledgerHtml({ rows: storyRows(eq, DATA, 2026, null), list: problems(eq, DATA, 2026), plan: null, state: 'held', view: 'pro', mode: 'fwd', p: null, dispCur: 'CNY' }));
@@ -245,4 +246,14 @@ test('proLedgerRowHtml: the professional fund line closed, held and out of reach
   assert.equal(strip(proLedgerRowHtml({ held: true, open: true })), '放假线 — 怎么算的 ▾');
   assert.equal(strip(proLedgerRowHtml({ need: null, success: null, cur: 'CNY' })), '规划期内未达到 怎么算的 ▸');
   assert.match(proLedgerRowHtml({ held: true }), /aria-controls="ledger"/);
+});
+
+// ---- Review fix round 1.
+test('ledgerHtml pro ②: a self-pay row with no amount sorts at its claim age, after 50 起 月供', () => {
+  const s = { ...S, view: 'pro' };
+  const plan = solve(s);
+  const text = strip(ledgerHtml({ rows: storyRows(s, DATA, 2026, plan), list: [], odds: oddsAround(plan.p, plan.t), plan, state: 'ok', view: 'pro', mode: 'fwd', p: plan.p, dispCur: 'CNY' }));
+  const at = x => text.indexOf(x);
+  assert.ok(at('50 起 月供') >= 0 && at('→ 63 自缴') >= 0);
+  assert.ok(at('月供实际变轻') < at('50 起 月供') && at('50 起 月供') < at('→ 63 自缴') && at('→ 63 自缴') < at('63 起 养老金'), text);
 });

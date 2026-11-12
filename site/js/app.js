@@ -552,8 +552,8 @@ function renderHero() {
   const success = latest.success;
   latest.hero = heroModel({ mode, p, t, bwd, success, need: target[retireT ?? 0], ruler: mode === 'bwd' ? null : ruler });
   $('hero').innerHTML = heroHtml(latest.hero, { p, dispCur: cur, open: ledgerOpen });
-  // The professional view's fund line: the ledger closed, in the work currency like the ledger's own ⇒ row.
-  $('ledger-row').innerHTML = proLedgerRowHtml({ need: retireT === null ? null : target[retireT], success, cur: p.wCur, open: ledgerOpen });
+  // The professional view's fund line: the ledger closed, in the display currency like the tiles beside it.
+  $('ledger-row').innerHTML = proLedgerRowHtml({ need: retireT === null ? null : toDisplay(target[retireT], p, cur), success, cur, open: ledgerOpen });
   renderLedger();
   placeTag();
   stickyNow = '';

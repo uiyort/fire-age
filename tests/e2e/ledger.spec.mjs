@@ -145,3 +145,13 @@ test('across currencies the professional form shows the rate and the estimate be
   await expect(page.locator('#pro-form')).toContainText(/汇率 1 THB = \d\.\d\d CNY/);
   await expect(page.locator('#pro-form')).toContainText(/≈ 72,000 × 物价比 [\d.]+ ÷ 汇率 [\d.]+/);
 });
+
+// ---- Review fix round 1.
+test('the professional fund line follows the display currency, like the tiles', async ({ page }) => {
+  await page.goto('/'); await page.click('#to-pro');
+  await expect(page.locator('#ledger-row')).toContainText(/放假线 ¥[\d,]+/);
+  await page.selectOption('#p-disp', 'USD');
+  await expect(page.locator('#ledger-row')).toContainText(/放假线 USD [\d,]+ · \d+\.\d%/);
+  await expect(page.locator('#ledger-row')).not.toContainText('¥');
+  await expect(page.locator('#tiles')).toContainText('US$');
+});

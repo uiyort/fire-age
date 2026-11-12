@@ -860,7 +860,7 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
     const draw = s => drawn.filter(r => r.section === s && shown(r)).map(rowHtml).join('');
     const first = sec(head('① 攒钱') + draw('now') + (at === 'now' ? none(saveLabel, '=') : ''));
     const second = at === 'after' ? sec(head('② 放假以后', afterRight) + draw('after')) : '';
-    return first + second + sec(none('② 要有', '⇒') + none('③ 放假年龄', '⇒'), 'wait') + foot(METHOD[at]);
+    return first + second + sec(none(pro ? '放假线' : '② 要有', '⇒') + none('③ 放假年龄', '⇒'), 'wait') + foot(METHOD[at]);
   }
 
   const { t } = plan;
@@ -872,7 +872,9 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
   // The professional rows with no age follow: the real payment its first row, the cut, the drift and the estimate last.
   const fromHoliday = r => (r.section === 'after' && r.ages && r.ages[0] !== null && r.ages[0] !== undefined && r.ages[0] < holiday
     ? { ...r, ages: [holiday, r.ages[1] !== null && r.ages[1] !== undefined && r.ages[1] < holiday ? holiday : r.ages[1]] } : r);
-  const startOf = r => (r.ages && isSet(r.ages[0]) ? r.ages[0] : r.ages || r.key === 'retReal' ? holiday : Infinity);
+  // Self-pay with no amount is drawn as → 63, so it sorts at the claim age.
+  const startOf = r => (r.key === 'self' && r.value === null && isSet(r.ages?.[1]) ? r.ages[1]
+    : r.ages && isSet(r.ages[0]) ? r.ages[0] : r.ages || r.key === 'retReal' ? holiday : Infinity);
   const draw = s => rows.filter(r => r.section === s && shown(r)).map(fromHoliday)
     .map((r, i) => [r, i]).sort(([a, i], [b, j]) => (s === 'after' ? startOf(a) - startOf(b) : 0) || i - j).map(([r]) => r)
     .map(rowHtml).join('');
@@ -939,8 +941,11 @@ export function proLedgerRowHtml({ held = false, need = null, success = null, cu
 export function proLinesHtml({ S, p, data, list = [], rows = [] }) {
   const out = { region: '', expense: '', retExp: '', pension: '' };
   const wCur = p.wCur, rCur = p.rCur;
-  const rate = p.fx[wCur] / p.fx[rCur];
-  if (wCur !== rCur) out.region = `<p class="row">汇率 1 ${rCur} = ${rate.toFixed(2)} ${wCur}</p>`;
+  // The rate as printed: two decimals from 0.1, else three significant digits (1 JPY = 0.00667 USD, never 0.00). The
+  // ≈ line divides by this same printed value.
+  const value = p.fx[wCur] / p.fx[rCur];
+  const rate = value >= 0.1 ? value.toFixed(2) : value.toPrecision(3);
+  if (wCur !== rCur) out.region = `<p class="row">汇率 1 ${rCur} = ${rate} ${wCur}</p>`;
   // A mortgage counted: its row under spending, plain or in a relation (A2, A3), not ended, not waiting or out of range.
   const m = rows.find(r => r.key === 'mortgage');
   const counted = rows.some(r => r.key === 'items') || (m && (m.status === null || (m.status === 'block' && m.rel?.sub)));
@@ -949,10 +954,10 @@ export function proLinesHtml({ S, p, data, list = [], rows = [] }) {
   if (S.workC !== S.retC && !S.touched?.retExp && isSet(S.expense)) {
     const ratio = data.countries[S.retC].priceLevel.value / data.countries[S.workC].priceLevel.value;
     const items = itemsYearly(S);
-    const tail = `× 物价比 ${ratio.toFixed(2)} ÷ 汇率 ${rate.toFixed(2)}`;
+    const tail = `× 物价比 ${ratio.toFixed(2)} ÷ 汇率 ${rate}`;
     const est = '<span class="est" aria-label="估算">≈</span>';
     out.retExp = items > 0
-      ? `<p class="row">${est} (${num(S.expense)} − 月供和孩子 ${num(items)}) ${tail} + 月供和孩子 ${num(items)} ÷ 汇率 ${rate.toFixed(2)}</p>`
+      ? `<p class="row">${est} (${num(S.expense)} − 月供和孩子 ${num(items)}) ${tail} + 月供和孩子 ${num(items)} ÷ 汇率 ${rate}</p>`
       : `<p class="row">${est} ${num(S.expense)} ${tail}</p>`;
   }
   const b12 = list.find(q => q.rule === 'B12');

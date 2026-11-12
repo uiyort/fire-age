@@ -212,3 +212,23 @@ test('proLinesHtml: the cross-country line is the estimate; B11 and B12 flags; o
   // No mortgage counted, no nominal note.
   assert.equal(strip(proLinesHtml({ S: defaultState(DATA), p: toParams(defaultState(DATA), DATA), data: DATA, list: [], rows: [] }).expense), '');
 });
+
+// ---- Review fix round 1: a small rate keeps three significant digits, in the rate line and in the ≈ line alike.
+test('proLinesHtml: the rate prints to 2 decimals from 0.1, else to 3 significant digits', () => {
+  const lines = (workC, retC) => {
+    const s = { ...defaultState(DATA), view: 'pro', workC, retC };
+    const p = toParams(s, DATA, 2026);
+    return { p, out: proLinesHtml({ S: s, p, data: DATA, list: [], rows: [] }) };
+  };
+  assert.equal(strip(lines('CN', 'TH').out.region), '汇率 1 THB = 0.20 CNY');
+  const us = lines('US', 'JP');
+  const usRate = (us.p.fx.USD / us.p.fx.JPY).toPrecision(3);
+  assert.match(usRate, /^0\.00[1-9]\d\d$/);
+  assert.equal(strip(us.out.region), `汇率 1 JPY = ${usRate} USD`);
+  assert.ok(strip(us.out.retExp).endsWith(`÷ 汇率 ${usRate}`), us.out.retExp);
+  const uk = lines('UK', 'JP');
+  const ukRate = (uk.p.fx.GBP / uk.p.fx.JPY).toPrecision(3);
+  assert.equal(strip(uk.out.region), `汇率 1 JPY = ${ukRate} GBP`);
+  assert.ok(strip(uk.out.retExp).endsWith(`÷ 汇率 ${ukRate}`));
+  for (const o of [us.out, uk.out]) assert.ok(!/= 0\.00 |汇率 0\.00(?!\d)/.test(strip(o.region + o.retExp)));
+});
