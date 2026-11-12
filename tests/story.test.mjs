@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
-import { defaultState, storyRows, problems, toParams } from '../site/js/state.js';
+import { defaultState, storyRows, problems, toParams, setRetireCountry } from '../site/js/state.js';
 import { firstDraw, planFlows, savingsAt } from '../site/js/engine.js';
 import { needLine, oddsSolve } from '../site/js/odds.js';
 
@@ -139,4 +139,40 @@ test('storyRows: an unreachable plan shows its year but no line', () => {
 test('storyRows: no shown value is a negative zero', () => {
   const rows = storyRows({ ...S, income: 179995, real: { mortgage: { monthly: null, endYear: null }, kids: { count: null, age: null, monthly: null } } }, DATA, 2026, null);
   assert.ok(Object.is(row(rows, 'save').value, 0));
+});
+
+// ---- Review round 1: the ledger's numbers are the engine's.
+
+test('storyRows: across currencies with drift, the real payment row is the engine\'s spending that year', () => {
+  const s = { ...setRetireCountry({ ...S, real: { ...S.real, mortgage: { monthly: 7500, endYear: 2060 } } }, 'US', DATA), view: 'pro', fxDrift: 1 };
+  const plan = solved(s); const { p, t } = plan;
+  assert.ok(t !== null && 30 + t < 65);
+  const retReal = row(storyRows(s, DATA, 2026, plan), 'retReal');
+  assert.equal(retReal.value, Math.round(firstDraw(p, t)));
+});
+
+test('storyRows: an item that ends before the holiday folds into the first ② row', () => {
+  const p = toParams(S, DATA, 2026); const t = 23;
+  const plan = { p, t, need: needLine(p)[t] };
+  const rows = storyRows(S, DATA, 2026, plan);
+  const ret = row(rows, 'retExp');
+  assert.deepEqual([ret.ages, ret.value, ret.struck, ret.typed], [[53, null], Math.round(firstDraw(p, t) / 12), ['月供'], 15000]);
+  assert.equal(row(rows, 'after:50').folded, true);
+  assert.equal(row(storyRows(S, DATA, 2026, solved(S)), 'after:50').folded, undefined);
+  assert.equal(row(storyRows({ ...S, view: 'pro' }, DATA, 2026, plan), 'mortgageReal'), undefined);
+});
+
+test('storyRows: self-pay shows no amount once the holiday starts at or after the claim age', () => {
+  const s = { ...S, pension: 36000, pAge: 63, selfPension: 500, selfMedical: 300 };
+  const p = toParams(s, DATA, 2026);
+  const at = t => ({ p, t, need: needLine(p)[t] });
+  assert.equal(row(storyRows({ ...s, view: 'pro' }, DATA, 2026, at(33)), 'self').value, null);
+  assert.equal(row(storyRows(s, DATA, 2026, at(33)), 'self'), undefined);
+  assert.equal(row(storyRows(s, DATA, 2026, at(14)), 'self').value, 800);
+});
+
+test('setWorkCountry no longer shadows the engine\'s conv', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const src = await readFile(new URL('../site/js/state.js', import.meta.url), 'utf8');
+  assert.ok(!/const conv =/.test(src));
 });

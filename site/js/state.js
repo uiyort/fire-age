@@ -1,5 +1,5 @@
 // Input state for the calculator: what the person typed, before it becomes model parameters.
-import { buildParams, conv, eventDelta, firstDraw, longRunInflation, savingsAt } from './engine.js';
+import { buildParams, firstDraw, longRunInflation, savingsAt } from './engine.js';
 
 const STORAGE_KEY = 'fire-age-v1';
 const MONEY_FIELDS = ['assets', 'income', 'expense', 'retExp', 'pension', 'selfPension', 'selfMedical'];
@@ -633,7 +633,9 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
         { ...item, field: 'kids.monthly', end: KIDS_END, tag: pro ? TOOL : null, ...(kStop ?? (kEnd ? { status: 'ended', rel: kEnd.rel } : {})) });
     }
   }
-  if (pro && plan && mOn) {
+  // The real payment at t − 1, while the mortgage still runs in that year.
+  const mEvent = events.find(e => e.id === 'mortgage');
+  if (pro && plan && mOn && mEvent.endAge > p.age + Math.max(t - 1, 0)) {
     add('mortgageReal', 'now', `月供实际 × (1 + ${num(p.infl)}%)^−t`, whole(m.monthly * 12 * Math.pow(1 + p.infl / 100, -Math.max(t - 1, 0))),
       { cur: 'work', per, under: 'expense', views: 'pro' });
   }
@@ -648,15 +650,22 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
   }
   if (pro) add('floor', 'now', '年末存入 · 资产不低于 0', null, { tag: TOOL, views: 'pro' });
 
-  // ② After the holiday. The ages come from the items' end ages (at most two, C23) and the claim age.
+  // ② After the holiday. The ages come from the items' end ages (at most two, C23) and the claim age. The section
+  // starts at the holiday: an item that has ended by then is already out of the first row's amount (struck there),
+  // and its → row is marked folded, kept only for the line under the field, which lists every end age to come.
   const holiday = plan ? p.age + t : null;
   const ends = isSet(S.age) ? [...new Set(events.map(e => e.endAge))].sort((a, b) => a - b).slice(0, 2) : [];
   const nextEnd = ends.find(e => e > (holiday ?? S.age));
+  const leftAfter = gone => (isSet(S.retExp) ? S.retExp - toRet(gone.reduce((total, e) => total + e.amount, 0)) : null);
+  const goneAtHoliday = holiday === null ? [] : events.filter(e => e.endAge <= holiday);
   const retStop = stop(['retExp']) ?? (a4 ? { status: 'block', rel: a4.rel } : !S.touched?.retExp ? { status: 'est' } : null);
-  add('retExp', 'after', pro ? '退休后年支出' : '退休后', yearly(S.retExp),
-    { cur: 'retire', per, field: 'retExp', ages: [holiday, nextEnd === undefined ? null : nextEnd - 1], ...retStop });
-  if (pro && plan && mOn && events.find(e => e.id === 'mortgage').endAge > holiday) {
-    add('retReal', 'after', `月供实际变轻，${holiday} 岁实付`, whole(conv(p.retExp, p.rCur, p.wCur, p.fx) + eventDelta(p, t)),
+  add('retExp', 'after', pro ? '退休后年支出' : '退休后', yearly(leftAfter(goneAtHoliday)), {
+    cur: 'retire', per, field: 'retExp', ages: [holiday, nextEnd === undefined ? null : nextEnd - 1], typed: yearly(S.retExp),
+    ...(goneAtHoliday.length ? { struck: goneAtHoliday.map(e => ITEM_NAME[e.id]) } : {}), ...retStop,
+  });
+  // The holiday year's spending as the engine counts it (drift, the mortgage at its real value), before pension and self-pay.
+  if (pro && plan && mOn && mEvent.endAge > holiday) {
+    add('retReal', 'after', `月供实际变轻，${holiday} 岁实付`, whole(firstDraw({ ...p, pension: 0, selfPay: 0 }, t)),
       { cur: 'work', per, views: 'pro' });
   }
   const retItem = { op: '└', cur: 'retire', per, under: 'retExp' };
@@ -666,21 +675,22 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
     if (kOn) add('ret:kids', 'after', ITEM_NAME.kids, monthlyRet(k.count * k.monthly), { ...retItem, field: 'kids.monthly' });
   }
   for (const age of ends) {
-    const gone = events.filter(e => e.endAge <= age).reduce((total, e) => total + e.amount, 0);
-    const left = isSet(S.retExp) ? S.retExp - toRet(gone) : null;
+    const left = leftAfter(events.filter(e => e.endAge <= age));
     // A10 judges the amount left once every item has ended; each → row is judged on its own amount the same way.
     const low = a10 && left !== null && convert(whole(left / 12), ret, work, data) < S.expense / 12 * LIMITS.low;
     add(`after:${age}`, 'after', null, a4 ? null : yearly(left), {
       op: '→', cur: 'retire', per, under: 'retExp', ages: [age, null], struck: events.filter(e => e.endAge === age).map(e => ITEM_NAME[e.id]),
-      ...(low ? { status: 'flag' } : {}),
+      ...(holiday !== null && age <= holiday ? { folded: true } : {}), ...(low ? { status: 'flag' } : {}),
     });
   }
   const own = v => (Number.isFinite(Number(v)) ? Math.max(Number(v), 0) : 0);
   const selfPay = plan ? p.selfPay ?? 0 : S.workC === 'CN' && (S.pension ?? 0) > 0 ? (own(S.selfPension) + own(S.selfMedical)) * 12 : 0;
   const pAge = plan ? p.pAge : S.pAge ?? S.lastValid?.pAge ?? null;
   const selfStop = stop(['selfPension', 'selfMedical']);
-  if (pro || selfPay > 0 || selfStop) {
-    add('self', 'after', pro ? '自缴（工作地中国大陆且填了养老金才计）' : '自缴', selfPay > 0 ? yearly(selfPay) : null,
+  // Self-pay runs from the holiday until the pension starts; a holiday at or after the claim age pays none.
+  const selfOn = selfPay > 0 && !(holiday !== null && isSet(pAge) && holiday >= pAge);
+  if (pro || selfOn || selfStop) {
+    add('self', 'after', pro ? '自缴（工作地中国大陆且填了养老金才计）' : '自缴', selfOn ? yearly(selfPay) : null,
       { cur: 'work', per, field: 'selfPension', ages: [holiday, pAge], ...selfStop });
   }
   add('pension', 'after', pro ? '养老金（超出年支出不计）' : '养老金', S.pension > 0 ? yearly(-S.pension) : null,
@@ -720,11 +730,11 @@ export function setWorkCountry(S, code, data) {
   }
   // The payments are work-currency money, like the other work-currency fields.
   const r = cleanReal(S.real);
-  const conv = v => (v === null ? null : Math.round(convert(v, from, to, data)));
-  moved.real = { mortgage: { ...r.mortgage, monthly: conv(r.mortgage.monthly) }, kids: { ...r.kids, monthly: conv(r.kids.monthly) } };
+  const move = v => (v === null ? null : Math.round(convert(v, from, to, data)));
+  moved.real = { mortgage: { ...r.mortgage, monthly: move(r.mortgage.monthly) }, kids: { ...r.kids, monthly: move(r.kids.monthly) } };
   // So are the split parts and the total remembered from before the split; the spending stays their sum.
   const sp = cleanSplit(S.split);
-  moved.split = { rent: conv(sp.rent), food: conv(sp.food), other: conv(sp.other), before: conv(sp.before) };
+  moved.split = { rent: move(sp.rent), food: move(sp.food), other: move(sp.other), before: move(sp.before) };
   if (splitOn(moved)) moved.expense = splitTotal(moved.split);
   if (!S.touched.retExp) moved.retExp = Math.round(estimateRetireSpend(moved.expense ?? 0, code, S.retC, data, itemsYearly(moved)));
   moved.lastValid = { ...S.lastValid, ...localAssumptions(country) };
