@@ -35,12 +35,13 @@ export function cleanPen(raw) {
 }
 
 // Spending that ends at a known age, already inside the monthly spending: a mortgage (monthly payment, last year)
-// and children (how many, the youngest's age, monthly cost each). Any item may be blank.
+// and children (how many, the youngest's age, monthly cost each). Any item may be blank. Any finite number is kept,
+// negatives and fractions too, so problems() can stop them instead of letting them vanish.
 export const REAL_DEFAULT = { mortgage: { monthly: null, endYear: null }, kids: { count: null, age: null, monthly: null } };
 const realNum = v => {
-  if (v === null || v === undefined || typeof v === 'boolean' || String(v).trim() === '') return null;
+  if (v === null || v === undefined || typeof v === 'boolean' || typeof v === 'object' || String(v).trim() === '') return null;
   const n = Number(v);
-  return Number.isFinite(n) && n >= 0 ? n : null;
+  return Number.isFinite(n) ? n : null;
 };
 const group = (raw, keys) => {
   const t = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
@@ -57,12 +58,17 @@ export function setReal(S, part, field, rawText, data = null) {
   return next;
 }
 
-// Yearly amounts of the two items, or null while an item is not filled in.
-function realItems(S) {
+// Yearly amounts of the two items, or null while an item is not filled in or not valid: a mortgage needs a payment
+// above 0 and a whole end year from 50 years back to 40 ahead; children need a whole count of at least 1, a whole
+// age of at least 0 and a cost above 0. Whether an item has already ended is left to itemEvents.
+const mortgageValid = (m, thisYear) => m.monthly > 0 && Number.isInteger(m.endYear)
+  && m.endYear >= thisYear - LIMITS.endYearBack && m.endYear <= thisYear + LIMITS.endYearAhead;
+const kidsValid = k => Number.isInteger(k.count) && k.count >= 1 && Number.isInteger(k.age) && k.age >= 0 && k.monthly > 0;
+function realItems(S, thisYear = new Date().getFullYear()) {
   const { mortgage: m, kids: k } = cleanReal(S.real);
   return {
-    mortgage: m.monthly > 0 && m.endYear !== null ? { yearly: m.monthly * 12, endYear: m.endYear } : null,
-    kids: k.count > 0 && k.monthly > 0 && k.age !== null ? { yearly: k.count * k.monthly * 12, age: k.age } : null,
+    mortgage: mortgageValid(m, thisYear) ? { yearly: m.monthly * 12, endYear: m.endYear } : null,
+    kids: kidsValid(k) ? { yearly: k.count * k.monthly * 12, age: k.age } : null,
   };
 }
 
@@ -78,23 +84,32 @@ export function lifeIssue(S, data) {
 }
 
 // "Until year Y" means the payments continue through year Y, so they stop at the start of the year after.
+// problems() stops the result before items that do not fit reach the model (A3, A4); dropping them here is only a
+// backstop, on the same edges: items at or above the spending, or at or above the retirement spending.
 export function eventsOf(S, data, thisYear = new Date().getFullYear()) {
-  return lifeIssue(S, data) ? [] : itemEvents(S, thisYear);
+  const events = itemEvents(S, thisYear);
+  const yearly = events.reduce((total, e) => total + e.amount, 0);
+  if (yearly <= 0) return events;
+  if (yearly >= (S.expense ?? 0)) return [];
+  if (convert(yearly, curOf(data, S.workC), curOf(data, S.retC), data) >= (S.retExp ?? 0)) return [];
+  return events;
 }
 
+// The valid items that have not ended: a mortgage paid through this year or later, children up to 21.
 function itemEvents(S, thisYear) {
-  const { mortgage, kids } = realItems(S);
+  const { mortgage, kids } = realItems(S, thisYear);
   const out = [];
-  if (mortgage) out.push({ id: 'mortgage', amount: mortgage.yearly, endAge: Math.round(S.age) + (mortgage.endYear - thisYear) + 1, nominal: true });
-  if (kids) out.push({ id: 'kids', amount: kids.yearly, endAge: Math.round(S.age) + (22 - kids.age), nominal: false });
+  if (mortgage && mortgage.endYear >= thisYear) out.push({ id: 'mortgage', amount: mortgage.yearly, endAge: Math.round(S.age) + (mortgage.endYear - thisYear) + 1, nominal: true });
+  if (kids && kids.age < KIDS_END) out.push({ id: 'kids', amount: kids.yearly, endAge: Math.round(S.age) + (KIDS_END - kids.age), nominal: false });
   return out.filter(e => e.endAge > S.age);
 }
+const KIDS_END = 22;
 
 // The yearly amount (work currency) of the items still running, as the automatic estimate holds them apart.
-// Items larger than the whole spending are dropped by the model, so the estimate does not hold them apart either.
+// Items at or above the whole spending are stopped (A3), so the estimate does not hold them apart either.
 export function itemsYearly(S, thisYear = new Date().getFullYear()) {
   const sum = itemEvents(S, thisYear).reduce((total, e) => total + e.amount, 0);
-  return sum > (S.expense ?? 0) ? 0 : sum;
+  return sum >= (S.expense ?? 0) ? 0 : sum;
 }
 
 // What the status line under the inputs says: when the items end, and what retirement spending is left after they do.
@@ -153,7 +168,7 @@ export function defaultState(data) {
   };
   return {
     view: 'simple', mode: 'fwd', workC: 'CN', retC: 'CN', dispCur: 'CNY',
-    autoSwr: true, touched: {}, notice: '', town: { name: '', monthly: null }, pen: { ...PEN_DEFAULT }, real: cleanReal(null),
+    autoSwr: true, touched: {}, notice: '', town: { name: '', monthly: null }, pen: { ...PEN_DEFAULT }, real: cleanReal(null), split: cleanSplit(null),
     ...values,
     lastValid: Object.fromEntries(Object.entries(values).filter(([, v]) => v !== null)),
   };
@@ -191,6 +206,274 @@ export function missingFields(S) {
   return ids.filter(id => S[id] === null || S[id] === undefined);
 }
 
+// ---- The relations between the numbers: one list that the chip, the frames, the group counts, the lines under the
+// fields, the sidebar and the ledger all read from. The page never judges a relation itself.
+
+const SPLIT_PARTS = ['rent', 'food', 'other'];
+const SPLIT_KEYS = SPLIT_PARTS.map(k => `split.${k}`);
+const ITEM_KEYS = ['mortgage.monthly', 'mortgage.endYear', 'kids.count', 'kids.age', 'kids.monthly'];
+const PRO_ONLY = ['growth', 'life', 'pAge', 'eq', 'eqReal', 'bondY', 'infl', 'drag', 'fxDrift', 'swr', 'sigEq', 'sigBd', 'rho', 'flexCut'];
+const PRO_ORDER = ['age', 'assets', 'income', 'growth', 'expense', ...SPLIT_KEYS, ...ITEM_KEYS, 'retExp', 'life', 'pension', 'pAge',
+  'selfPension', 'selfMedical', 'pen.years', 'tAge', 'eq', 'eqReal', 'bondY', 'infl', 'drag', 'fxDrift', 'swr', 'sigEq', 'sigBd', 'rho', 'flexCut'];
+// Page order of every field a rule can point at. The simple view lists the professional-only fields after its own;
+// the town's spend sits in the result area, after the form.
+export const FIELD_ORDER = {
+  simple: ['age', 'assets', 'income', 'expense', ...SPLIT_KEYS, ...ITEM_KEYS, 'pension', 'selfPension', 'selfMedical', 'pen.years', 'tAge', 'retExp',
+    ...PRO_ORDER.filter(k => PRO_ONLY.includes(k)), 'town.monthly'],
+  pro: [...PRO_ORDER, 'town.monthly'],
+};
+
+const ROWS = {
+  simple: {
+    tage: ['tAge'], now: ['age', 'assets', 'income'], spend: ['expense', ...SPLIT_KEYS, ...ITEM_KEYS], where: [],
+    pension: ['pension', 'selfPension', 'selfMedical', 'pen.years'], retire: ['retExp'],
+  },
+  pro: {
+    region: [], now: ['age', 'assets', 'income', 'growth'], spend: ['expense', ...SPLIT_KEYS, ...ITEM_KEYS],
+    retire: ['retExp', 'life', 'pension', 'pAge', 'selfPension', 'selfMedical', 'pen.years', 'tAge'],
+    returns: ['eq', 'eqReal', 'bondY', 'infl', 'drag', 'fxDrift', 'swr'], risk: ['sigEq', 'sigBd', 'rho', 'flexCut'], sim: [],
+  },
+};
+// The row a field sits in. In the simple view a professional-only field keeps its professional row.
+export function rowOf(field, view) {
+  const find = v => Object.keys(ROWS[v]).find(row => ROWS[v][row].includes(field)) ?? null;
+  return view === 'simple' ? find('simple') ?? find('pro') : find('pro');
+}
+const GROUP_OF = { simple: { tage: 'pension', spend: 'now', returns: null, risk: null }, pro: { spend: 'now' } };
+// The form group (the header that counts the problems) a row belongs to.
+export function formGroupOf(row, view) {
+  if (row === null || row === undefined) return null;
+  const map = GROUP_OF[view === 'simple' ? 'simple' : 'pro'];
+  return row in map ? map[row] : row;
+}
+
+const SIMPLE_LABEL = {
+  age: '年龄', assets: '已有存款和投资', income: '每月到手收入', expense: '每月支出', retExp: '退休后每月想花', pension: '预计每月养老金',
+  selfPension: '放假后每月自缴养老保险', selfMedical: '放假后每月自缴医保', tAge: '想几岁放假',
+  'split.rent': '房租和房贷', 'split.food': '吃饭', 'split.other': '其他', 'mortgage.monthly': '月供', 'mortgage.endYear': '还到哪年',
+  'kids.count': '孩子几个', 'kids.age': '最小的孩子', 'kids.monthly': '每个孩子每月', 'pen.years': '累计缴费', 'town.monthly': '每月花销',
+};
+const PRO_LABEL = {
+  ...SIMPLE_LABEL, assets: '可投资资产', income: '税后年收入', expense: '当前年支出', retExp: '年支出', pension: '养老金/年', tAge: '目标放假年龄',
+  growth: '收入实际增长', life: '规划到', pAge: '领取年龄', eq: '股票占比', eqReal: '股票实际收益', bondY: '10 年国债', infl: '长期通胀',
+  drag: '税费拖累', fxDrift: '退休币升值', swr: '安全提取率', sigEq: '股票波动率', sigBd: '债券波动率', rho: '股债相关性', flexCut: '一年跌 ≥ 15% 后少花',
+};
+// The field's name in the lines under the fields and in the exit buttons' spoken labels.
+export const FIELD_LABEL = { simple: { ...PRO_LABEL, ...SIMPLE_LABEL }, pro: PRO_LABEL };
+
+const SIMPLE_CHIP = {
+  ...Object.fromEntries(PRO_ONLY.map(k => [k, PRO_LABEL[k]])), flexCut: '少花',
+  age: '年龄', assets: '存款', income: '到手收入', expense: '每月支出', retExp: '退休后', pension: '养老金', selfPension: '自缴', selfMedical: '自缴',
+  tAge: '想几岁放假', ...Object.fromEntries(SPLIT_KEYS.map(k => [k, '每月支出'])), 'mortgage.monthly': '房贷', 'mortgage.endYear': '房贷',
+  'kids.count': '孩子', 'kids.age': '孩子', 'kids.monthly': '孩子', 'pen.years': '养老金', 'town.monthly': '每月花销',
+};
+// The item named on the red chip for a problem in that field.
+export const CHIP_NAME = {
+  simple: SIMPLE_CHIP,
+  pro: { ...SIMPLE_CHIP, income: '年收入', expense: '当前年支出', ...Object.fromEntries(SPLIT_KEYS.map(k => [k, '当前年支出'])), retExp: '年支出', tAge: '目标年龄' },
+};
+
+const NUM = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
+// A number as the page writes it: grouped, at most two decimals, a true minus sign.
+export function num(v) {
+  const text = NUM.format(Math.abs(v));
+  return v < 0 && text !== '0' ? `−${text}` : text;
+}
+
+// Limits the tool sets (本工具设定), all listed on the method page.
+export const LIMITS = {
+  age: [16, 85], endYearBack: 50, endYearAhead: 40, pAge: [45, 75], lifeMin: 2, lifeMax: 110, swrMax: 10, low: 0.25,
+  common: { growth: [-2, 5], eqReal: [-2, 10], bondY: [0, 8], infl: [0, 6], drag: [0, 2], fxDrift: [-3, 3] },
+};
+
+// The spending split: three monthly parts in the work currency and the yearly spending from just before the first
+// part was entered. Anything that is not a number reads as blank, so an old or broken save reads as not split.
+export function cleanSplit(raw) {
+  const t = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  return { rent: realNum(t.rent), food: realNum(t.food), other: realNum(t.other), before: realNum(t.before) };
+}
+// While any part is above 0 the spending is their sum and cannot be typed directly.
+export const splitOn = S => {
+  const sp = cleanSplit(S.split);
+  return SPLIT_PARTS.some(k => sp[k] > 0);
+};
+const splitTotal = sp => SPLIT_PARTS.reduce((total, k) => total + (sp[k] ?? 0), 0) * 12;
+const reestimate = (S, data) => (data && !S.touched?.retExp
+  ? { ...S, retExp: Math.round(estimateRetireSpend(S.expense ?? 0, S.workC, S.retC, data, itemsYearly(S))) }
+  : S);
+
+export function setSplit(S, part, rawText, data) {
+  if (!SPLIT_PARTS.includes(part)) return S;
+  const old = cleanSplit(S.split);
+  const split = { ...old, [part]: realNum(rawText) };
+  // Clearing every part by hand is the same as 只填总数.
+  if (SPLIT_PARTS.every(k => split[k] === null)) return unsplit({ ...S, split }, data);
+  if (SPLIT_PARTS.every(k => old[k] === null)) split.before = S.expense ?? null;
+  const next = { ...S, split };
+  if (splitOn(next)) next.expense = splitTotal(split);
+  return reestimate(next, data);
+}
+
+// 只填总数: the parts go and the spending returns to what it was before the split.
+export function unsplit(S, data) {
+  const { before } = cleanSplit(S.split);
+  const next = { ...S, split: cleanSplit(null) };
+  if (before !== null) next.expense = before;
+  return reestimate(next, data);
+}
+
+const isSet = v => v !== null && v !== undefined;
+
+// Every rule result, in page order: blank (待填), block (拦住), ended (struck through, not a problem), flag (!), local
+// (stops only its own line). Amounts in rel are in the view's units; amounts in a fix's set are in state units.
+// last: the field the person committed last, which takes the solid frame where a relation has two sides.
+export function problems(S, data, thisYear = new Date().getFullYear(), { last = null } = {}) {
+  const view = S.view === 'pro' ? 'pro' : 'simple';
+  const pro = view === 'pro';
+  const label = k => FIELD_LABEL[view][k];
+  const out = [];
+  const add = q => {
+    const local = q.kind === 'local';
+    out.push({
+      id: `${q.rule}:${q.field}`, row: local ? null : rowOf(q.field, view), more: [], compare: [], at: q.field,
+      chip: local ? null : CHIP_NAME[view][q.field], rel: null, note: null, fixes: [], ...q,
+    });
+  };
+  const to = (field, n) => ({ text: `→ ${num(n)}`, aria: `${label(field)}改成 ${num(n)}`, set: { [field]: n } });
+  const work = curOf(data, S.workC), ret = curOf(data, S.retC);
+  const toRet = v => convert(v, work, ret, data);
+  const { mortgage: m, kids: k } = cleanReal(S.real);
+  const split = cleanSplit(S.split);
+  const on = splitOn(S);
+
+  // B1: the numbers a result rests on.
+  for (const field of missingFields(S)) add({ rule: 'B1', kind: 'blank', field });
+
+  // A5: a group filled in part waits for the rest; children counted as 0 need nothing more.
+  const half = (name, cells, text) => {
+    const blank = Object.keys(cells).filter(c => cells[c] === null).map(c => `${name}.${c}`);
+    if (blank.length === 0 || blank.length === Object.keys(cells).length) return;
+    add({ id: `A5:${name}`, rule: 'A5', kind: 'blank', field: blank[0], more: blank.slice(1), at: 'expense', fixes: [{ text, clear: name }] });
+  };
+  half('mortgage', m, '不算房贷');
+  if (k.count !== 0) half('kids', k, '不算孩子');
+
+  // A6: the end year is a whole year in range; before this year the mortgage has ended.
+  if (m.endYear !== null) {
+    const y = m.endYear, back = thisYear - LIMITS.endYearBack, ahead = thisYear + LIMITS.endYearAhead;
+    const left = [{ label: label('mortgage.endYear'), value: y }];
+    const rel = !Number.isInteger(y) ? { sub: false, left, op: null, right: null }
+      : y < back ? { sub: false, left, op: '<', right: { label: null, value: back } }
+        : y > ahead ? { sub: false, left, op: '>', right: { label: null, value: ahead } } : null;
+    if (rel) add({ rule: 'A6', kind: 'block', field: 'mortgage.endYear', at: 'expense', rel });
+    else if (y < thisYear && m.monthly > 0) {
+      add({ id: 'end:mortgage', rule: 'A6', kind: 'ended', field: 'mortgage.endYear', at: 'expense',
+        rel: { sub: true, ended: true, label: label('mortgage.monthly'), value: m.monthly, fact: `${y} 已还完` } });
+    }
+  }
+
+  // A7: how many children: a whole number, not negative; 0 has ended.
+  let kidsEnded = false;
+  if (k.count !== null) {
+    const left = [{ label: label('kids.count'), value: k.count }];
+    if (k.count < 0) add({ rule: 'A7', kind: 'block', field: 'kids.count', at: 'expense', rel: { sub: false, left, op: '<', right: { label: null, value: 0 } }, fixes: [to('kids.count', 0)] });
+    else if (!Number.isInteger(k.count)) {
+      add({ rule: 'A7', kind: 'block', field: 'kids.count', at: 'expense', rel: { sub: false, left, op: null, right: null },
+        fixes: [to('kids.count', Math.floor(k.count)), to('kids.count', Math.ceil(k.count))] });
+    } else if (k.count === 0 && k.monthly > 0) {
+      kidsEnded = true;
+      add({ id: 'end:kids', rule: 'A7', kind: 'ended', field: 'kids.count', at: 'expense', rel: { sub: true, ended: true, label: '孩子', value: k.monthly, fact: '0 个' } });
+    }
+  }
+
+  // A8: the youngest child's age: below 0 blocks; from 22 the children have ended.
+  if (k.age !== null) {
+    const left = [{ label: label('kids.age'), value: k.age }];
+    if (k.age < 0) add({ rule: 'A8', kind: 'block', field: 'kids.age', at: 'expense', rel: { sub: false, left, op: '<', right: { label: null, value: 0 } }, fixes: [to('kids.age', 0)] });
+    else if (!Number.isInteger(k.age)) {
+      add({ rule: 'A8', kind: 'block', field: 'kids.age', at: 'expense', rel: { sub: false, left, op: null, right: null },
+        fixes: [to('kids.age', Math.floor(k.age)), to('kids.age', Math.ceil(k.age))] });
+    } else if (k.age >= KIDS_END && !kidsEnded && Number.isInteger(k.count) && k.count >= 1 && k.monthly > 0) {
+      add({ id: 'end:kids', rule: 'A8', kind: 'ended', field: 'kids.age', at: 'expense',
+        rel: { sub: true, ended: true, label: '孩子', value: k.count * k.monthly, fact: `已满 ${KIDS_END} 岁` } });
+    }
+  }
+
+  // The items that would enter the model, and their yearly sum in the work currency.
+  const events = itemEvents(S, thisYear);
+  const mortgageOn = events.some(e => e.id === 'mortgage'), kidsOn = events.some(e => e.id === 'kids');
+  const itemsY = events.reduce((total, e) => total + e.amount, 0);
+  const items = (show, unit) => [
+    mortgageOn && { label: label('mortgage.monthly'), value: show(m.monthly) },
+    kidsOn && { label: '孩子', value: show(k.count * k.monthly) },
+  ].filter(Boolean).map(x => (unit ? { ...x, unit } : x));
+
+  // A2: with the split, the mortgage fits inside 房租和房贷 (equal is fine). It is the sharper form of A3.
+  let a2 = false;
+  if (on && mortgageOn && m.monthly > (split.rent ?? 0)) {
+    a2 = true;
+    const rent = split.rent ?? 0;
+    const field = last === 'split.rent' ? 'split.rent' : 'mortgage.monthly';
+    add({ id: 'A2', rule: 'A2', kind: 'block', field, compare: [field === 'split.rent' ? 'mortgage.monthly' : 'split.rent'], at: 'expense',
+      chip: CHIP_NAME[view]['mortgage.monthly'],
+      rel: { sub: true, left: [{ label: label('mortgage.monthly'), value: m.monthly }], op: '>', right: { label: label('split.rent'), value: rent } },
+      fixes: [
+        { text: `${label('split.rent')} → ${num(m.monthly)}`, aria: `${label('split.rent')}改成 ${num(m.monthly)}`, set: { 'split.rent': m.monthly } },
+        { text: `改${label('mortgage.monthly')}`, focus: 'mortgage.monthly' },
+      ] });
+  }
+
+  // A3: the items stay below the spending; equal blocks.
+  if (!a2 && isSet(S.expense) && itemsY > 0 && itemsY >= S.expense) {
+    const spendField = on ? 'split.other' : 'expense';
+    const sides = [spendField, ...(mortgageOn ? ['mortgage.monthly'] : []), ...(kidsOn ? ['kids.monthly'] : [])];
+    const pick = [...(on ? SPLIT_KEYS : ['expense']), ...(mortgageOn ? ['mortgage.monthly'] : []), ...(kidsOn ? ['kids.count', 'kids.monthly'] : [])];
+    const field = pick.includes(last) ? last : sides[1];
+    const side = f => (f === 'expense' || SPLIT_KEYS.includes(f) ? 'spend' : f.split('.')[0]);
+    add({ id: 'A3', rule: 'A3', kind: 'block', field, compare: sides.filter(f => side(f) !== side(field)), at: 'expense',
+      rel: { sub: true, left: items(v => (pro ? v * 12 : v), pro ? '/年' : null), op: '≥', right: { label: label('expense'), value: pro ? S.expense : S.expense / 12 } },
+      fixes: [
+        { text: `改${label('expense')}`, focus: spendField },
+        ...(mortgageOn ? [{ text: `改${label('mortgage.monthly')}`, focus: 'mortgage.monthly' }] : []),
+        ...(kidsOn ? [{ text: '改孩子', focus: 'kids.monthly' }] : []),
+      ] });
+  }
+
+  // A4: typed retirement spending stays above the items (in the retirement currency); equal blocks. The estimate never does.
+  let a4 = false;
+  if (S.touched?.retExp && isSet(S.retExp) && itemsY > 0 && toRet(itemsY) >= S.retExp) {
+    a4 = true;
+    const shown = v => (work === ret ? v : Math.round(toRet(v)));
+    const est = Math.round(estimateRetireSpend(S.expense ?? 0, S.workC, S.retC, data, itemsYearly(S, thisYear)));
+    add({ id: 'A4', rule: 'A4', kind: 'block', field: 'retExp', at: 'retExp',
+      rel: { sub: true, left: items(v => shown(pro ? v * 12 : v), pro ? '/年' : null), op: '≥', right: { label: label('retExp'), value: pro ? S.retExp : S.retExp / 12 } },
+      fixes: [{ text: `改回估算 ≈ ${num(pro ? est : Math.round(est / 12))}`, reset: 'retExp' }] });
+  }
+
+  // A9: a town's spend holds the items too; below them only that line stops. Equal is fine.
+  const town = Number(S.town?.monthly);
+  if (town > 0 && itemsY > 0 && town * 12 < toRet(itemsY)) {
+    add({ id: 'A9', rule: 'A9', kind: 'local', field: 'town.monthly', fixes: [{ text: '改花销', focus: 'town.monthly' }] });
+  }
+
+  // A10: typed retirement spending that leaves less than a quarter of today's spending once the items end.
+  if (!a4 && S.touched?.retExp && isSet(S.retExp) && isSet(S.expense) && itemsY > 0) {
+    const afterMonthly = Math.round((S.retExp - toRet(itemsY)) / 12);
+    if (convert(afterMonthly, ret, work, data) < S.expense / 12 * LIMITS.low) add({ id: 'A10', rule: 'A10', kind: 'flag', field: 'retExp', at: 'retExp' });
+  }
+
+  // B14: spending above income still counts (savings stay at 0 or above), with an orange line under spending.
+  if (isSet(S.income) && isSet(S.expense) && S.income < S.expense) {
+    const yearly = S.income - S.expense;
+    add({ id: 'B14', rule: 'B14', kind: 'flag', field: 'expense', at: 'expense',
+      rel: { sub: false, left: [{ label: pro ? '年储蓄' : '每月存下', value: pro ? yearly : yearly / 12 }], op: null, right: null },
+      note: pro ? '存款用完后按 0 算' : null });
+  }
+
+  const order = FIELD_ORDER[view];
+  return out.map((q, i) => [q, i]).sort(([a, i], [b, j]) => order.indexOf(a.field) - order.indexOf(b.field) || i - j).map(([q]) => q);
+}
+
 export const commitField =(S, id) => (S[id] === null || S[id] === undefined ? S : { ...S, lastValid: { ...S.lastValid, [id]: S[id] } });
 
 export function setWorkCountry(S, code, data) {
@@ -205,6 +488,10 @@ export function setWorkCountry(S, code, data) {
   const r = cleanReal(S.real);
   const conv = v => (v === null ? null : Math.round(convert(v, from, to, data)));
   moved.real = { mortgage: { ...r.mortgage, monthly: conv(r.mortgage.monthly) }, kids: { ...r.kids, monthly: conv(r.kids.monthly) } };
+  // So are the split parts and the total remembered from before the split; the spending stays their sum.
+  const sp = cleanSplit(S.split);
+  moved.split = { rent: conv(sp.rent), food: conv(sp.food), other: conv(sp.other), before: conv(sp.before) };
+  if (splitOn(moved)) moved.expense = splitTotal(moved.split);
   if (!S.touched.retExp) moved.retExp = Math.round(estimateRetireSpend(moved.expense ?? 0, code, S.retC, data, itemsYearly(moved)));
   moved.lastValid = { ...S.lastValid, ...localAssumptions(country) };
   moved.touched = Object.fromEntries(Object.entries(S.touched).filter(([id]) => !ASSUMPTION_FIELDS.includes(id)));
@@ -273,7 +560,7 @@ export function loadState(data, storage) {
     // Assumptions nobody edited follow the current month's data rather than the saved copy.
     const local = localAssumptions(data.countries[saved.workC]);
     const fresh = Object.fromEntries(ASSUMPTION_FIELDS.filter(id => !touched[id]).map(id => [id, local[id]]));
-    return { ...base, ...saved, ...fresh, town: cleanTown(saved.town), pen: cleanPen(saved.pen), real: cleanReal(saved.real), dispCur: dispOk ? saved.dispCur : base.dispCur, lastValid: { ...base.lastValid, ...saved.lastValid, ...fresh }, touched };
+    return { ...base, ...saved, ...fresh, town: cleanTown(saved.town), pen: cleanPen(saved.pen), real: cleanReal(saved.real), split: cleanSplit(saved.split), dispCur: dispOk ? saved.dispCur : base.dispCur, lastValid: { ...base.lastValid, ...saved.lastValid, ...fresh }, touched };
   } catch {
     return base;
   }
