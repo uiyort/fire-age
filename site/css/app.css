@@ -475,10 +475,27 @@ button.link { font: inherit; padding: 0; border: 0; background: transparent; col
 
 .life-grid label { justify-content: flex-end; }
 .life-included-tag { align-self: flex-start; margin: 4px 0 0; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink-2); font: inherit; font-size: 13px; cursor: pointer; }
-.life-included-tag[hidden], .life-issue[hidden] { display: none; }
-.life-issue { color: var(--warn, #b45309); margin: 6px 0; }
+.life-included-tag[hidden] { display: none; }
 /* The mortgage and children fold reads as one more line under monthly spending, like the split above it. */
 .life-fold > .sub { margin-top: 6px; }
-.life-after { margin: 8px 0 0; font-size: 13px; font-weight: 700; color: var(--ink); }
-.life-after[hidden], .life-gain[hidden], .split-life[hidden] { display: none; }
+.life-gain[hidden], .split-life[hidden] { display: none; }
+
+/* The lines under the fields: what a number holds (└ 其中), why it is stopped (red, ✕), what is left once the items
+   end (→). A line or a row of exit buttons takes a whole row of its grid; dense flow lets the field beside the one it
+   follows stay on its row, so the line sits under both. */
+fieldset, .pen-grid, .split-row, .town-row { grid-auto-flow: row dense; }
+.field-lines, .field-after { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.field-lines:empty { display: none; }
+.field-lines .split-line { margin: 0 0 2px; }
+.row { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.row.bad { color: var(--bad); font-weight: 700; }
+.row.ended { color: var(--ink-3); }
+.row.warn, .row .warn { color: var(--warn); }
+.row.after { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 12px; }
+.tool { display: inline-block; padding: 0 5px; border: 1px dashed var(--ink-3); border-radius: 4px; font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.fixes { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 2px 0; }
+.fix { white-space: nowrap; }
+.f-pre.est { color: var(--s1); }
+input.has-pre { padding-left: 28px; }
+.f .lab .link { font-size: 12px; margin-left: auto; }
 .split-life { display: block; margin: 6px 0 0; padding: 0; border: 0; background: transparent; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer; text-align: left; }

@@ -4,7 +4,7 @@ import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn, o
 import { needLine, oddsSolve } from './odds.js';
 import { MIN_SHOWN, SCENARIOS, answerValues, scenarioOptions } from './scenario.js';
 import { impactOf, lifeChoices, tryParam } from './levers.js';
-import { FIELD_LABEL, num } from './state.js';
+import { FIELD_LABEL, LIMITS, num } from './state.js';
 
 const moneyFormats = {};
 export function money(v, cur) {
@@ -89,18 +89,20 @@ function pensionNote(p, { withPension: w, withoutPension: wo, gain }) {
 
 // The estimate under the pension field: the statutory age, the two parts and their sum, and the settings this tool made.
 // result comes from estimateFromForm (null until a birth month and a base are filled in).
-// held: the pension field above still holds an earlier figure.
-export function pensionEstimateHtml(result, { used = false, held = false } = {}) {
+// held: the pension field above still holds an earlier figure. problem: B15 (fewer years than already paid), drawn with
+// its exit above the use button.
+export function pensionEstimateHtml(result, { used = false, held = false, problem = null } = {}) {
   if (!result) return '<p class="fine">填上出生年月和当地的计发基数，这里就会出现估算。</p>';
   const { st, est, years, claimAge } = result;
   const age = `${st.years} 岁${st.months > 0 ? ` ${st.months} 个月` : ''}`;
   const money = v => wholeMoney(Number.isFinite(v) ? v : 0, 'CNY');
+  const stop = problem ? `${fieldLineHtml(problem)}<div class="fixes">${fixesHtml(problem.fixes)}</div>` : '';
   const body = est.eligible
     ? `<div class="pen-sum"><span>基础养老金 <b>${money(est.basic)}</b>/月</span><span>个人账户养老金 <b>${money(est.personal)}</b>/月</span><span>合计 <b>${money(est.monthly)}</b>/月</span></div>
        <p class="fine">按累计缴费 ${years} 年算，今天的钱。法定领取年龄 ${age}，模型里按 ${claimAge} 岁开始领。</p>
-       ${used ? '<p class="fine pen-used">已填进上面的养老金和领取年龄。</p>' : '<button type="button" class="primary" data-pen-use>用这个结果</button>'}`
+       ${stop}${used ? '<p class="fine pen-used">已填进上面的养老金和领取年龄。</p>' : '<button type="button" class="primary" data-pen-use>用这个结果</button>'}`
     : `<p class="pen-short">累计缴费不满 ${est.minYears ?? '最低'} 年，不能按月领取${held ? '。上面的养老金还是之前填的，要按 0 算请清空它。' : '，这里按 0 算。'}</p>
-       <p class="fine">法定领取年龄 ${age}。</p>`;
+       <p class="fine">法定领取年龄 ${age}。</p>${stop}`;
   return `${body}<div class="pen-set"><b>本工具设定</b><ul>
     <li>计发基数按今天的钱算，只跟物价涨；个人账户记账利率与通胀持平。</li>
     <li>累计缴费年限默认“已缴年数 + 距领取的年数”，可以改。</li>
@@ -421,16 +423,12 @@ export function townHtml(town, plan, p) {
   return `<p class="town-line">${where}：${plan.age} 岁放假${move}（八成把握）。</p>`;
 }
 
-// The tag under the big age: what is counted and what is spent each month once it has ended (retirement currency).
-export function lifeTagText(sum, cur) {
-  const parts = [sum.mortgageEnd !== null ? `房贷到 ${sum.mortgageEnd}` : '', sum.kidsTo22 ? '孩子到 22 岁' : ''].filter(Boolean);
-  return `已算：${parts.join('、')} · 之后每月约 ${wholeMoney(sum.afterMonthly, cur)} ›`;
-}
-
-// Inside the fold, so a spend typed without the mortgage and children shows up as far too little.
-export function lifeAfterText(sum, cur) {
-  const low = sum.low ? '比现在少很多。如果退休后每月想花里没有包含月供和孩子，请把它们加回去。' : '';
-  return `到期后，退休后每月约花 ${wholeMoney(sum.afterMonthly, cur)}。${low}`;
+// The tag under the big age: the items that are counted, without an amount (the amount after they end is on the
+// → rows under retirement spending). Empty when nothing is counted.
+export function lifeTagText(rows) {
+  const counted = rows.filter(r => (r.key === 'mortgage' || r.key === 'kids') && r.status === null);
+  const parts = counted.map(r => (r.key === 'mortgage' ? `房贷到 ${r.end}` : `孩子到 ${r.end} 岁`));
+  return parts.length ? `已算：${parts.join('、')} ›` : '';
 }
 
 // What counting the end of the items changes; told only inside the fold, never beside the big age.
@@ -589,6 +587,77 @@ export function splitLineHtml(row, { view, wCur }) {
   const label = simple ? `三项合计 ${num(total)}：${named}` : `三项合计每月 ${num(total)} × 12 = ${num(total * 12)}：${named}`;
   const back = row.before === null || row.before === undefined ? '' : ` ${wholeMoney(row.before / (simple ? 12 : 1), wCur)}`;
   return `<span class="split-sum" role="group" aria-label="${label}">${sum}</span><button type="button" class="link" data-unsplit>只填总数${back}</button>`;
+}
+
+// ---- The lines under the fields: what a number holds, why it is stopped, and what is left once the items end.
+
+// A relation as one line of text: the names and amounts on the left, then the operator and the other side. An item
+// that has ended is struck through with its fact (HTML, read as 已结束，不计入). Years are written without grouping.
+const YEAR_LABEL = FIELD_LABEL.simple['mortgage.endYear'];
+const plainYear = v => (v < 0 ? `−${Math.abs(v)}` : String(v));
+export function relText(rel) {
+  if (rel.ended) return `<span aria-label="已结束，不计入">└ 其中<s>${rel.label} ${num(rel.value)}${rel.unit ?? ''}</s> ${rel.fact}</span>`;
+  const { sub, left, op, right } = rel;
+  const fmt = left.length === 1 && left[0].label === YEAR_LABEL ? plainYear : num;
+  const sum = left.reduce((total, x) => total + x.value, 0);
+  const lhs = `${left.map(x => x.label).join(' + ')} ${fmt(sum)}${left[0].unit ?? ''}`;
+  const rhs = op ? ` ${op} ${right.label ? `${right.label} ` : ''}${fmt(right.value)}${right.unit ?? ''}` : '';
+  return `${sub ? '└ 其中' : ''}${lhs}${rhs}`;
+}
+
+// A live relation in HTML: < and > escaped, the └ not read out (其中 is).
+const liveHtml = rel => relText(rel).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/^└ /, `${OP('└')} `);
+const X = '<span class="x" aria-label="拦住">✕</span>';
+const WARN = '<span aria-label="提示">!</span>';
+const NONE = '<span aria-label="没有数">—</span>';
+const TOOL_TAG = '<span class="tool">本工具设定</span>';
+
+// A range rule, drawn under its own field; the field points at it with aria-describedby.
+export const fieldLineHtml = q => `<p class="row bad" id="rel-${q.field}">${liveHtml(q.rel)} ${X}</p>`;
+
+// The exit buttons. data-fix carries only the action (set, focus, clear, reset, unsplit); the text is the button's.
+export function fixesHtml(fixes = []) {
+  return fixes.map(({ text, aria, ...act }) => {
+    const data = JSON.stringify(act).replace(/&/g, '&amp;').replace(/'/g, '&#39;');
+    return `<button type="button" class="ghost fix" data-fix='${data}'${aria ? ` aria-label="${aria}"` : ''}>${text}</button>`;
+  }).join('');
+}
+
+// The lines under monthly spending (at 'expense') or retirement spending (at 'retExp'), from storyRows and the
+// problems to show (a stop not yet shown draws its item plainly, not red). Under spending: the split's sum (its
+// before is the stored yearly total, as splitLineHtml takes it), the items it holds (counted, ended, or the stopped
+// relation), and the orange line when spending is above income. Under retirement spending: the items again, and one
+// → row per end age still to come, with what is left from then on.
+export function fieldLinesHtml({ rows, list, at, view, wCur, rCur }) {
+  const pro = view === 'pro';
+  const unit = pro ? '/年' : '';
+  const stop = list.find(q => q.kind === 'block' && q.rel?.sub && q.at === at);
+  const item = r => {
+    if (r.status === 'ended') return `<p class="row ended">${relText({ ...r.rel, value: r.value ?? r.rel.value, unit })}</p>`;
+    // A half-filled group (A5) adds no line; a range rule is drawn under its own field.
+    if (r.status === 'blank' || (r.status === 'block' && !r.rel?.sub)) return '';
+    if (r.status === 'block' && stop) return `<p class="row bad" id="rel-${stop.field}">${liveHtml(stop.rel)} ${X}</p>`;
+    if (r.status === 'block') return `<p class="row">${liveHtml({ ...r.rel, op: null })}</p>`;
+    const [name, end] = r.label.split(' → ');
+    const amount = r.value === null ? NONE : `${num(r.value)}${unit}`;
+    return `<p class="row">${OP('└')} 其中${name} ${amount}${end ? ` ${OP('→')} ${end}` : ''}${r.tag ? ` ${TOOL_TAG}` : ''}</p>`;
+  };
+  const items = rows.filter(r => r.op === '└' && r.under === at).map(item);
+  if (at === 'expense') {
+    const split = rows.find(r => r.key === 'split');
+    const sum = split ? `<p class="split-line" id="split-line-${pro ? 'p' : 's'}">${splitLineHtml(split, { view, wCur })}</p>` : '';
+    const b14 = list.find(q => q.rule === 'B14');
+    const save = b14 ? `<p class="row warn">${WARN} ${liveHtml(b14.rel)}${b14.note ? ` · ${b14.note}` : ''}</p>` : '';
+    return sum + items.join('') + save;
+  }
+  const today = rows.find(r => r.key === 'expense')?.value;
+  const after = rows.filter(r => r.key.startsWith('after:')).map(r => {
+    const money = r.value === null ? NONE : wholeMoney(r.value, rCur);
+    const low = pro && today !== null && today !== undefined ? ` &lt; 现在 ${wholeMoney(today, wCur)} × ${num(LIMITS.low * 100)}% ${TOOL_TAG}` : '';
+    const amount = r.status === 'flag' && r.value !== null ? `<span class="warn">${WARN} ${money}</span>${low}` : money;
+    return `<p class="row after"><span>${OP('→')} ${r.ages[0]} 岁起</span> <span class="amt">${amount}</span></p>`;
+  });
+  return items.join('') + after.join('');
 }
 
 // The red chip on a stopped result: a blank first (nothing can be worked out without it), else a block.

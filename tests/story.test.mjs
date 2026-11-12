@@ -176,3 +176,12 @@ test('setWorkCountry no longer shadows the engine\'s conv', async () => {
   const src = await readFile(new URL('../site/js/state.js', import.meta.url), 'utf8');
   assert.ok(!/const conv =/.test(src));
 });
+
+test('storyRows: the items under spending repeat what was typed, so a stop before them leaves their amounts', () => {
+  const kids = { count: 1, age: 5, monthly: 1700 };
+  const blank = storyRows({ ...S, income: null, real: { ...S.real, kids } }, DATA, 2026, null);
+  assert.deepEqual([row(blank, 'mortgage').value, row(blank, 'kids').value, row(blank, 'save').value], [7500, 1700, null]);
+  const a2 = { ...S, expense: 108000, split: { rent: 5000, food: 2000, other: 2000, before: 72000 }, real: { ...S.real, kids } };
+  const rows = storyRows(a2, DATA, 2026, null);
+  assert.equal(row(rows, 'mortgage').status, 'block'); assert.equal(row(rows, 'kids').value, 1700);
+});

@@ -198,7 +198,7 @@ test('using a pension estimate writes the yearly pension in the retirement curre
 });
 
 // ---- spending that ends at a known age ----
-import { eventsOf, lifeIssue, lifeSummary } from '../site/js/state.js';
+import { eventsOf, problems } from '../site/js/state.js';
 const withReal = (real, o = {}) => ({ ...defaultState(DATA), age: 35, expense: 120000, retExp: 120000, real, ...o });
 const emptyReal = { mortgage: { monthly: null, endYear: null }, kids: { count: null, age: null, monthly: null } };
 
@@ -223,59 +223,11 @@ test('events: eventsOf turns a mortgage and children into events, and drops fini
     [{ id: 'mortgage', amount: 36000, endAge: 36, nominal: true }]);
 });
 
-test('events: lifeIssue speaks up when the payments do not fit, and events are dropped', () => {
+test('events: items that do not fit are dropped (a backstop; problems() stops the result first)', () => {
   const big = withReal({ mortgage: { monthly: 6000, endYear: 2046 }, kids: { count: 2, age: 6, monthly: 3000 } });
-  assert.equal(lifeIssue(big, DATA), '月供和孩子的花销加起来达到或超过了每月支出，请检查这两处');
   assert.deepEqual(eventsOf(big, DATA, 2026), []);
   const ret = withReal({ mortgage: { monthly: 6000, endYear: 2046 }, kids: { count: 1, age: 6, monthly: 3000 } }, { expense: 240000, retExp: 60000 });
-  assert.equal(lifeIssue(ret, DATA), '退休后每月想花里也要算上月供和孩子的花销');
   assert.deepEqual(eventsOf(ret, DATA, 2026), []);
-  assert.equal(lifeIssue(withReal({ mortgage: { monthly: 3000, endYear: 2046 }, kids: { count: 1, age: 6, monthly: 1000 } }), DATA), '');
-  assert.equal(lifeIssue(defaultState(DATA), DATA), '');
-});
-
-test('events: items equal to the spending are an issue too', () => {
-  const eq = withReal({ mortgage: { monthly: 10000, endYear: 2046 }, kids: emptyReal.kids });
-  assert.equal(lifeIssue(eq, DATA), '月供和孩子的花销加起来达到或超过了每月支出，请检查这两处');
-  const ret = withReal({ mortgage: { monthly: 5000, endYear: 2046 }, kids: emptyReal.kids }, { retExp: 60000 });
-  assert.equal(lifeIssue(ret, DATA), '退休后每月想花里也要算上月供和孩子的花销');
-});
-
-test('lifeSummary: null without items; end year, kids flag, spending after, low flag', () => {
-  assert.equal(lifeSummary(defaultState(DATA), DATA, 2026), null);
-  const S = withReal({ mortgage: { monthly: 3000, endYear: 2046 }, kids: { count: 1, age: 6, monthly: 1000 } }, { retExp: 120000 });
-  assert.deepEqual(lifeSummary(S, DATA, 2026), { mortgageEnd: 2046, kidsTo22: true, afterMonthly: 6000, low: false });
-  const m = withReal({ mortgage: { monthly: 3000, endYear: 2046 }, kids: emptyReal.kids });
-  assert.deepEqual(lifeSummary(m, DATA, 2026), { mortgageEnd: 2046, kidsTo22: false, afterMonthly: 7000, low: false });
-  // an item that already ended is not an event
-  assert.equal(lifeSummary(withReal({ mortgage: { monthly: 3000, endYear: 2025 }, kids: emptyReal.kids }), DATA, 2026), null);
-  // 25% edge of 10000: 2500 is not low, 2499 is
-  const edge = (retExp) => lifeSummary(withReal({ mortgage: { monthly: 3000, endYear: 2046 }, kids: emptyReal.kids }, { retExp, touched: { retExp: true } }), DATA, 2026);
-  assert.equal(edge(66000).afterMonthly, 2500);
-  assert.equal(edge(66000).low, false);
-  assert.equal(edge(65988).afterMonthly, 2499);
-  assert.equal(edge(65988).low, true);
-});
-
-test('lifeSummary: the retirement currency differs from the work currency', () => {
-  const base = withReal({ mortgage: { monthly: 3000, endYear: 2046 }, kids: emptyReal.kids });
-  const S = { ...setRetireCountry(base, 'TH', DATA), retExp: 600000 };
-  const fx = c => (c === 'USD' ? 1 : DATA.fx[c].value);
-  const thb = 36000 / fx(DATA.countries.CN.cur) * fx(DATA.countries.TH.cur);
-  const s = lifeSummary(S, DATA, 2026);
-  assert.equal(s.afterMonthly, Math.round((600000 - thb) / 12));
-  assert.equal(s.low, false);
-  const tiny = lifeSummary({ ...S, retExp: Math.round(thb + 12), touched: { retExp: true } }, DATA, 2026);
-  assert.equal(tiny.afterMonthly, 1);
-  assert.equal(tiny.low, true);
-});
-
-test('lifeSummary: low only fires when the person typed retirement spending', () => {
-  const real = { mortgage: { monthly: 12000, endYear: 2045 }, kids: emptyReal.kids };
-  const auto = withReal(real, { expense: 180000, retExp: 180000 });
-  assert.equal(lifeSummary(auto, DATA, 2026).low, false);
-  const typed = lifeSummary({ ...auto, touched: { retExp: true } }, DATA, 2026);
-  assert.equal(typed.low, true);
 });
 
 test('events: an old save has empty events, and a bad real block reads as empty', () => {
@@ -292,12 +244,13 @@ test('events: an old save has empty events, and a bad real block reads as empty'
 test('events: payments in the work currency are compared with retirement spending in the same currency', () => {
   const real = { mortgage: { monthly: 2000, endYear: 2046 }, kids: { count: 1, age: 6, monthly: 1500 } };
   const S = withReal(real, { expense: 144000, retExp: 72000 });
-  assert.equal(lifeIssue(S, DATA), '');
+  const fits = x => problems(x, DATA, 2026).filter(q => q.rule === 'A3' || q.rule === 'A4');
+  assert.deepEqual(fits(S), []);
   for (const code of ['US', 'DE', 'UK', 'AU', 'CA', 'SG', 'MY']) {
     if (!DATA.countries[code]) continue;
     const abroad = setRetireCountry(S, code, DATA);
     const inWork = { ...abroad, retExp: Math.round(estimateRetireSpend(144000, 'CN', code, DATA)) };
-    assert.equal(lifeIssue(inWork, DATA), '', code);
+    assert.deepEqual(fits({ ...inWork, touched: { retExp: true } }), [], code);
     assert.equal(eventsOf(inWork, DATA, 2026).length, 2, code);
   }
 });

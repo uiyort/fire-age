@@ -285,3 +285,180 @@ test('the sum line reads in words; its operators are not read', async ({ page })
   await expect(sum).toHaveAttribute('aria-label', '三项合计 8,000：房租和房贷 5,000，吃饭 2,000，其他 1,000');
   await expect(sum.locator('[aria-hidden="true"]')).toHaveText(['=', '+', '+']);
 });
+
+// ---- Task 6: the lines under the fields and the exit buttons.
+const roomy = async page => { await page.fill('#s-income', '30000'); await page.fill('#s-expense', '15000'); };
+const mortgage = async (page, m, end = '2045') => {
+  const fold = page.locator('#life-fold'); if (!(await fold.evaluate(el => el.open))) await fold.locator('summary').click();
+  await page.fill('#life-mortgage', m); await page.fill('#life-mortgage-end', end); await page.locator('#life-mortgage-end').press('Tab');
+};
+const noScroll = async page => expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+
+test('a counted mortgage: the line under spending, the → line and the tag without an amount', async ({ page }) => {
+  await page.goto('/'); await roomy(page); await mortgage(page, '7500');
+  await expect(page.locator('#lines-expense')).toContainText('└ 其中月供 7,500');
+  await expect(page.locator('#lines-retexp')).toContainText('→ 50 岁起 ¥7,500');
+  await expect(page.locator('#life-tag')).toHaveText('已算：房贷到 2045 ›');
+  await expect(page.locator('#life-issue, #life-after')).toHaveCount(0);
+  await expect(page.locator('#estimate')).not.toContainText('估算值');
+  // The └ and → are not read; 其中 is.
+  await expect(page.locator('#lines-expense [aria-hidden="true"]')).toHaveText(['└']);
+  await expect(page.locator('#lines-retexp .after [aria-hidden="true"]')).toHaveText(['→']);
+  await noScroll(page);
+});
+
+test('A3 shows the relation and its three-word exits', async ({ page }) => {
+  await page.goto('/'); await page.fill('#s-expense', '7000'); await mortgage(page, '7500');
+  await expect(page.locator('#lines-expense')).toContainText('└ 其中月供 7,500 ≥ 每月支出 7,000 ✕');
+  await expect(page.locator('#lines-expense .x')).toHaveAttribute('aria-label', '拦住');
+  await expect(page.locator('#life-mortgage')).toHaveAttribute('aria-describedby', 'rel-mortgage.monthly');
+  await noScroll(page);
+  await page.getByRole('button', { name: '改每月支出' }).click();
+  await expect(page.locator('#s-expense')).toBeFocused();
+});
+
+test('A2: 房租和房贷 → 9,000 fixes it in one tap', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#expense-split summary').click();
+  for (const [k, v] of [['rent', '5000'], ['food', '2000'], ['other', '1000']]) await page.fill(`#split-${k}`, v);
+  await mortgage(page, '9000');
+  await expect(page.locator('#lines-expense')).toContainText('└ 其中月供 9,000 > 房租和房贷 5,000');
+  // The exits sit under the mortgage box, the solid field.
+  const fixes = page.locator('#life-fold .fixes');
+  await expect(fixes.locator('button')).toHaveText(['房租和房贷 → 9,000', '改月供']);
+  await noScroll(page);
+  await page.getByRole('button', { name: '房租和房贷改成 9,000' }).click();
+  await expect(page.locator('#split-rent')).toHaveValue('9000');
+  await expect(page.locator('#s-expense')).toHaveValue('12000');
+  await expect(page.locator('.chip')).toHaveCount(0);
+  await expect(page.locator('#split-rent')).toBeFocused();
+  await expect(page.locator('.fixes')).toHaveCount(0);
+  await expect(page.locator('#lines-expense')).toContainText('└ 其中月供 9,000');
+  await expect(page.locator('#lines-expense .bad')).toHaveCount(0);
+});
+
+test('A4: typed retirement spending below the items; 改回估算 brings back ≈', async ({ page }) => {
+  await page.goto('/'); await roomy(page); await mortgage(page, '7500');
+  await expect(page.locator('#estimate .f-pre')).toBeVisible();
+  await page.fill('#s-retexp', '6000'); await page.locator('#s-retexp').press('Tab');
+  await expect(page.locator('#lines-retexp')).toContainText('└ 其中月供 7,500 ≥ 退休后每月想花 6,000');
+  await expect(page.locator('#lines-retexp')).toContainText('→ 50 岁起 —');
+  await expect(page.locator('#lines-retexp [aria-label="没有数"]')).toHaveText('—');
+  await expect(page.locator('#sticky-result .chip')).toHaveText('拦住：退休后 ›');
+  await expect(page.locator('#estimate .f-pre')).toBeHidden();
+  await expect(page.locator('#s-retexp')).toHaveAttribute('aria-describedby', 'rel-retExp');
+  // Typed by hand: a link right of the label goes back to the estimate too.
+  await expect(page.locator('#estimate .lab [data-fix]')).toHaveText('改回估算');
+  await noScroll(page);
+  await page.getByRole('button', { name: '改回估算 ≈ 15,000' }).click();
+  await expect(page.locator('#s-retexp')).toHaveValue('15000');
+  await expect(page.locator('#estimate .f-pre')).toHaveText('≈');
+  await expect(page.locator('#estimate .f-pre')).toBeVisible();
+  await expect(page.locator('#estimate .lab [data-fix]')).toBeHidden();
+  await expect(page.locator('.chip')).toHaveCount(0);
+  await expect(page.locator('#lines-retexp')).toContainText('→ 50 岁起 ¥7,500');
+});
+
+test('a fix that leaves another problem moves the chip on and leaves no stale mark', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#life-fold summary').click();
+  await page.fill('#life-mortgage', '3000'); await page.locator('#life-mortgage').press('Tab');
+  await page.fill('#life-kids', '1.5'); await page.locator('#life-kids').press('Tab');
+  await expect(page.locator('#rel-kids\\.count')).toContainText('孩子几个 1.5 ✕');
+  await page.getByRole('button', { name: '孩子几个改成 1' }).click();
+  await expect(page.locator('#life-kids')).toHaveValue('1');
+  await expect(page.locator('#life-kids')).not.toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#life-kids')).not.toHaveAttribute('aria-describedby', /./);
+  await expect(page.locator('#rel-kids\\.count')).toHaveCount(0);
+  await expect(page.locator('#sticky-result .chip')).toHaveText('待填 2 处 ›');
+  await expect(page.locator('#hero')).toContainText('— 岁放假');
+});
+
+test('A5 不算房贷; an ended mortgage is struck through; a range line and its → button', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#life-fold summary').click();
+  await page.fill('#life-mortgage', '3000'); await page.locator('#life-mortgage').press('Tab');
+  await expect(page.locator('#sticky-result .chip')).toHaveText('待填：房贷 ›');
+  // A half-filled group adds no line; the chip and the frame say it.
+  await expect(page.locator('#lines-expense')).toHaveText('');
+  await page.getByRole('button', { name: '不算房贷' }).click();
+  await expect(page.locator('#life-mortgage')).toHaveValue(''); await expect(page.locator('.chip')).toHaveCount(0);
+  await mortgage(page, '4000', '2020');
+  await expect(page.locator('#lines-expense s')).toHaveText('月供 4,000');
+  await expect(page.locator('#lines-expense')).toContainText('2020 已还完');
+  await expect(page.locator('.chip')).toHaveCount(0);
+  await page.fill('#s-age', '120'); await page.locator('#s-age').press('Tab');
+  await expect(page.locator('#rel-age')).toContainText('年龄 120 > 85');
+  await expect(page.locator('#s-age')).toHaveAttribute('aria-describedby', 'rel-age');
+  await noScroll(page);
+  await page.getByRole('button', { name: '年龄改成 85' }).click();
+  await expect(page.locator('#s-age')).toHaveValue('85');
+  await expect(page.locator('#rel-age')).toHaveCount(0);
+});
+
+test('an end year out of range: the year unwritten in thousands, no value button', async ({ page }) => {
+  await page.goto('/'); await roomy(page); await mortgage(page, '4000', '2200');
+  const line = page.locator('#rel-mortgage\\.endYear');
+  await expect(line).toHaveText(`还到哪年 2200 > ${new Date().getFullYear() + 40} ✕`);
+  await expect(page.locator('#life-mortgage-end')).toHaveAttribute('aria-describedby', 'rel-mortgage.endYear');
+  await expect(page.locator('.fixes')).toHaveCount(0);
+  await expect(page.locator('#lines-expense')).toHaveText('');
+  await noScroll(page);
+});
+
+test('spending above income: an orange line, the result still shows', async ({ page }) => {
+  await page.goto('/'); await page.fill('#s-income', '5000'); await page.locator('#s-income').press('Tab');
+  await expect(page.locator('#lines-expense')).toContainText('! 每月存下 −1,000');
+  await expect(page.locator('#lines-expense .warn [aria-label="提示"]')).toHaveText('!');
+  await expect(page.locator('.chip')).toHaveCount(0);
+});
+
+test('the town line and the pension estimate stop only themselves', async ({ page }) => {
+  await page.goto('/'); await roomy(page); await mortgage(page, '4000');
+  await page.locator('#places-fold > summary').click();
+  await page.fill('#town-name', '大理'); await page.fill('#town-monthly', '3000');
+  // Nothing red while the spend is typed.
+  await expect(page.locator('#town-monthly')).not.toHaveAttribute('aria-invalid', 'true');
+  await page.locator('#town-monthly').press('Tab');
+  await expect(page.locator('#town-monthly')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#town-result')).toContainText('比月供和孩子的花销还少');
+  await expect(page.locator('.chip')).toHaveCount(0);
+  await page.getByRole('button', { name: '改花销' }).click();
+  await expect(page.locator('#town-monthly')).toBeFocused();
+  await page.fill('#town-monthly', '6000');
+  await expect(page.locator('#town-monthly')).not.toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByRole('button', { name: '改花销' })).toHaveCount(0);
+  await page.locator('#pen-fold-s summary').click();
+  await page.fill('#pen-s-birth', '1990-06'); await page.fill('#pen-s-base', '8000');
+  await page.fill('#pen-s-paid', '15'); await page.fill('#pen-s-years', '12'); await page.locator('#pen-s-years').press('Tab');
+  await expect(page.locator('#pen-result-s')).toContainText('累计缴费 12 年 < 已缴 15 年');
+  await expect(page.locator('#pen-s-years')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('.chip')).toHaveCount(0);
+  await page.getByRole('button', { name: '累计缴费改成 15' }).click();
+  await expect(page.locator('#pen-s-years')).toHaveValue('15');
+  await expect(page.locator('#pen-result-s')).not.toContainText('已缴 15 年');
+  await expect(page.locator('#pen-s-years')).not.toHaveAttribute('aria-invalid', 'true');
+  // An estimate that could be used: 用这个结果 goes to the field instead while the years do not add up.
+  await page.fill('#pen-s-paid', '25'); await page.fill('#pen-s-years', '22'); await page.locator('#pen-s-years').press('Tab');
+  await expect(page.locator('#pen-result-s')).toContainText('累计缴费 22 年 < 已缴 25 年');
+  await page.locator('#pen-result-s [data-pen-use]').click();
+  await expect(page.locator('#pen-s-years')).toBeFocused();
+  await expect(page.locator('#s-pension')).toHaveValue('');
+});
+
+test('the professional view: yearly lines, ≈ and 改回估算 beside 年支出', async ({ page }) => {
+  await page.goto('/'); await roomy(page); await mortgage(page, '7500');
+  await page.click('#to-pro');
+  await expect(page.locator('#lines-expense')).toContainText('└ 其中月供 90,000/年');
+  await expect(page.locator('#lines-retexp')).toContainText('→ 50 岁起 ¥90,000');
+  const pre = page.locator('#p-retExp').locator('xpath=preceding-sibling::span[contains(@class,"f-pre")]');
+  await expect(pre).toBeVisible(); await expect(pre).toHaveText('≈');
+  await page.fill('#p-retExp', '80000'); await page.locator('#p-retExp').press('Tab');
+  await expect(page.locator('#lines-retexp')).toContainText('└ 其中月供 90,000/年 ≥ 年支出 80,000 ✕');
+  await expect(pre).toBeHidden();
+  await page.locator('#pro-form .lab [data-fix]').click();
+  await expect(page.locator('#p-retExp')).toHaveValue('180000');
+  await expect(pre).toBeVisible();
+  await expect(page.locator('.chip')).toHaveCount(0);
+  await noScroll(page);
+});

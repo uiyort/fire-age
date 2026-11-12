@@ -3,9 +3,9 @@ import { oddsSolve, oddsYears } from '../site/js/odds.js';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
 import { townPlan, cardPlace } from '../site/js/holiday.js';
-import { lifeAfterText, lifeGainText, lifeTagText, townHtml } from '../site/js/views.js';
+import { lifeGainText, lifeTagText, townHtml } from '../site/js/views.js';
 import { fiNeed, fiYears, fwdSolve, lifePath, monteCarlo } from '../site/js/engine.js';
-import { defaultState, setField, setRetireCountry, setWorkCountry, toParams } from '../site/js/state.js';
+import { defaultState, setField, setRetireCountry, setWorkCountry, storyRows, toParams } from '../site/js/state.js';
 import { rankLevers } from '../site/js/levers.js';
 import { AXES, GROUPS, TYPES, drawLives, holidayType, weakness, lifeStory, mondaysIn, placeRanking, workdaysIn } from '../site/js/holiday.js';
 import { allTypesHtml, livesSummary, storyHtml, typeHtml, variantsHtml } from '../site/js/views.js';
@@ -354,13 +354,15 @@ test('a town the person typed wins the card slot only when it gains something', 
   assert.equal(cardPlace([{ name: 'A', years: 3, current: true }], { name: '', monthly: null }, null), null);
 });
 
-test('the tag, the spending after the items end and the gain are told in plain words', () => {
-  const both = { mortgageEnd: 2045, kidsTo22: true, afterMonthly: 7500, low: false };
-  assert.equal(lifeTagText(both, 'CNY'), '已算：房贷到 2045、孩子到 22 岁 · 之后每月约 ¥7,500 ›');
-  assert.equal(lifeTagText({ ...both, kidsTo22: false }, 'CNY'), '已算：房贷到 2045 · 之后每月约 ¥7,500 ›');
-  assert.equal(lifeTagText({ ...both, mortgageEnd: null }, 'THB'), '已算：孩子到 22 岁 · 之后每月约 THB 7,500 ›');
-  assert.equal(lifeAfterText(both, 'CNY'), '到期后，退休后每月约花 ¥7,500。');
-  assert.equal(lifeAfterText({ ...both, afterMonthly: 500, low: true }, 'CNY'), '到期后，退休后每月约花 ¥500。比现在少很多。如果退休后每月想花里没有包含月供和孩子，请把它们加回去。');
+test('the tag lists only the counted items, without an amount; the gain is told in plain words', () => {
+  const rows = real => storyRows({ ...defaultState(DATA), expense: 180000, retExp: 180000, real }, DATA, 2026, null);
+  const kids = { count: 1, age: 5, monthly: 1500 }, none = { count: null, age: null, monthly: null };
+  assert.equal(lifeTagText(rows({ mortgage: { monthly: 7500, endYear: 2045 }, kids })), '已算：房贷到 2045、孩子到 22 岁 ›');
+  assert.equal(lifeTagText(rows({ mortgage: { monthly: 7500, endYear: 2045 }, kids: none })), '已算：房贷到 2045 ›');
+  assert.equal(lifeTagText(rows({ mortgage: { monthly: null, endYear: null }, kids })), '已算：孩子到 22 岁 ›');
+  // An ended mortgage is struck through under the field, not counted on the tag.
+  assert.equal(lifeTagText(rows({ mortgage: { monthly: 7500, endYear: 2020 }, kids })), '已算：孩子到 22 岁 ›');
+  assert.equal(lifeTagText(rows({ mortgage: { monthly: 7500, endYear: 2020 }, kids: none })), '');
   assert.equal(lifeGainText(null), '');
   assert.equal(lifeGainText({ years: 3 }), '算上到期，比不算早 3 年放假。');
   assert.equal(lifeGainText({ years: 0 }), '算上到期，放假年龄没变。');

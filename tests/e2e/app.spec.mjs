@@ -72,7 +72,8 @@ test('retirement-only countries cannot be chosen as the place you live', async (
   await expect(page.locator('#s-work option[value="MY"]')).toHaveCount(0);
   await expect(page.locator('#s-ret option[value="MY"]')).toHaveCount(1);
   await page.selectOption('#s-ret', 'MY');
-  await expect(page.locator('#estimate')).toContainText('估算值');
+  await expect(page.locator('#estimate .f-pre')).toHaveText('≈');
+  await expect(page.locator('#estimate .f-pre')).toBeVisible();
 });
 
 test('a lever can become a goal that survives a reload', async ({ page }) => {

@@ -72,17 +72,6 @@ function realItems(S, thisYear = new Date().getFullYear()) {
   };
 }
 
-// The payments are in the work currency; retExp is in the retirement currency, so it is converted before comparing.
-export function lifeIssue(S, data) {
-  const { mortgage, kids } = realItems(S);
-  const monthly = ((mortgage?.yearly ?? 0) + (kids?.yearly ?? 0)) / 12;
-  if (monthly <= 0) return '';
-  if (monthly >= (S.expense ?? 0) / 12) return '月供和孩子的花销加起来达到或超过了每月支出，请检查这两处';
-  const retW = convert(S.retExp ?? 0, curOf(data, S.retC), curOf(data, S.workC), data);
-  if (monthly >= retW / 12) return '退休后每月想花里也要算上月供和孩子的花销';
-  return '';
-}
-
 // "Until year Y" means the payments continue through year Y, so they stop at the start of the year after.
 // problems() stops the result before items that do not fit reach the model (A3, A4); dropping them here is only a
 // backstop, on the same edges: items at or above the spending, or at or above the retirement spending.
@@ -110,23 +99,6 @@ const KIDS_END = 22;
 export function itemsYearly(S, thisYear = new Date().getFullYear()) {
   const sum = itemEvents(S, thisYear).reduce((total, e) => total + e.amount, 0);
   return sum >= (S.expense ?? 0) ? 0 : sum;
-}
-
-// What the status line under the inputs says: when the items end, and what retirement spending is left after they do.
-// afterMonthly is in the retirement currency, today's money; low means under a quarter of today's monthly spending.
-export function lifeSummary(S, data, thisYear = new Date().getFullYear()) {
-  const events = eventsOf(S, data, thisYear);
-  if (!events.length) return null;
-  const { mortgage } = realItems(S);
-  const work = curOf(data, S.workC), ret = curOf(data, S.retC);
-  const running = events.reduce((total, e) => total + e.amount, 0);
-  const afterMonthly = Math.round(((S.retExp ?? 0) - convert(running, work, ret, data)) / 12);
-  return {
-    mortgageEnd: events.some(e => e.id === 'mortgage') ? mortgage.endYear : null,
-    kidsTo22: events.some(e => e.id === 'kids'),
-    afterMonthly,
-    low: !!S.touched?.retExp && convert(afterMonthly, ret, work, data) < (S.expense ?? 0) / 12 * 0.25,
-  };
 }
 
 export const setPen = (S, change) => ({ ...S, pen: cleanPen({ ...S.pen, ...change }) });
@@ -331,6 +303,12 @@ export function unsplit(S, data) {
   const next = { ...S, split: cleanSplit(null) };
   if (before !== null) next.expense = before;
   return reestimate(next, data);
+}
+
+// 改回估算: retirement spending is the page's own estimate again, and follows spending from now on.
+export function resetRetExp(S, data) {
+  const next = reestimate({ ...S, touched: { ...S.touched, retExp: false }, notice: '' }, data);
+  return next.retExp === null || next.retExp === undefined ? next : { ...next, lastValid: { ...next.lastValid, retExp: next.retExp } };
 }
 
 const isSet = v => v !== null && v !== undefined;
@@ -710,12 +688,12 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
   const draw = need === null ? 0 : firstDraw(p, t);
   add('times', 'after', null, draw > 0 ? Math.round(need / draw) : null);
 
-  // The cut: the first blocked or blank row keeps its value, every row after it waits. The retirement items only
-  // repeat an amount the person typed, so they stay.
+  // The cut: the first blocked or blank row keeps its value, every row after it waits. The items (└ under spending and
+  // under retirement spending) only repeat an amount the person typed, so they stay.
   const cut = rows.findIndex(r => r.status === 'block' || r.status === 'blank');
   if (cut >= 0) {
     for (const r of rows.slice(cut + 1)) {
-      if (r.key === 'ret:mortgage' || r.key === 'ret:kids') continue;
+      if (r.op === '└') continue;
       r.value = null;
       if (r.values) r.values = null;
     }

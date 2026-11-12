@@ -32,7 +32,8 @@ test.describe('mortgage and children', () => {
     await expect(fold.locator('summary')).toHaveText('有房贷或孩子？到期后开销会降');
     expect(await fold.evaluate(el => el.open)).toBe(false);
     expect(await fold.evaluate(el => el.parentElement.closest('form')?.id)).toBe('simple-form');
-    expect(await fold.evaluate(el => el.previousElementSibling?.id)).toBe('expense-split');
+    expect(await fold.evaluate(el => el.previousElementSibling?.id)).toBe('lines-expense');
+    expect(await fold.evaluate(el => el.previousElementSibling.previousElementSibling?.id)).toBe('expense-split');
     expect(await fold.evaluate(el => el.classList.contains('card'))).toBe(false);
     expect((await fold.boundingBox()).height).toBeLessThan(48);
     await expect(page.locator('#life-mortgage')).toBeHidden();
@@ -43,16 +44,17 @@ test.describe('mortgage and children', () => {
     await expect(fold).toContainText('月供和孩子的花销，算在每月支出里，也算在退休后每月想花里。到期以后，这部分自动减掉。');
     await expect(fold).not.toContainText('这些已经算在上面的每月支出里');
     await expect(fold).toContainText('没算：给孩子买房或婚嫁、赡养父母、出国读书、提前还款或利率变化。');
-    await expect(page.locator('#life-after')).toBeHidden();
+    await expect(page.locator('#life-issue, #life-after')).toHaveCount(0);
+    await expect(fold).not.toContainText('后面的版本');
     await page.locator('#life-mortgage').press('Enter');
     await expect(page).toHaveURL(/\/$/);
 
     await page.locator('#to-pro').click();
     await expect.poll(() => fold.evaluate(el => el.parentElement.closest('form')?.id)).toBe('pro-form');
-    expect(await fold.evaluate(el => el.previousElementSibling?.id)).toBe('p-expense-split');
+    expect(await fold.evaluate(el => el.previousElementSibling.previousElementSibling?.id)).toBe('p-expense-split');
     await expect(fold).toBeVisible();
     await page.locator('#to-simple').click();
-    await expect.poll(() => fold.evaluate(el => el.previousElementSibling?.id)).toBe('expense-split');
+    await expect.poll(() => fold.evaluate(el => el.previousElementSibling.previousElementSibling?.id)).toBe('expense-split');
   });
 
   test('a mortgage: the tag under the big age, the spending after it ends, and the gain', async ({ page }) => {
@@ -60,41 +62,48 @@ test.describe('mortgage and children', () => {
     await roomForMortgage(page);
     const before = await ageOf(page);
     expect(before).toBeGreaterThan(0);
-    await expect(page.locator('#estimate')).toContainText('估算值，请按你计划的实际生活改写。');
-    await expect(page.locator('#estimate')).not.toContainText('要包含月供和孩子');
+    await expect(page.locator('#estimate')).not.toContainText('估算值');
+    await expect(page.locator('#estimate .f-pre')).toHaveText('≈');
+    await expect(page.locator('#lines-retexp')).toHaveText('');
     await expect(page.locator('#type-section')).not.toContainText('类型也可能跟着变');
     await addMortgage(page);
 
     const tag = page.locator('#life-tag');
-    await expect(tag).toHaveText(/^已算：房贷到 2045 · 之后每月约 ¥[\d,]+ ›$/);
+    await expect(tag).toHaveText('已算：房贷到 2045 ›');
     expect(await tag.evaluate(el => el.previousElementSibling?.classList.contains('hero-big'))).toBe(true);
-    const after = page.locator('#life-after');
-    await expect(after).toHaveText(/^到期后，退休后每月约花 ¥[\d,]+。$/);
-    expect(amountOf(await after.innerText())).toBe(amountOf(await tag.innerText()));
-    expect(amountOf(await after.innerText())).toBe(7500);
+    const after = page.locator('#lines-retexp');
+    await expect(after).toContainText('└ 其中月供 7,500');
+    await expect(after).toContainText('→ 50 岁起 ¥7,500');
+    expect(amountOf(await after.locator('.after .amt').innerText())).toBe(7500);
+    await expect(page.locator('#lines-expense')).toHaveText('└ 其中月供 7,500');
     await expect(page.locator('#life-gain')).toHaveText(/^(算上到期，比不算早 \d+ 年放假。|算上到期，放假年龄没变。)$/);
     await expect.poll(() => ageOf(page)).toBeLessThanOrEqual(before);
-    await expect(page.locator('#estimate')).toContainText('估算值，请按你计划的实际生活改写。要包含月供和孩子，到期会自动减掉。');
+    await expect(page.locator('#estimate')).not.toContainText('要包含月供和孩子');
     await expect(page.locator('#type-section p.fine')).toHaveText('算上到期支出，放假可能更早，类型也可能跟着变。');
 
     await page.fill('#life-kids', '1');
     await page.fill('#life-kid-age', '5');
     await page.fill('#life-kid-monthly', '1500');
-    await expect(tag).toHaveText(/^已算：房贷到 2045、孩子到 22 岁 · 之后每月约 ¥[\d,]+ ›$/);
+    await expect(tag).toHaveText('已算：房贷到 2045、孩子到 22 岁 ›');
+    await expect(after).toContainText('→ 47 岁起 ¥13,500');
+    await expect(after).toContainText('→ 50 岁起 ¥6,000');
     const withBoth = await ageOf(page);
 
     await page.fill('#life-mortgage', '99999');
     await page.locator('#life-mortgage').press('Tab');
     await expect(page.locator('#sticky-result .chip')).toHaveText('拦住：房贷 ›');
     await expect(tag).toBeHidden();
-    await expect(after).toBeHidden();
+    await expect(after).toContainText('→ 50 岁起 —');
     await expect(page.locator('#life-gain')).toBeHidden();
 
     await page.fill('#life-mortgage', '7500');
     await expect(page.locator('.chip')).toHaveCount(0);
     await expect.poll(() => ageOf(page)).toBe(withBoth);
     await page.locator('#to-pro').click();
-    await expect(tag).toHaveText(/^已算：房贷到 2045、孩子到 22 岁 · /);
+    await expect(tag).toHaveText('已算：房贷到 2045、孩子到 22 岁 ›');
+    await expect(page.locator('#lines-expense')).toContainText('└ 其中月供 90,000/年');
+    await expect(page.locator('#lines-retexp')).toContainText('→ 50 岁起 ¥72,000');
+    expect(await page.locator('#lines-retexp').evaluate(el => el.previousElementSibling?.contains(document.getElementById('p-retExp')))).toBe(true);
     await expect.poll(() => tag.evaluate(el => el.previousElementSibling?.id)).toBe('headline');
     await expect(page.locator('#life-mortgage')).toHaveValue('7500');
     await expect(page.locator('#life-kid-monthly')).toHaveValue('1500');
@@ -107,9 +116,13 @@ test.describe('mortgage and children', () => {
     await page.goto('/');
     await roomForMortgage(page);
     await addMortgage(page);
-    await expect(page.locator('#life-after')).not.toContainText('比现在少很多');
+    const after = page.locator('#lines-retexp');
+    await expect(after).toContainText('→ 50 岁起 ¥7,500');
+    await expect(after.locator('.warn')).toHaveCount(0);
     await page.fill('#s-retexp', '8000');
-    await expect(page.locator('#life-after')).toHaveText('到期后，退休后每月约花 ¥500。比现在少很多。如果退休后每月想花里没有包含月供和孩子，请把它们加回去。');
+    await expect(after).toContainText('→ 50 岁起 ! ¥500');
+    await expect(after.locator('.warn [aria-label="提示"]')).toHaveText('!');
+    await expect(page.locator('.chip')).toHaveCount(0);
   });
 
   test('the tag opens the numbers and the fold', async ({ page }) => {
@@ -168,23 +181,29 @@ test.describe('mortgage and children', () => {
     await expect(line).not.toHaveText(/\d+ 岁/);
   });
 
-  test('entries that are ignored say so, and the inputs take whole numbers', async ({ page }) => {
+  test('entries that have ended are struck through, and the inputs take whole numbers', async ({ page }) => {
     await page.goto('/');
     await page.locator('#life-fold summary').click();
-    await expect(page.locator('#life-kids')).toHaveAttribute('min', '1');
+    const year = new Date().getFullYear();
+    await expect(page.locator('#life-kids')).toHaveAttribute('min', '0');
     await expect(page.locator('#life-kid-age')).toHaveAttribute('max', '22');
     await expect(page.locator('#life-kid-age')).toHaveAttribute('step', '1');
-    await expect(page.locator('#life-mortgage-end')).toHaveAttribute('min', String(new Date().getFullYear()));
+    await expect(page.locator('#life-mortgage-end')).toHaveAttribute('min', String(year - 50));
+    await expect(page.locator('#life-mortgage-end')).toHaveAttribute('max', String(year + 40));
+    const lines = page.locator('#lines-expense');
     await page.fill('#life-kids', '1');
     await page.fill('#life-kid-age', '25');
     await page.fill('#life-kid-monthly', '1500');
-    await expect(page.locator('#life-issue')).toHaveText('孩子已满 22 岁，这一项不再计入。');
+    await expect(lines.locator('s')).toHaveText('孩子 1,500');
+    await expect(lines).toContainText('已满 22 岁');
+    await expect(lines.locator('.ended > span')).toHaveAttribute('aria-label', '已结束，不计入');
     await expect(page.locator('#life-tag')).toBeHidden();
     await page.fill('#life-kid-age', '5');
-    await expect(page.locator('#life-issue')).toBeHidden();
+    await expect(lines.locator('s')).toHaveCount(0);
     await page.fill('#life-mortgage', '4000');
     await page.fill('#life-mortgage-end', '2020');
-    await expect(page.locator('#life-issue')).toHaveText('这一年已经过了，月供不再计入。');
+    await expect(lines.locator('s')).toHaveText('月供 4,000');
+    await expect(lines).toContainText('2020 已还完');
   });
 
   test('the new tag does not restyle the hardest-life pill', async ({ page }) => {

@@ -3,7 +3,7 @@ import DATA from './data-latest.js';
 import { DEFAULT_SEED, bwdSolve, monteCarlo, walkPath } from './engine.js';
 import { bwdOdds, decilePaths, dualOdds, extendRow, needLine, oddsRuler, oddsSolve, oddsYears, successAt } from './odds.js';
 import { hardestIndex, heroModel, holidayType, oddsText, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking, townPlan, cardPlace, withoutItemsGain } from './holiday.js';
-import { FIELD_LABEL, FIELD_ORDER, applyPensionEstimate, cleanSplit, commitField, defaultState, lifeIssue, lifeSummary, loadState, problems, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setSplit, setTown, setWorkCountry, splitOn, storyRows, toParams, unsplit } from './state.js';
+import { FIELD_LABEL, FIELD_ORDER, LIMITS, applyPensionEstimate, cleanSplit, commitField, defaultState, loadState, problems, resetRetExp, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setSplit, setTown, setWorkCountry, splitOn, storyRows, toParams, unsplit } from './state.js';
 import { estimateFromForm } from './pension.js';
 import { labPlan, lifeChoices, personalLever, rankLevers, impactOf, smallStep, tryRange } from './levers.js';
 import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody } from './scenario.js';
@@ -14,7 +14,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { assumptionLine, renderCard, summaryCardSpec, typeCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, leversHtml, lifeAfterText, lifeGainText, lifeTagText, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, splitLineHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
+  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, leversHtml, lifeGainText, lifeTagText, fieldLineHtml, fieldLinesHtml, fixesHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -203,6 +203,9 @@ const PRO_FIELDS = [
 
 // An empty money field reads as 0 to the eye; the result still waits for it to be filled in.
 const MONEY_UNITS = ['work', 'retire'];
+// Retirement spending: the estimate's ≈, and the way back to it once typed by hand (shown by syncEstimateMark).
+const EST_PRE = '<span class="f-pre est" aria-label="估算" hidden>≈</span>';
+const EST_BACK = `<button type="button" class="link est-back" data-fix='{"reset":"retExp"}' hidden>改回估算</button>`;
 function fieldHtml(prefix, f) {
   const id = f.elementId ?? `${prefix}-${f.id}`;
   const cls = `f${f.full ? ' full' : ''}`;
@@ -214,9 +217,12 @@ function fieldHtml(prefix, f) {
     : `<input type="number" inputmode="decimal" id="${id}" step="${f.step ?? 1}"${f.min === undefined ? '' : ` min="${f.min}"`}${MONEY_UNITS.includes(f.unit) ? ' placeholder="0"' : ''}>`;
   const flags = `${f.bwdOnly ? ' data-bwd-only' : ''}${f.cnPension ? ' data-cn-pension' : ''}`;
   const note = f.note ? `<p class="fine">${f.note}</p>` : '';
-  // Spending can be a locked sum, drawn with = inside the box, in front of the number and not part of it.
-  const box = f.id === 'expense' ? `<span class="f-box"><span class="f-pre" aria-hidden="true" hidden>=</span>${control}</span>` : control;
-  const wrap = `<div class="${cls}"${flags}><div class="lab"><label for="${id}">${f.label} ${unit}</label>${help}</div>${box}${note}</div>`;
+  // Spending can be a locked sum, drawn with = inside the box, in front of the number and not part of it; retirement
+  // spending not typed by hand is the page's estimate, drawn with a blue ≈ the same way.
+  const box = f.id === 'expense' ? `<span class="f-box"><span class="f-pre" aria-hidden="true" hidden>=</span>${control}</span>`
+    : f.id === 'retExp' ? `<span class="f-box">${EST_PRE}${control}</span>` : control;
+  const back = f.id === 'retExp' ? EST_BACK : '';
+  const wrap = `<div class="${cls}"${flags}><div class="lab"><label for="${id}">${f.label} ${unit}</label>${back}${help}</div>${box}${note}</div>`;
   const extra = f.id === 'expense' ? splitHtml(prefix) : f.id === 'pension' ? penFoldHtml(prefix) : '';
   return (hasCard ? `${wrap}<div class="lcard" id="card-${f.id}" hidden></div>` : wrap) + extra;
 }
@@ -239,6 +245,8 @@ function penFoldHtml(prefix) {
 }
 
 const penEstimate = () => estimateFromForm(S.pen, new Date().getFullYear());
+// B15, once shown (not while the years are being typed).
+const penProblem = () => (localShown.has('pen.years') ? problems(S, DATA).find(q => q.rule === 'B15') ?? null : null);
 
 // Writes the estimate fields from state, then the result under each form; the person's own typing is left alone.
 function renderPen() {
@@ -257,7 +265,13 @@ function renderPen() {
       const q = applyPensionEstimate(S, { monthly: est.est.monthly, claimAge: est.claimAge, selfPay: est.selfPay }, DATA);
       return q.pension === S.pension && q.pAge === S.pAge;
     })();
-    out.innerHTML = pensionEstimateHtml(est, { used, held: S.pension > 0 });
+    const problem = prefix === (S.view === 'pro' ? 'p' : 's') ? penProblem() : null;
+    out.innerHTML = pensionEstimateHtml(est, { used, held: S.pension > 0, problem });
+    // The years field points at the line that says why.
+    if (years && problem && est) {
+      years.setAttribute('aria-describedby', 'rel-pen.years');
+      years.dataset.described = '';
+    }
   }
   const age = $('pen-age-s');
   if (age) {
@@ -275,16 +289,15 @@ function splitHtml(prefix) {
   const unit = simple ? '' : ' <span class="u">/月</span>';
   const parts = SPLIT_PARTS.map(([key, name]) => `<label><span>${name}${unit}</span><input type="number" inputmode="decimal" id="${simple ? '' : 'p-'}split-${key}" step="100" min="0" placeholder="0"></label>`).join('');
   const life = simple ? '<button type="button" class="split-life" id="split-life" hidden>房贷会还完？填上还到哪年 ›</button>' : '';
-  return `<details class="split" id="${simple ? '' : 'p-'}expense-split"><summary>每月花多少说不准？拆开来加</summary><div class="split-row">${parts}</div><p class="split-line" id="split-line-${prefix}"></p>${life}</details>`;
+  return `<details class="split" id="${simple ? '' : 'p-'}expense-split"><summary>每月花多少说不准？拆开来加</summary><div class="split-row">${parts}</div>${life}</details>`;
 }
 
-// The split as stored, written into both views: the parts (except the one being typed in), the locked total, the
-// line under it. A rent or mortgage in the parts may end one day, so the simple view points at the fold for the end year.
+// The split as stored, written into both views: the parts (except the one being typed in) and the locked total; its
+// line is drawn with the lines under spending. A rent or mortgage in the parts may end one day, so the simple view
+// points at the fold for the end year.
 function syncSplit() {
   const sp = cleanSplit(S.split);
   const on = splitOn(S);
-  const row = storyRows(S, DATA, new Date().getFullYear(), null).find(r => r.key === 'split');
-  const wCur = DATA.countries[S.workC].cur;
   for (const view of ['simple', 'pro']) {
     const simple = view === 'simple';
     for (const [key] of SPLIT_PARTS) {
@@ -307,10 +320,9 @@ function syncSplit() {
       total.removeAttribute('aria-readonly');
       total.removeAttribute('aria-label');
     }
-    // The row's before is in the view's units; the line takes the stored yearly total.
-    $(`split-line-${simple ? 's' : 'p'}`).innerHTML = splitLineHtml(row && { ...row, before: sp.before }, { view, wCur });
   }
   $('split-life').hidden = !(sp.rent > 0);
+  renderLines();
 }
 
 function buildForm(el, prefix, groups) {
@@ -355,12 +367,20 @@ function syncInputs() {
   syncSplit();
 }
 
-// The fold sits under the spending field of the form on screen. It is one node, moved only when the view
-// changes, so its inputs keep their values and typing keeps its focus.
+// The lines under spending and the fold sit under the spending field of the form on screen. Each is one node, moved
+// only when the view changes, so its inputs keep their values and typing keeps its focus.
+const linesExp = $('lines-expense');
+const linesRet = $('lines-retexp');
 function placeFold() {
   const fold = $('life-fold');
   const anchor = $(S.view === 'simple' ? 'expense-split' : 'p-expense-split');
-  if (fold.previousElementSibling !== anchor) anchor.after(fold);
+  if (linesExp.previousElementSibling !== anchor) anchor.after(linesExp);
+  if (fold.previousElementSibling !== linesExp) linesExp.after(fold);
+}
+// The lines under retirement spending follow its field, which the simple view draws inside the estimate box.
+function placeRetLines() {
+  const box = fieldEl('retExp')?.closest('.f');
+  if (box && box.nextElementSibling !== linesRet) box.after(linesRet);
 }
 
 // The tag sits under the big age in the simple view and under the headline in the professional one. The hero is
@@ -412,15 +432,18 @@ function renderEstimate(p) {
       <div><span>组合年化波动</span><b>${pct(p.sigma, 1)}</b></div>
       <div><span>债券实际收益</span><b>${pct(p.bondReal, 2)}</b></div>
     </div><label class="chk"><input type="checkbox" id="p-autoswr"${S.autoSwr ? ' checked' : ''}> 提取率按退休年限自动调整</label>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}`);
+    placeRetLines();
+    renderLines();
     return;
   }
   const typing = document.activeElement?.id === 's-retexp';
   if (!typing) {
-    setEstimate(`<div class="f"><div class="lab"><label for="s-retexp">退休后每月想花 <span class="u">${p.rCur}</span></label></div>
-      <input type="number" inputmode="decimal" id="s-retexp" step="500" placeholder="0" value="${S.retExp === null ? '' : Math.round(S.retExp / 12)}"></div>
-      <p class="fine">估算值，请按你计划的实际生活改写。${p.events.length ? '要包含月供和孩子，到期会自动减掉。' : ''}</p>
+    setEstimate(`<div class="f"><div class="lab"><label for="s-retexp">退休后每月想花 <span class="u">${p.rCur}</span></label>${EST_BACK}</div>
+      <span class="f-box">${EST_PRE}<input type="number" inputmode="decimal" id="s-retexp" step="500" placeholder="0" value="${S.retExp === null ? '' : Math.round(S.retExp / 12)}"></span></div>
       <p class="fine mix-note">组合按股票 ${p.eq}% / 债券 ${100 - p.eq}% 估算（常见的基准组合，不是建议），扣掉通胀后约 ${pct(p.r, 1)}/年。<a href="sources.html">数据来源</a>，专业模式可以改。</p>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}`);
   }
+  placeRetLines();
+  renderLines();
 }
 
 function renderFast() {
@@ -488,31 +511,25 @@ const LIFE_INPUTS = [
   ['life-mortgage', 'mortgage', 'monthly'], ['life-mortgage-end', 'mortgage', 'endYear'],
   ['life-kids', 'kids', 'count'], ['life-kid-age', 'kids', 'age'], ['life-kid-monthly', 'kids', 'monthly'],
 ];
-// The fold's inputs, the warning and the lines under them, and the tag under the big age; typing is left alone.
-// solve: false while the result is stopped, when nothing is worked out from the numbers.
-function renderLife(p = latest.p, { solve = true } = {}) {
+// The fold's inputs, typing left alone.
+function syncLifeInputs() {
   for (const [id, part, field] of LIFE_INPUTS) {
     const el = $(id);
     if (el && el !== document.activeElement) el.value = S.real[part][field] ?? '';
   }
+}
+// The fold's inputs and the tag under the big age (the counted items, hidden while the result is stopped).
+// solve: false while the result is stopped, when nothing is worked out from the numbers.
+function renderLife(p = latest.p, { solve = true } = {}) {
+  syncLifeInputs();
   const year = new Date().getFullYear();
-  $('life-mortgage-end').min = String(year);
-  const { mortgage: m, kids: k } = S.real;
-  const dropped = [];
-  if (m.monthly > 0 && m.endYear !== null && m.endYear < year) dropped.push('这一年已经过了，月供不再计入。');
-  if (k.monthly > 0 && k.count === 0) dropped.push('孩子数是 0，孩子的花销不再计入。');
-  else if (k.count > 0 && k.monthly > 0 && k.age !== null && k.age >= 22) dropped.push('孩子已满 22 岁，这一项不再计入。');
-  const issue = lifeIssue(S, DATA) || dropped.join('');
-  $('life-issue').hidden = !issue;
-  $('life-issue').textContent = issue;
-  const sum = lifeSummary(S, DATA, year);
-  const cur = p.rCur;
-  lifeTag.hidden = !sum;
-  lifeTag.textContent = sum ? lifeTagText(sum, cur) : '';
-  $('life-after').hidden = !sum;
-  $('life-after').textContent = sum ? lifeAfterText(sum, cur) : '';
+  $('life-mortgage-end').min = String(year - LIMITS.endYearBack);
+  $('life-mortgage-end').max = String(year + LIMITS.endYearAhead);
+  const tag = lifeTagText(storyRows(S, DATA, year, null));
+  lifeTag.hidden = !tag;
+  lifeTag.textContent = tag;
   // One more solve, without the items, for the comparison inside the fold.
-  const gain = solve && sum ? lifeGainText(withoutItemsGain(p)) : '';
+  const gain = solve && tag ? lifeGainText(withoutItemsGain(p)) : '';
   $('life-gain').hidden = !gain;
   $('life-gain').textContent = gain;
 }
@@ -803,6 +820,147 @@ function markProblems(list) {
       wrap(el).classList.add('cmp');
     }
   }
+  markedNow = list;
+  renderLines();
+}
+
+// ---- The lines under the fields and the exit buttons. A stop is drawn red only once it is marked; a stop that waits
+// while its field is typed in draws its items plainly. A local stop (A9, B15) frames its field once the field is left.
+
+// The stops marked now; the local stops shown now (by field key).
+let markedNow = [];
+const localShown = new Set();
+const wrapOf = el => el.closest('.f') ?? el.closest('label') ?? el;
+// A line goes right after its field's box, or after the lines that already follow it (retirement spending).
+const anchorOf = el => (wrapOf(el).nextElementSibling === linesRet ? linesRet : wrapOf(el));
+const drawn = new Map();
+const boxField = new WeakMap();
+const setHtml = (el, html) => {
+  if (drawn.get(el) === html && el.isConnected) return;
+  drawn.set(el, html);
+  el.innerHTML = html;
+};
+// ≈ inside the retirement spending box while it is the estimate; 改回估算 by its label once typed.
+function syncEstimateMark() {
+  const typed = Boolean(S.touched?.retExp);
+  for (const view of ['simple', 'pro']) {
+    const el = fieldEl('retExp', view);
+    if (!el) continue;
+    el.previousElementSibling.hidden = typed;
+    el.classList.toggle('has-pre', !typed);
+    el.closest('.f').querySelector('.est-back').hidden = !typed;
+  }
+}
+function renderLines() {
+  const view = S.view === 'pro' ? 'pro' : 'simple';
+  const year = new Date().getFullYear();
+  const all = problems(S, DATA, year, { last: lastField });
+  const marked = new Set(markedNow.map(q => q.id));
+  // Local stops: shown once their field is left, gone as soon as they no longer hold.
+  for (const key of [...localShown]) if (!all.some(q => q.kind === 'local' && q.field === key)) localShown.delete(key);
+  for (const q of all) if (q.kind === 'local' && fieldEl(q.field) !== document.activeElement) localShown.add(q.field);
+  const list = all.filter(q => (isStop(q) ? marked.has(q.id) : q.kind !== 'local' || localShown.has(q.field)));
+  const sp = cleanSplit(S.split);
+  // The split line takes the stored yearly total from before the split.
+  const rows = storyRows(S, DATA, year, null).map(r => (r.key === 'split' ? { ...r, before: sp.before } : r));
+  const wCur = DATA.countries[S.workC].cur, rCur = DATA.countries[S.retC].cur;
+  const lines = at => fieldLinesHtml({ rows, list, at, view, wCur, rCur });
+  // Exits of the relations drawn in the lines block, whose solid field is the block's own field, end the block.
+  const ownFixes = key => {
+    const html = list.filter(q => isStop(q) && q.rel?.sub && q.field === key).map(q => fixesHtml(q.fixes)).join('');
+    return html ? `<div class="fixes">${html}</div>` : '';
+  };
+  setHtml(linesExp, lines('expense') + ownFixes('expense'));
+  setHtml(linesRet, lines('retExp') + ownFixes('retExp'));
+  // Everything else goes right after its solid field: a range rule's line and its exits, or the exits alone.
+  const after = new Map();
+  for (const q of list) {
+    if (q.rule === 'B15' || (isStop(q) && q.rel?.sub && (q.field === 'expense' || q.field === 'retExp'))) continue;
+    const range = isStop(q) && q.rel && !q.rel.sub;
+    const fixes = isStop(q) || q.kind === 'local' ? fixesHtml(q.fixes) : '';
+    if (!range && !fixes) continue;
+    const el = fieldEl(q.field);
+    if (!el) continue;
+    const html = (range ? fieldLineHtml(q) : '') + (fixes ? `<div class="fixes">${fixes}</div>` : '');
+    after.set(el, (after.get(el) ?? '') + html);
+  }
+  // A box already in place with the same content stays, so a redraw never swaps a button under the pointer.
+  for (const box of document.querySelectorAll('.field-after')) {
+    const field = boxField.get(box);
+    if (field && after.get(field) === drawn.get(box) && box.previousElementSibling === anchorOf(field)) after.delete(field);
+    else box.remove();
+  }
+  for (const [el, html] of after) {
+    const box = document.createElement('div');
+    box.className = 'field-after';
+    box.innerHTML = html;
+    drawn.set(box, html);
+    boxField.set(box, el);
+    anchorOf(el).after(box);
+  }
+  // The solid field points at the line that says why.
+  document.querySelectorAll('[data-described]').forEach(el => { el.removeAttribute('aria-describedby'); el.removeAttribute('data-described'); });
+  for (const q of list) {
+    if (!(isStop(q) || q.rule === 'B15') || !q.rel || !document.getElementById(`rel-${q.field}`)) continue;
+    const el = fieldEl(q.field);
+    if (!el) continue;
+    el.setAttribute('aria-describedby', `rel-${q.field}`);
+    el.dataset.described = '';
+  }
+  // The local frames.
+  for (const key of localShown) {
+    const el = fieldEl(key);
+    if (!el) continue;
+    el.setAttribute('aria-invalid', 'true');
+    wrapOf(el).classList.add('bad');
+  }
+  for (const key of ['town.monthly', 'pen.years']) {
+    const el = fieldEl(key);
+    if (!el || localShown.has(key) || markedNow.some(q => q.field === key)) continue;
+    el.removeAttribute('aria-invalid');
+    wrapOf(el).classList.remove('bad');
+  }
+  syncEstimateMark();
+}
+
+// An exit button: the value it names goes into its field (which keeps the cursor), or the cursor goes to the field.
+function applyFix(fix) {
+  labValues = {};
+  countCalculation();
+  if (fix.focus) {
+    refresh({ commit: true });
+    goToField(fix.focus);
+    return;
+  }
+  let key = null;
+  if (fix.set) {
+    for (const [k, v] of Object.entries(fix.set)) {
+      const [head, tail] = k.split('.');
+      if (head === 'split') S = setSplit(S, tail, String(v), DATA);
+      else if (head === 'mortgage' || head === 'kids') S = setReal(S, head, tail, String(v), DATA);
+      else if (head === 'pen') S = setPen(S, { [tail]: v });
+      else S = setField(S, k, String(v), DATA);
+      key ??= k;
+    }
+  } else if (fix.clear) {
+    const fields = Object.keys(S.real[fix.clear]);
+    for (const field of fields) S = setReal(S, fix.clear, field, '', DATA);
+    key = `${fix.clear}.${fields[0]}`;
+  } else if (fix.reset === 'retExp') {
+    S = resetRetExp(S, DATA);
+    key = 'retExp';
+  } else if (fix.unsplit) {
+    S = unsplit(S, DATA);
+    key = 'expense';
+  }
+  if (key === null) return;
+  lastField = key;
+  // The new value is written before the field takes the cursor: a focused field is never written over.
+  syncInputs();
+  syncLifeInputs();
+  refresh({ commit: true });
+  renderPen();
+  fieldEl(key)?.focus();
 }
 
 // The stopped result: — 岁放假, the chip naming stops, frames for marks (the stops shown, by default all of them).
@@ -874,7 +1032,9 @@ let pressing = false;
 let judgeAfterPress = false;
 function judgeLeft() {
   judgeAfterPress = pressing;
-  if (!pressing) refresh({ commit: true });
+  if (pressing) return;
+  refresh({ commit: true });
+  renderPen();
 }
 
 // commit: the person left a field, pressed a button or jumped. Until then a new stop that rests only on the field
@@ -938,6 +1098,7 @@ function onInput(ev) {
     if (!key) return;
     S = setPen(S, { [key]: el.value });
     saveState(S, storage);
+    renderLines();
     renderPen();
     return;
   }
@@ -982,6 +1143,7 @@ function onInput(ev) {
   if (el.id === 'town-name' || el.id === 'town-monthly') {
     S = setTown(S, el.id === 'town-name' ? { name: el.value } : { monthly: el.value });
     saveState(S, storage);
+    renderLines();
     if (latest?.p && !isHeld()) renderTown();
     return;
   }
@@ -1152,6 +1314,11 @@ function onClick(ev) {
     ev.preventDefault();
     return;
   }
+  const fixButton = ev.target.closest?.('[data-fix]');
+  if (fixButton) {
+    applyFix(JSON.parse(fixButton.dataset.fix));
+    return;
+  }
   if (ev.target.closest?.('#life-tag')) {
     $('inputs-box').open = true;
     $('life-fold').open = true;
@@ -1175,6 +1342,10 @@ function onClick(ev) {
     return;
   }
   if (ev.target.closest?.('[data-pen-use]')) {
+    if (problems(S, DATA).some(q => q.rule === 'B15')) {
+      goToField('pen.years');
+      return;
+    }
     const est = penEstimate();
     if (!est?.est.eligible) return;
     S = applyPensionEstimate(S, { monthly: est.est.monthly, claimAge: est.claimAge, selfPay: est.selfPay }, DATA);
@@ -1331,7 +1502,11 @@ function init() {
     }
     const key = fieldKeyOf(ev.target);
     if (key) lastField = key;
-    if (ev.target.closest?.('.pen')) return;
+    // The pension estimate and the town stop only themselves; leaving one of their fields shows that stop.
+    if (ev.target.closest?.('.pen') || ev.target.closest?.('.town-row')) {
+      judgeLeft();
+      return;
+    }
     if (ev.target.tagName === 'SELECT') {
       onSelect(ev);
       return;
