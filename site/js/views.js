@@ -4,7 +4,7 @@ import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn, o
 import { needLine, oddsSolve } from './odds.js';
 import { MIN_SHOWN, SCENARIOS, answerValues, scenarioOptions } from './scenario.js';
 import { impactOf, lifeChoices, tryParam } from './levers.js';
-import { num } from './state.js';
+import { FIELD_LABEL, num } from './state.js';
 
 const moneyFormats = {};
 export function money(v, cur) {
@@ -575,13 +575,20 @@ export function labChangesHtml(labels) {
 
 // The line under a split spending: what the locked total adds up from (monthly; the professional view's yearly total
 // is the parts × 12), and the way back to the one total typed before the split. before is that total, yearly.
+// The operators are not read out; the sum says in words what it adds up.
+const SPLIT_KEYS = ['split.rent', 'split.food', 'split.other'];
+const OP = op => `<span aria-hidden="true">${op}</span>`;
 export function splitLineHtml(row, { view, wCur }) {
   if (!row) return '';
   const simple = view !== 'pro';
-  const parts = row.parts.map(v => num(v ?? 0)).join(' + ');
-  const sum = simple ? `= ${parts}` : `(${parts}) × 12`;
+  const values = row.parts.map(v => v ?? 0);
+  const total = values.reduce((a, b) => a + b, 0);
+  const parts = values.map(num).join(` ${OP('+')} `);
+  const sum = simple ? `${OP('=')} ${parts}` : `(${parts}) ${OP('×')} 12`;
+  const named = values.map((v, i) => `${FIELD_LABEL.simple[SPLIT_KEYS[i]]} ${num(v)}`).join('，');
+  const label = simple ? `三项合计 ${num(total)}：${named}` : `三项合计每月 ${num(total)} × 12 = ${num(total * 12)}：${named}`;
   const back = row.before === null || row.before === undefined ? '' : ` ${wholeMoney(row.before / (simple ? 12 : 1), wCur)}`;
-  return `<span class="split-sum">${sum}</span><button type="button" class="link" data-unsplit>只填总数${back}</button>`;
+  return `<span class="split-sum" role="group" aria-label="${label}">${sum}</span><button type="button" class="link" data-unsplit>只填总数${back}</button>`;
 }
 
 // The red chip on a stopped result: a blank first (nothing can be worked out without it), else a block.

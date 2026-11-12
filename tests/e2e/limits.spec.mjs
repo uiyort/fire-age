@@ -230,3 +230,58 @@ test('the two views share one split: parts typed in the simple view lock the pro
   await expect(page.locator('#p-expense-split')).toHaveAttribute('open', '');
   await page.locator('#p-expense').click(); await expect(page.locator('#p-split-rent')).toBeFocused();
 });
+
+// Task 5 review round 1.
+test('Shift+Tab from the first part goes back past the locked total to the fields before it', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#expense-split summary').click();
+  await page.fill('#split-rent', '5000');
+  await expect(page.locator('#s-expense')).toHaveAttribute('readonly', '');
+  await page.locator('#split-rent').focus();
+  const seen = [];
+  for (let i = 0; i < 8 && seen.at(-1) !== 's-assets'; i += 1) {
+    await page.keyboard.press('Shift+Tab');
+    seen.push(await page.evaluate(() => document.activeElement.id));
+  }
+  expect(seen.at(-1)).toBe('s-assets');
+  expect(seen).not.toContain('split-rent');
+  expect(seen).not.toContain('s-expense');
+});
+
+test('a closed split still leads on: tapping the locked total opens it and puts the cursor in the first part', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#expense-split summary').click();
+  await page.fill('#split-rent', '5000');
+  await expect(page.locator('#s-expense')).toHaveAttribute('readonly', '');
+  await page.locator('#expense-split summary').click();
+  await expect(page.locator('#expense-split')).not.toHaveAttribute('open', '');
+  await page.locator('#s-expense').click();
+  await expect(page.locator('#split-rent')).toBeFocused();
+  await expect(page.locator('#expense-split')).toHaveAttribute('open', '');
+});
+
+test('the professional parts say they are monthly; the simple ones need not', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#expense-split .split-row')).not.toContainText('/月');
+  await page.click('#to-pro');
+  for (const k of ['rent', 'food', 'other']) await expect(page.locator(`label:has(#p-split-${k})`)).toContainText('/月');
+});
+
+test('a negative part keeps the total locked and the stop on the part', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#expense-split summary').click();
+  await page.fill('#split-rent', '-500'); await page.locator('#split-rent').press('Tab');
+  await expect(page.locator('#s-expense')).toHaveAttribute('readonly', '');
+  await expect(page.locator('#sticky-result .chip')).toHaveText('拦住：每月支出 ›');
+  await expect(page.locator('#split-rent')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#s-expense')).not.toHaveAttribute('aria-invalid', 'true');
+});
+
+test('the sum line reads in words; its operators are not read', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#expense-split summary').click();
+  for (const [k, v] of [['rent', '5000'], ['food', '2000'], ['other', '1000']]) await page.fill(`#split-${k}`, v);
+  const sum = page.locator('#split-line-s .split-sum');
+  await expect(sum).toHaveAttribute('aria-label', '三项合计 8,000：房租和房贷 5,000，吃饭 2,000，其他 1,000');
+  await expect(sum.locator('[aria-hidden="true"]')).toHaveText(['=', '+', '+']);
+});

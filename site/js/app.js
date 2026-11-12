@@ -271,7 +271,9 @@ function renderPen() {
 const SPLIT_PARTS = [['rent', '房租和房贷'], ['food', '吃饭'], ['other', '其他']];
 function splitHtml(prefix) {
   const simple = prefix === 's';
-  const parts = SPLIT_PARTS.map(([key, name]) => `<label>${name}<input type="number" inputmode="decimal" id="${simple ? '' : 'p-'}split-${key}" step="100" min="0" placeholder="0"></label>`).join('');
+  // The professional total is yearly, so its parts say they are monthly.
+  const unit = simple ? '' : ' <span class="u">/月</span>';
+  const parts = SPLIT_PARTS.map(([key, name]) => `<label><span>${name}${unit}</span><input type="number" inputmode="decimal" id="${simple ? '' : 'p-'}split-${key}" step="100" min="0" placeholder="0"></label>`).join('');
   const life = simple ? '<button type="button" class="split-life" id="split-life" hidden>房贷会还完？填上还到哪年 ›</button>' : '';
   return `<details class="split" id="${simple ? '' : 'p-'}expense-split"><summary>每月花多少说不准？拆开来加</summary><div class="split-row">${parts}</div><p class="split-line" id="split-line-${prefix}"></p>${life}</details>`;
 }
@@ -292,6 +294,9 @@ function syncSplit() {
     const total = fieldEl('expense', view);
     if (total !== document.activeElement) total.value = S.expense === null ? '' : simple ? Math.round(S.expense / 12) : S.expense;
     total.readOnly = on;
+    // Out of the Tab order while locked, so Shift+Tab from the first part goes on to the fields before it.
+    if (on) total.tabIndex = -1;
+    else total.removeAttribute('tabindex');
     total.classList.toggle('locked', on);
     total.previousElementSibling.hidden = !on;
     if (on) {
@@ -1375,9 +1380,12 @@ function init() {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => { if (latest?.mc && !isHeld()) renderSimulation(); }, 120);
   });
-  // A locked total is not typed in: the cursor goes to the first part, where the total comes from.
+  // A locked total is not typed in: the cursor goes to the first part, where the total comes from, its fold opened.
   document.addEventListener('focusin', ev => {
-    if (splitOn(S) && (ev.target.id === 's-expense' || ev.target.id === 'p-expense')) fieldEl('split.rent', ev.target.id === 'p-expense' ? 'pro' : 'simple').focus();
+    if (!splitOn(S) || (ev.target.id !== 's-expense' && ev.target.id !== 'p-expense')) return;
+    const first = fieldEl('split.rent', ev.target.id === 'p-expense' ? 'pro' : 'simple');
+    first.closest('details').open = true;
+    first.focus();
   });
   // Leaving a field with a stop not yet shown (one that waited while it was typed) shows it.
   document.addEventListener('focusout', ev => {

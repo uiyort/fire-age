@@ -28,11 +28,25 @@ test('stickyHtml with a chip: no age, the chip as a button; without one, as befo
   assert.equal(stickyHtml(h, {}), '<b class="sticky-age">还在路上</b><span>先看提前的办法</span>');
 });
 
+const visible = html => html.replace(/<[^>]+>/g, '');
 test('splitLineHtml: the sum by month, or by month × 12 in the professional view', () => {
   const row = { key: 'split', parts: [5000, 2000, 0], before: 72000 };
   const simple = splitLineHtml(row, { view: 'simple', wCur: 'CNY' });
-  assert.match(simple, /= 5,000 \+ 2,000 \+ 0/); assert.match(simple, /只填总数 ¥6,000/);
+  assert.match(visible(simple), /= 5,000 \+ 2,000 \+ 0/); assert.match(visible(simple), /只填总数 ¥6,000/);
   const pro = splitLineHtml({ ...row, parts: [2000, 1500, 1000] }, { view: 'pro', wCur: 'CNY' });
-  assert.match(pro, /\(2,000 \+ 1,500 \+ 1,000\) × 12/); assert.match(pro, /只填总数 ¥72,000/);
+  assert.match(visible(pro), /\(2,000 \+ 1,500 \+ 1,000\) × 12/); assert.match(visible(pro), /只填总数 ¥72,000/);
   assert.equal(splitLineHtml(undefined, { view: 'simple', wCur: 'CNY' }), '');
+});
+
+test('splitLineHtml: the operators are not read; the sum carries a readable label', () => {
+  const row = { key: 'split', parts: [5000, 2000, 1000], before: 72000 };
+  const simple = splitLineHtml(row, { view: 'simple', wCur: 'CNY' });
+  assert.match(simple, /aria-label="三项合计 8,000：房租和房贷 5,000，吃饭 2,000，其他 1,000"/);
+  const pro = splitLineHtml(row, { view: 'pro', wCur: 'CNY' });
+  assert.match(pro, /aria-label="三项合计每月 8,000 × 12 = 96,000：房租和房贷 5,000，吃饭 2,000，其他 1,000"/);
+  for (const html of [simple, pro]) {
+    const shown = html.replace(/<span aria-hidden="true">[^<]*<\/span>/g, '');
+    assert.doesNotMatch(visible(shown), /[=+×]/);
+  }
+  assert.match(splitLineHtml({ ...row, parts: [-500, 0, 0] }, { view: 'simple', wCur: 'CNY' }), /aria-label="三项合计 −500：房租和房贷 −500，吃饭 0，其他 0"/);
 });

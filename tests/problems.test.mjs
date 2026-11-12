@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
-import { defaultState, loadState, problems, setSplit, unsplit, splitOn, cleanSplit, itemsYearly, setWorkCountry, setRetireCountry, num } from '../site/js/state.js';
+import { defaultState, loadState, problems, setField, setSplit, unsplit, splitOn, cleanSplit, itemsYearly, setWorkCountry, setRetireCountry, num } from '../site/js/state.js';
 
 const real = (m = {}, k = {}) => ({ mortgage: { monthly: null, endYear: null, ...m }, kids: { count: null, age: null, monthly: null, ...k } });
 const S0 = o => ({ ...defaultState(DATA), ...o });
@@ -392,4 +392,44 @@ test('a value that rounds to −0 is shown as 0', () => {
   assert.equal(num(-0), '0'); assert.equal(num(-0.001), '0');
   assert.ok(Object.is(rel(S0({ expense: -5 }), 'B2').left[0].value, 0));
   assert.ok(Object.is(rel(S0({ income: 72000, expense: 72005 }), 'B14').left[0].value, 0));
+});
+
+// Task 5 review round 1.
+test('the split stays on while any part is not blank and not 0: a negative-only part keeps the lock, and B2 stops the part, not the total', () => {
+  const neg = setSplit(defaultState(DATA), 'rent', '-500', DATA);
+  assert.equal(splitOn(neg), true);
+  assert.equal(neg.expense, -6000);
+  assert.deepEqual(only(neg, 'B2').map(q => q.field), ['split.rent']);
+  assert.equal(neg.split.before, 72000);
+  // Blank or 0 everywhere is still the same as 只填总数.
+  const zero = setSplit(neg, 'rent', '0', DATA);
+  assert.equal(splitOn(zero), false); assert.deepEqual(zero, unsplit(neg, DATA));
+  const mixed = setSplit(setSplit(defaultState(DATA), 'rent', '5000', DATA), 'food', '-500', DATA);
+  assert.equal(splitOn(mixed), true); assert.equal(mixed.expense, 54000);
+  assert.deepEqual(only(mixed, 'B2').map(q => q.field), ['split.food']);
+  assert.equal(splitOn({ split: { rent: 0, food: null, other: 0 } }), false);
+});
+
+test('setting spending directly while split leaves the split first, then takes the value', () => {
+  let S = defaultState(DATA);
+  for (const [k, v] of [['rent', '5000'], ['food', '2000'], ['other', '1000']]) S = setSplit(S, k, v, DATA);
+  const set = setField(S, 'expense', '90000', DATA);
+  assert.equal(splitOn(set), false);
+  assert.deepEqual(set.split, { rent: null, food: null, other: null, before: null });
+  assert.equal(set.expense, 90000);
+  assert.equal(set.retExp, setField(unsplit(S, DATA), 'expense', '90000', DATA).retExp);
+  // Not split: unchanged behaviour.
+  assert.deepEqual(setField(defaultState(DATA), 'expense', '90000', DATA), setField({ ...defaultState(DATA) }, 'expense', '90000', DATA));
+});
+
+test('a saved split is the spending: a save whose total is not the parts × 12 loads with their sum', () => {
+  const store = v => ({ getItem: () => JSON.stringify(v) });
+  let S = defaultState(DATA);
+  for (const [k, v] of [['rent', '5000'], ['food', '2000'], ['other', '1000']]) S = setSplit(S, k, v, DATA);
+  const loaded = loadState(DATA, store({ ...S, expense: 12345 }));
+  assert.equal(loaded.expense, 96000);
+  assert.equal(loaded.retExp, S.retExp);
+  assert.equal(loadState(DATA, store({ ...S, split: { rent: -500, food: null, other: null, before: 72000 } })).expense, -6000);
+  // A save that is not split keeps its own total.
+  assert.equal(loadState(DATA, store({ ...defaultState(DATA), expense: 12345 })).expense, 12345);
 });

@@ -185,6 +185,8 @@ export function estimateRetireSpend(annualExpense, workC, retC, data, items = 0)
 
 // commit: false is for values still being typed, which must not become the fallback for a blank field.
 export function setField(S, id, rawText, data, { commit = true } = {}) {
+  // Spending set directly (a slider brought in, an exit) leaves the split first, as 只填总数 would.
+  if (id === 'expense' && splitOn(S)) S = unsplit(S, data);
   const text = String(rawText).trim();
   const parsed = text === '' ? NaN : Number(text);
   const value = Number.isFinite(parsed) ? parsed : null;
@@ -297,14 +299,16 @@ export function cleanSplit(raw) {
   const t = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   return { rent: realNum(t.rent), food: realNum(t.food), other: realNum(t.other), before: realNum(t.before) };
 }
-// While any part is above 0 the spending is their sum and cannot be typed directly.
+// While any part is filled and not 0 the spending is their sum and cannot be typed directly. A negative part keeps
+// the lock (B2 stops the part); every part blank or 0 is no split at all.
 export const splitOn = S => {
   const sp = cleanSplit(S.split);
-  return SPLIT_PARTS.some(k => sp[k] > 0);
+  return SPLIT_PARTS.some(k => sp[k] !== null && sp[k] !== 0);
 };
 const splitTotal = sp => SPLIT_PARTS.reduce((total, k) => total + (sp[k] ?? 0), 0) * 12;
+// A split total below 0 (a negative part, stopped by B2) estimates from 0, so the stop stays on the part alone.
 const reestimate = (S, data) => (data && !S.touched?.retExp
-  ? { ...S, retExp: Math.round(estimateRetireSpend(S.expense ?? 0, S.workC, S.retC, data, itemsYearly(S))) }
+  ? { ...S, retExp: Math.round(estimateRetireSpend(Math.max(S.expense ?? 0, 0), S.workC, S.retC, data, itemsYearly(S))) }
   : S);
 
 export function setSplit(S, part, rawText, data) {
@@ -315,8 +319,8 @@ export function setSplit(S, part, rawText, data) {
   if (SPLIT_PARTS.every(k => split[k] === null)) return unsplit({ ...S, split }, data);
   if (SPLIT_PARTS.every(k => old[k] === null)) split.before = S.expense ?? null;
   const next = { ...S, split };
-  // Every part now blank or 0 after the split was on: the same as 只填总数. A negative part stays, for B2 to stop.
-  if (splitOn(S) && !splitOn(next) && SPLIT_PARTS.every(k => !(split[k] < 0))) return unsplit(next, data);
+  // Every part now blank or 0 after the split was on: the same as 只填总数.
+  if (splitOn(S) && !splitOn(next)) return unsplit(next, data);
   if (splitOn(next)) next.expense = splitTotal(split);
   return reestimate(next, data);
 }
@@ -480,7 +484,8 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
   // B2: no amount below 0. The exit drops the minus sign; savings go to 0.
   for (const f of NEG) {
     const v = valueOf(f);
-    if (!isSet(v) || !(v < 0)) continue;
+    // A split total below 0 is a negative part, stopped there; the total itself is not typed.
+    if (!isSet(v) || !(v < 0) || (f === 'expense' && on)) continue;
     const shown = x => (!pro && YEARLY.includes(f) ? whole(x / 12) : x);
     const fixTo = f === 'assets' ? 0 : Math.abs(v);
     add({ rule: 'B2', kind: 'block', field: f, at: f.includes('.') ? 'expense' : f,
@@ -804,7 +809,9 @@ export function loadState(data, storage) {
     // Assumptions nobody edited follow the current month's data rather than the saved copy.
     const local = localAssumptions(data.countries[saved.workC]);
     const fresh = Object.fromEntries(ASSUMPTION_FIELDS.filter(id => !touched[id]).map(id => [id, local[id]]));
-    return { ...base, ...saved, ...fresh, town: cleanTown(saved.town), pen: cleanPen(saved.pen), real: cleanReal(saved.real), split: cleanSplit(saved.split), dispCur: dispOk ? saved.dispCur : base.dispCur, lastValid: { ...base.lastValid, ...saved.lastValid, ...fresh }, touched };
+    const S = { ...base, ...saved, ...fresh, town: cleanTown(saved.town), pen: cleanPen(saved.pen), real: cleanReal(saved.real), split: cleanSplit(saved.split), dispCur: dispOk ? saved.dispCur : base.dispCur, lastValid: { ...base.lastValid, ...saved.lastValid, ...fresh }, touched };
+    // A split save is its parts: an older or hand-edited total that is not their sum is replaced by it.
+    return splitOn(S) && S.expense !== splitTotal(S.split) ? reestimate({ ...S, expense: splitTotal(S.split) }, data) : S;
   } catch {
     return base;
   }
