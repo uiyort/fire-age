@@ -1,6 +1,6 @@
 // Page wiring: reads inputs into state, recomputes, renders.
 import DATA from './data-latest.js';
-import { DEFAULT_SEED, bwdSolve, monteCarlo, walkPath } from './engine.js';
+import { DEFAULT_PATHS, DEFAULT_SEED, bwdSolve, monteCarlo, walkPath } from './engine.js';
 import { bwdOdds, decilePaths, dualOdds, extendRow, needLine, oddsAround, oddsRuler, oddsSolve, oddsYears, successAt } from './odds.js';
 import { hardestIndex, heroModel, holidayType, oddsText, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking, townPlan, cardPlace, withoutItemsGain } from './holiday.js';
 import { FIELD_LABEL, FIELD_ORDER, LIMITS, applyPensionEstimate, cleanReal, cleanSplit, commitField, defaultState, groupStates, loadState, problems, resetRetExp, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setSplit, setTown, setWorkCountry, splitOn, storyRows, toParams, unsplit } from './state.js';
@@ -14,7 +14,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { assumptionLine, renderCard, summaryCardSpec, typeCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, ledgerHtml, leversHtml, lifeGainText, lifeTagText, fieldLineHtml, fieldLinesHtml, fixesHtml, groupStatusHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
+  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, ledgerHtml, leversHtml, proLedgerRowHtml, proLinesHtml, lifeGainText, lifeTagText, fieldLineHtml, fieldLinesHtml, fixesHtml, groupStatusHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -175,7 +175,7 @@ const PRO_FIELDS = [
     { id: 'assets', label: '可投资资产', unit: 'work', step: 10000 },
     { id: 'income', label: '税后年收入', unit: 'work', step: 10000 },
     { id: 'expense', label: '当前年支出', unit: 'work', step: 5000 },
-    { id: 'growth', label: '收入实际增长', unit: '%', step: 0.5, full: true },
+    { id: 'growth', label: '收入实际增长', unit: '%', step: 0.5, full: true, tool: true },
   ] },
   { legend: '退休后', grp: 'retire', fields: [
     { id: 'retExp', label: '年支出', unit: 'retire', step: 5000 },
@@ -199,8 +199,10 @@ const PRO_FIELDS = [
     { id: 'sigEq', label: '股票波动率', unit: '小数', step: 0.01 },
     { id: 'sigBd', label: '债券波动率', unit: '小数', step: 0.01 },
     { id: 'rho', label: '股债相关性', unit: '−1 到 1', step: 0.05 },
-    { id: 'flexCut', label: '大跌后少花', unit: '%', step: 5 },
+    { id: 'flexCut', label: '一年跌 ≥ 15% 后少花', unit: '%', step: 5 },
   ] },
+  // Read only: the target, the runs and the seed the tool sets.
+  { legend: '模拟', grp: 'sim', fields: [], html: `<p class="sim-line">八成 · ${DEFAULT_PATHS.toLocaleString('en-US')} 次 · 种子 ${DEFAULT_SEED} <span class="tool">本工具设定</span></p>` },
 ];
 
 // An empty money field reads as 0 to the eye; the result still waits for it to be filled in.
@@ -224,7 +226,9 @@ function fieldHtml(prefix, f) {
   const box = f.id === 'expense' ? `<span class="f-box"><span class="f-pre" aria-hidden="true" hidden>=</span>${control}</span>`
     : f.id === 'retExp' ? `<span class="f-box">${EST_PRE}${control}</span>` : control;
   const back = f.id === 'retExp' ? EST_BACK : '';
-  const wrap = `<div class="${cls}"${flags}><div class="lab"><label for="${id}">${f.label} ${unit}</label>${back}${help}</div>${box}${note}</div>`;
+  // A value the tool sets by default says so by its label (the income growth, spec §8.3).
+  const tool = f.tool ? ' <span class="tool">本工具设定</span>' : '';
+  const wrap = `<div class="${cls}"${flags}><div class="lab"><label for="${id}">${f.label} ${unit}</label>${tool}${back}${help}</div>${box}${note}</div>`;
   const extra = f.id === 'expense' ? splitHtml(prefix) : f.id === 'pension' ? penFoldHtml(prefix) : '';
   return (hasCard ? `${wrap}<div class="lcard" id="card-${f.id}" hidden></div>` : wrap) + extra;
 }
@@ -325,7 +329,7 @@ function syncSplit() {
 }
 
 function buildForm(el, prefix, groups) {
-  el.innerHTML = groups.map(g => `<fieldset><legend>${g.legend}<span class="grp-status" data-grp="${g.grp}"></span></legend>${g.fields.map(f => fieldHtml(prefix, f)).join('')}</fieldset>`).join('');
+  el.innerHTML = groups.map(g => `<fieldset><legend>${g.legend}<span class="grp-status" data-grp="${g.grp}"></span></legend>${g.fields.map(f => fieldHtml(prefix, f)).join('')}${g.html ?? ''}</fieldset>`).join('');
 }
 
 function fillCountrySelects() {
@@ -394,6 +398,10 @@ function placeTag() {
 
 function syncChrome(p) {
   placeFold();
+  // The ledger opens under its closed line: the fund line in the simple view's hero, the line under the tiles in the
+  // professional view. One node, moved only when the view changes.
+  const ledgerAt = $(S.view === 'pro' ? 'ledger-row' : 'hero');
+  if (ledgerAt.nextElementSibling !== $('ledger')) ledgerAt.after($('ledger'));
   document.querySelectorAll('[data-unit="work"]').forEach(e => { e.textContent = p.wCur; });
   document.querySelectorAll('[data-unit="retire"]').forEach(e => { e.textContent = p.rCur; });
   // The town box reads its spend in the retirement currency; abroad, the towns are not 国内.
@@ -544,6 +552,8 @@ function renderHero() {
   const success = latest.success;
   latest.hero = heroModel({ mode, p, t, bwd, success, need: target[retireT ?? 0], ruler: mode === 'bwd' ? null : ruler });
   $('hero').innerHTML = heroHtml(latest.hero, { p, dispCur: cur, open: ledgerOpen });
+  // The professional view's fund line: the ledger closed, in the work currency like the ledger's own ⇒ row.
+  $('ledger-row').innerHTML = proLedgerRowHtml({ need: retireT === null ? null : target[retireT], success, cur: p.wCur, open: ledgerOpen });
   renderLedger();
   placeTag();
   stickyNow = '';
@@ -557,21 +567,22 @@ function renderHero() {
 // The ledger, while open, from the numbers as they are: held, the rows stop at the first stop and nothing is worked
 // out; otherwise from the solved plan (the year chosen, working backward; the last year, out of reach).
 function ledgerNow() {
-  // The professional ledger comes with Task 9; until then nothing is worked out for it.
-  if (S.view === 'pro') return '';
   const year = new Date().getFullYear();
-  const view = 'simple';
+  const view = S.view === 'pro' ? 'pro' : 'simple';
   if (isHeld()) {
     const { wCur, rCur } = toParams(S, DATA);
     // Only the stops marked on the page; one still being typed waits there too (the field is not red yet).
     return ledgerHtml({ rows: storyRows(S, DATA, year, null), list: stopsNow().filter(q => shown.has(q.id)), odds: [], plan: null, state: 'held', view, mode: S.mode, p: null, dispCur: wCur, rCur });
   }
-  const { p, t, bwd, target, odds, mc, mode, dispCur: cur } = latest;
+  const { p, t, bwd, target, odds, mc, mcFor, mode, dispCur: cur } = latest;
   const unreachable = mode !== 'bwd' && t === null;
   const T = mode === 'bwd' ? bwd.n : unreachable ? p.life - p.age - 1 : t;
   const plan = unreachable ? { p, t: T, need: null, unreachable: true } : { p, t: T, need: target[T] };
   const state = unreachable ? 'unreachable' : mode !== 'bwd' && T === 0 ? 'now' : 'ok';
-  return ledgerHtml({ rows: storyRows(S, DATA, year, plan), list: [], odds: oddsAround(p, T), plan, state, view, mode, p, dispCur: cur, mc: mc ?? null, bwdOdds: odds });
+  // The flags the professional ledger draws (B13 on the r row), from the page's own list. The median waits for the
+  // simulation of these numbers; one from numbers before is never shown.
+  const list = view === 'pro' ? problems(S, DATA, year).filter(q => q.kind === 'flag') : [];
+  return ledgerHtml({ rows: storyRows(S, DATA, year, plan), list, odds: oddsAround(p, T), plan, state, view, mode, p, dispCur: cur, mc: mc && mcFor === p ? mc : null, bwdOdds: odds });
 }
 function renderLedger() {
   document.querySelectorAll('.ledger-toggle').forEach(button => {
@@ -610,6 +621,7 @@ function renderSimulationCore() {
   const { p, retireT, mode, bwd, s0, dispCur: cur, target } = latest;
   const mc = monteCarlo(p, retireT, s0);
   latest.mc = mc;
+  latest.mcFor = p;
   $('tiles').innerHTML = tilesHtml({ mode, p, t: latest.t, bwd, mc, dispCur: cur, target });
   renderHero();
   const scale = v => toDisplay(v, p, cur);
@@ -912,7 +924,10 @@ function renderLines() {
   // The split line takes the stored yearly total from before the split.
   const rows = storyRows(S, DATA, year, null).map(r => (r.key === 'split' ? { ...r, before: sp.before } : r));
   const wCur = DATA.countries[S.workC].cur, rCur = DATA.countries[S.retC].cur;
-  const lines = at => fieldLinesHtml({ rows, list, at, view, wCur, rCur });
+  // The professional view's own lines: the rate, the nominal mortgage, the estimate across countries, the pension cap
+  // and the orange flags (B11, B12), each under its field.
+  const own = view === 'pro' ? proLinesHtml({ S, p: toParams(S, DATA, year), data: DATA, list, rows }) : {};
+  const lines = at => fieldLinesHtml({ rows, list, at, view, wCur, rCur, note: own[at] ?? '' });
   // Exits of the relations drawn in the lines block, whose solid field is the block's own field, end the block.
   const ownFixes = key => {
     const html = list.filter(q => isStop(q) && q.rel?.sub && q.field === key).map(q => fixesHtml(q.fixes)).join('');
@@ -935,6 +950,18 @@ function renderLines() {
     if (!el) continue;
     const html = (range ? fieldLineHtml(q) : '') + (fixes ? `<div class="fixes">${fixes}</div>` : '');
     after.set(el, (after.get(el) ?? '') + html);
+  }
+  const addAfter = (el, html) => { if (el && html) after.set(el, (after.get(el) ?? '') + html); };
+  if (view === 'pro') {
+    addAfter($('p-disp'), own.region && own.region.replace('</p>', ` <span class="grp-data">${DATA.version} 数据</span></p>`));
+    addAfter(fieldEl('pension'), own.pension);
+    for (const key of Object.keys(LIMITS.common)) addAfter(fieldEl(key), own[key]);
+  }
+  // Orange frames: a changed assumption outside the common range (B11), a pension above the year's spending (B12).
+  document.querySelectorAll('.f.warn').forEach(el => el.classList.remove('warn'));
+  for (const q of list) {
+    const el = view === 'pro' && (q.rule === 'B11' || q.rule === 'B12') ? fieldEl(q.field) : null;
+    if (el) wrapOf(el).classList.add('warn');
   }
   // A box already in place with the same content stays, so a redraw never swaps a button under the pointer.
   for (const box of document.querySelectorAll('.field-after')) {
@@ -1039,6 +1066,7 @@ function holdResult(stops, marks = stops) {
     $('type-now').innerHTML = '';
     $('tiles').innerHTML = '';
     $('hero').innerHTML = heldHeroHtml(ledgerOpen);
+    $('ledger-row').innerHTML = proLedgerRowHtml({ held: true, open: ledgerOpen });
     placeTag();
     const head = heldHeadHtml(S.view);
     $('headline').innerHTML = head;
@@ -1376,10 +1404,12 @@ function onClick(ev) {
   const ledgerToggle = ev.target.closest?.('.ledger-toggle');
   if (ledgerToggle) {
     const focused = document.activeElement === ledgerToggle;
+    const home = ledgerToggle.closest('#ledger-row') ? '#ledger-row' : '#hero';
     ledgerOpen = !ledgerOpen;
     if (ledgerOpen && !isHeld()) flushSimulation();
     renderLedger();
-    if (focused) document.querySelector('.ledger-toggle')?.focus();
+    // A finished simulation redraws the line, so the focus goes to the new toggle in the same place.
+    if (focused) document.querySelector(`${home} .ledger-toggle`)?.focus();
     return;
   }
   // A ledger row's label goes back to its field.

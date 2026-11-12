@@ -86,6 +86,8 @@ input:disabled { opacity: .65; }
 /* The frames keep the 1 px border, so a mark never changes the field's size. */
 .f.bad input, .f.bad input:hover, label.bad input, label.bad input:hover { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); }
 .f.cmp input, .f.cmp input:hover, label.cmp input, label.cmp input:hover { border-style: dashed; border-color: var(--bad); }
+/* An orange frame: the value counts, but look again (B11 outside the common range, B12 a pension above the spending). */
+.f.warn input, .f.warn input:hover { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
 .chip { font: inherit; font-size: 13px; font-weight: 700; line-height: 1.2; padding: 4px 12px; border: 0; border-radius: 999px; background: var(--bad); color: #fff; cursor: pointer; white-space: nowrap; flex: none; }
 body.result-held .sticky-age, body.result-held .hero-big { color: var(--ink-3); }
 body.result-held #type-section, body.result-held #type-all, body.result-held #tiles, body.result-held #views-banner,
@@ -344,6 +346,10 @@ h3 { font-family: var(--f-display); font-weight: 900; font-size: 16px; margin: 1
 .lg-row.ended, .lg-row.wait, .ledger s { color: var(--ink-3); }
 .lg-row.pick { color: var(--good); font-weight: 700; }
 .ledger button.link { white-space: normal; text-align: left; }
+/* A long linked label beside its operator and age: the link wraps inside itself instead of dropping below them. */
+.lg-row.lnk .lg-l { display: flex; align-items: baseline; }
+.lg-row.lnk .lg-op, .lg-row.lnk .lg-age { flex: none; }
+.lg-row.lnk button.link { min-width: 0; }
 .lg-row.go button.link::after { content: ""; position: absolute; inset: 0; }
 .ledger .est { color: var(--s1); }
 .ledger .warn { color: var(--warn); }
@@ -351,6 +357,10 @@ h3 { font-family: var(--f-display); font-weight: 900; font-size: 16px; margin: 1
 .lg-note { margin: 0 0 2px 1.3em; font-size: 12px; color: var(--ink-3); }
 .lg-more { text-align: right; font-size: 12px; }
 .lg-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-3); }
+/* The professional view's fund line, under the tiles; the ledger opens right under it. */
+.ledger-row { margin-top: 10px; }
+.ledger-row p { margin: 0; font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.ledger-row + .ledger { margin-top: 8px; }
 .story-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .story-list li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; font-size: 14px; }
 .story-list b { font-family: var(--f-mono); font-weight: 500; color: var(--accent); white-space: nowrap; }
@@ -526,6 +536,9 @@ fieldset, .pen-grid, .split-row, .town-row { grid-auto-flow: row dense; }
 .row.ended { color: var(--ink-3); }
 .row.warn, .row .warn { color: var(--warn); }
 .row.after { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 12px; }
+.row .est { color: var(--s1); }
+/* The professional form's read-only 模拟 line. */
+.sim-line { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--ink-2); }
 .tool { display: inline-block; padding: 0 5px; border: 1px dashed var(--ink-3); border-radius: 4px; font-size: 11px; color: var(--ink-3); white-space: nowrap; }
 .fixes { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 2px 0; }
 .fix { white-space: nowrap; }

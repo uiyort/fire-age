@@ -1,9 +1,9 @@
 // The views helpers that draw the stopped result and, in later tasks, the lines under the fields.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chipText, heldHeadHtml, heldHeroHtml, splitLineHtml, stickyHtml, relText, fieldLinesHtml, fieldLineHtml, fixesHtml, lifeTagText, pensionEstimateHtml, groupStatusHtml } from '../site/js/views.js';
+import { chipText, heldHeadHtml, heldHeroHtml, splitLineHtml, stickyHtml, relText, fieldLinesHtml, fieldLineHtml, fixesHtml, lifeTagText, pensionEstimateHtml, groupStatusHtml, proLinesHtml } from '../site/js/views.js';
 import DATA from '../site/js/data-latest.js';
-import { defaultState, storyRows, problems, resetRetExp } from '../site/js/state.js';
+import { defaultState, estimateRetireSpend, storyRows, problems, resetRetExp, toParams } from '../site/js/state.js';
 
 const b = (kind, chip) => ({ kind, chip });
 test('chipText: blanks first, one names the item, several count', () => {
@@ -178,4 +178,37 @@ test('groupStatusHtml: ✕ N first, then 示例, ＋, 默认 / 已改 N with the
   assert.equal(strip(groupStatusHtml(s({ changed: 0 }), { version: '2026-11' })), '默认 2026-11 数据');
   assert.equal(strip(groupStatusHtml(s({ changed: 1 }), { version: '2026-11' })), '已改 1 2026-11 数据');
   assert.equal(groupStatusHtml(s(), { version: '2026-11' }), '');
+});
+
+// ---- The professional view's own lines (spec §10.3).
+test('proLinesHtml: exchange rate, nominal mortgage, cross-country estimate, pension cap', () => {
+  const s = { ...defaultState(DATA), view: 'pro', retC: 'TH', real: { mortgage: { monthly: 3000, endYear: 2045 }, kids: { count: null, age: null, monthly: null } } };
+  const p = toParams(s, DATA, 2026);
+  const out = proLinesHtml({ S: s, p, data: DATA, list: problems(s, DATA, 2026), rows: storyRows(s, DATA, 2026, null) });
+  assert.match(strip(out.region), /^汇率 1 THB = \d\.\d\d CNY$/);
+  assert.equal(strip(out.expense).startsWith(`月供按名义值 · 实际 × (1 + ${p.infl}%)^−t`), true);
+  assert.match(strip(out.retExp), /^≈ \(72,000 − 月供和孩子 36,000\) × 物价比 [\d.]+ ÷ 汇率 [\d.]+ \+ 月供和孩子 36,000 ÷ 汇率 [\d.]+$/);
+  assert.equal(strip(out.pension), '养老金上限 = 年支出');
+  assert.equal(strip(proLinesHtml({ S: defaultState(DATA), p: toParams(defaultState(DATA), DATA), data: DATA, list: [], rows: [] }).region), '');
+});
+
+// Beyond the brief: the line equals the estimate, the flags, and nothing in one currency.
+test('proLinesHtml: the cross-country line is the estimate; B11 and B12 flags; one currency draws neither', () => {
+  const s = { ...defaultState(DATA), view: 'pro', retC: 'TH' };
+  const p = toParams(s, DATA, 2026);
+  const out = proLinesHtml({ S: s, p, data: DATA, list: problems(s, DATA, 2026), rows: storyRows(s, DATA, 2026, null) });
+  const ratio = DATA.countries.TH.priceLevel.value / DATA.countries.CN.priceLevel.value;
+  const rate = p.fx.CNY / p.fx.THB;
+  assert.equal(strip(out.retExp), `≈ 72,000 × 物价比 ${ratio.toFixed(2)} ÷ 汇率 ${rate.toFixed(2)}`);
+  assert.equal(Math.round(estimateRetireSpend(72000, 'CN', 'TH', DATA)), Math.round(72000 * ratio / rate));
+  assert.match(out.retExp, /class="est" aria-label="估算">≈/);
+  assert.equal(strip(proLinesHtml({ S: { ...s, touched: { retExp: true } }, p, data: DATA, list: [], rows: [] }).retExp), '');
+  const one = { ...defaultState(DATA), view: 'pro', pension: 90000, eqReal: 12, real: { mortgage: { monthly: 3000, endYear: 2045 }, kids: { count: null, age: null, monthly: null } } };
+  const o = proLinesHtml({ S: one, p: toParams(one, DATA, 2026), data: DATA, list: problems(one, DATA, 2026), rows: storyRows(one, DATA, 2026, null) });
+  assert.equal(strip(o.pension), '养老金上限 = 年支出 ! 养老金 90,000 > 年支出 72,000 · 多出 18,000 不计');
+  assert.match(o.pension, /<span aria-label="提示">!<\/span>/);
+  assert.equal(strip(o.eqReal), '! 常见 −2 到 10');
+  assert.equal(strip(o.retExp), ''); assert.equal(strip(o.region), '');
+  // No mortgage counted, no nominal note.
+  assert.equal(strip(proLinesHtml({ S: defaultState(DATA), p: toParams(defaultState(DATA), DATA), data: DATA, list: [], rows: [] }).expense), '');
 });

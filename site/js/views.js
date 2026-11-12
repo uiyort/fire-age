@@ -1,10 +1,10 @@
 // Turns model results into page text and tables. Strings only, no DOM access.
-import { coastNeed, conv, bwdSolve, firstDraw, savingsAt, savingsRate, buildParams } from './engine.js';
+import { DEFAULT_PATHS, DEFAULT_SEED, coastNeed, conv, bwdSolve, firstDraw, fwdSolve, savingsAt, savingsRate, buildParams } from './engine.js';
 import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn, oddsBand, oddsText, peopleOf } from './holiday.js';
-import { needLine, oddsSolve } from './odds.js';
+import { needLine, oddsSolve, oddsYears } from './odds.js';
 import { MIN_SHOWN, SCENARIOS, answerValues, scenarioOptions } from './scenario.js';
 import { impactOf, lifeChoices, tryParam } from './levers.js';
-import { FIELD_LABEL, LIMITS, num } from './state.js';
+import { FIELD_LABEL, LIMITS, itemsYearly, num } from './state.js';
 
 const moneyFormats = {};
 export function money(v, cur) {
@@ -627,8 +627,9 @@ export function fixesHtml(fixes = []) {
 // problems to show (a stop not yet shown draws its item plainly, not red). Under spending: the split's sum (its
 // before is the stored yearly total, as splitLineHtml takes it), the items it holds (counted, ended, or the stopped
 // relation), and the orange line when spending is above income. Under retirement spending: the items again, and one
-// → row per end age still to come, with what is left from then on.
-export function fieldLinesHtml({ rows, list, at, view, wCur, rCur }) {
+// → row per end age still to come, with what is left from then on. note: the professional view's own line for this
+// field (proLinesHtml), after the items under spending, first under retirement spending.
+export function fieldLinesHtml({ rows, list, at, view, wCur, rCur, note = '' }) {
   const pro = view === 'pro';
   const unit = pro ? '/年' : '';
   const stop = list.find(q => q.kind === 'block' && q.rel?.sub && q.at === at);
@@ -648,7 +649,7 @@ export function fieldLinesHtml({ rows, list, at, view, wCur, rCur }) {
     const sum = split ? `<p class="split-line" id="split-line-${pro ? 'p' : 's'}">${splitLineHtml(split, { view, wCur })}</p>` : '';
     const b14 = list.find(q => q.rule === 'B14');
     const save = b14 ? `<p class="row warn">${WARN} ${liveHtml(b14.rel)}${b14.note ? ` · ${b14.note}` : ''}</p>` : '';
-    return sum + items.join('') + save;
+    return sum + items.join('') + note + save;
   }
   const today = rows.find(r => r.key === 'expense')?.value;
   const after = rows.filter(r => r.key.startsWith('after:')).map(r => {
@@ -657,7 +658,7 @@ export function fieldLinesHtml({ rows, list, at, view, wCur, rCur }) {
     const amount = r.status === 'flag' && r.value !== null ? `<span class="warn">${WARN} ${money}</span>${low}` : money;
     return `<p class="row after"><span>${OP('→')} ${r.ages[0]} 岁起</span> <span class="amt">${amount}</span></p>`;
   });
-  return items.join('') + after.join('');
+  return note + items.join('') + after.join('');
 }
 
 // The red chip on a stopped result: a blank first (nothing can be worked out without it), else a block.
@@ -680,7 +681,8 @@ export const heldHeadHtml = view => (view === 'pro' ? `<p class="say">财务独�
 // ---- The ledger behind the fund line (spec §7): ① saving, ② after the holiday, ③ the 2,000 years, every number from
 // storyRows (① ②) and the odds (③). Two columns, label | number. Rows with a field go back to it. While the result is
 // held the rows stop at the first blocked or blank one; what follows is a fixed line each, with no number.
-// state: 'ok' | 'held' | 'unreachable' | 'now'. The professional ledger is drawn by Task 9.
+// state: 'ok' | 'held' | 'unreachable' | 'now'. The professional ledger (spec §7.3) speaks in years and adds the rows
+// only it has: the real payment, the floor, the cut after a fall, the drift, the formulas of ③.
 const METHOD = { now: 'accumulate', after: 'need-line', odds: 'odds' };
 const methodLink = id => `<a href="method.html#${id}">计算方法 ›</a>`;
 // The spaces between the cells are for reading the text as text (a copy, a screen reader); the layout ignores them.
@@ -699,29 +701,36 @@ const dotsHtml = count => {
   return `<span class="dots" aria-hidden="true">${'●'.repeat(on)}${'○'.repeat(10 - on)}</span>`;
 };
 const chengText = share => (peopleOf(share) === 0 ? '不到 1 成' : `${peopleOf(share)} 成`);
+const isSet = v => v !== null && v !== undefined;
+// The professional ③ inputs: a stop in one of them stops the ledger at the r row (spec §7.4).
+const THIRD_FIELDS = ['eq', 'eqReal', 'bondY', 'infl', 'drag', 'sigEq', 'sigBd', 'rho', 'swr'];
+const PATHS_TEXT = DEFAULT_PATHS.toLocaleString('en-US');
+const PRO_THIRD = `③ ${PATHS_TEXT} 条路径 · 种子 ${DEFAULT_SEED}`;
 
 export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'ok', view = 'simple', mode = 'fwd', p = null, dispCur, rCur = null, mc = null, bwdOdds = null }) {
-  if (view === 'pro') return '';
+  const pro = view === 'pro';
+  const labels = FIELD_LABEL[pro ? 'pro' : 'simple'];
   const wCur = p ? p.wCur : dispCur;
   const retCur = p ? p.rCur : rCur ?? dispCur;
   const curOf = r => (r.cur === 'retire' ? retCur : wCur);
   const signed = (v, c) => (v === null || v === undefined ? NONE : v < 0 ? `−${wholeMoney(-v, c)}` : wholeMoney(v, c));
   const flagged = amount => `<span class="warn"><span aria-label="提示">!</span> ${amount}</span>`;
   const held = state === 'held';
+  // A percentage below zero is written with U+2212, as every number on the page is.
+  const spct = (v, d) => pct(v, d).replace('-', '−');
 
   // A stopped or blank row: the very relation drawn under the field, or its label and 待填.
   const stopRow = r => {
     const sub = r.op === '└' || r.rel?.sub;
     if (r.status === 'blank') {
-      const label = r.op === '└' ? `${OP('└')} 其中${r.label ?? ''}` : r.label ?? FIELD_LABEL.simple[r.field] ?? '';
+      const label = r.op === '└' ? `${OP('└')} 其中${r.label ?? ''}` : r.label ?? labels[r.field] ?? '';
       return lgRow(`${sub ? '' : lgOp(r.op)}${fieldLink(r.field, label)}`, `待填 ${GO}`, `${sub ? 'sub ' : ''}bad go`);
     }
     // The relation stands alone: an operator before "每月支出 −500 < 0" would be read into it.
-    const text = r.rel ? liveHtml(r.rel) : r.label ?? FIELD_LABEL.simple[r.field] ?? '';
+    const text = r.rel ? liveHtml(r.rel) : r.label ?? labels[r.field] ?? '';
     return lgRow(`${sub ? '' : lgOp()}${fieldLink(r.field, text)}`, `${X} ${GO}`, `${sub ? 'sub ' : ''}bad go`);
   };
-  const rowHtml = r => {
-    if (r.status === 'block' || r.status === 'blank') return stopRow(r);
+  const simpleRow = r => {
     if (r.value === 0 && r.key !== 'pension') return '';
     const c = curOf(r);
     switch (r.key) {
@@ -758,14 +767,73 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
         return '';
     }
   };
-  // The rows the simple ledger draws: not the professional ones, not the → rows folded into the first ② row (they are
-  // for the line under the field), not the └ rows under retirement spending (the field line's), not ⇒ and its N.
-  const shown = r => r.views !== 'pro' && !r.folded && !r.key.startsWith('ret:') && r.key !== 'need' && r.key !== 'times';
+  // The professional rows: yearly amounts in full, the tool's settings tagged, the rows only this view has.
+  const savingFlag = rows.find(r => r.key === 'save')?.status === 'flag';
+  // A long linked label (class lnk) sits beside its age and wraps inside itself at 390 px, not under them.
+  const proRow = r => {
+    if (r.value === 0 && !['pension', 'flexCut', 'fxDrift'].includes(r.key)) return '';
+    const c = curOf(r);
+    const tag = r.tag ? ` ${TOOL_TAG}` : '';
+    switch (r.key) {
+      case 'have': return lgRow(`${lgOp()}${fieldLink(r.field, r.label)}`, signed(r.value, c));
+      // 税后年收入 · 实际增长 +2%/年: each part goes back to its own field.
+      case 'income': {
+        const [name, growth] = r.label.split(' · ');
+        return lgRow(`${lgOp(r.op)}${fieldLink(r.field, name)} · ${fieldLink('growth', growth)}${tag}`, signed(r.value, c));
+      }
+      case 'expense': return lgRow(`${lgOp(r.op)}${fieldLink(r.field, r.label)}${tag}`, signed(r.value, c));
+      case 'split': return lgRow(fieldLink(r.field, `(${r.parts.map(v => num(v ?? 0)).join(` ${OP('+')} `)}) ${OP('×')} 12`), '', 'sub');
+      case 'mortgage':
+      case 'kids': {
+        if (r.status === 'ended') return lgRow(relText({ ...r.rel, value: r.value ?? r.rel.value, unit: '/年' }), '', 'sub ended');
+        // The children's label carries its own end (→ 22 岁（按最小的）); the mortgage's is its year.
+        const [name, end = r.end] = r.label.split(' → ');
+        return lgRow(fieldLink(r.field, `${OP('└')} 其中${name} ${r.value === null ? NONE : `${num(r.value)}/年`} ${OP('→')} ${end}`) + tag, '', 'sub');
+      }
+      case 'mortgageReal': return lgRow(r.label, `t = ${Math.max(plan.t - 1, 0)} 时 ${wholeMoney(r.value, c)}`, 'sub');
+      case 'save': {
+        const pair = r.values ? r.values.map(num).join(` ${OP('→')} `) : signed(r.value, c);
+        const label = r.values ? `${r.label} t0 ${OP('→')} t${plan.t - 1}` : r.label;
+        return lgRow(`${lgOp('=')}<b>${label}</b>`, r.status === 'flag' ? flagged(pair) : `<b>${pair}</b>`, 'sum');
+      }
+      case 'floor': return lgRow(`${lgOp()}${r.label}${tag}${savingFlag ? ` ${flagged('存款用完后按 0 算')}` : ''}`);
+      case 'retExp': {
+        const est = r.status === 'est' ? '<span class="est" aria-label="估算">≈</span> ' : '';
+        return lgRow(`${lgOp()}${agesText(r.ages)}${fieldLink(r.field, r.label)}${r.struck ? ` ${struckHtml(r.struck)}` : ''}`, r.value === null ? NONE : `${est}${wholeMoney(r.value, c)}`);
+      }
+      case 'retReal': return lgRow(r.label, wholeMoney(r.value, c), 'sub');
+      // Self-pay with no amount still says until when it would run: → 63.
+      case 'self': {
+        const ages = r.value === null && isSet(r.ages?.[1]) ? `<span class="lg-age">${OP('→')} ${r.ages[1]}</span> ` : agesText(r.ages);
+        return lgRow(`${lgOp()}${ages}${fieldLink(r.field, r.label)}`, r.value === null ? NONE : `+${wholeMoney(r.value, c)}`, 'lnk');
+      }
+      case 'pension': {
+        const label = `${lgOp()}${agesText(r.ages)}${fieldLink(r.field, r.label)}`;
+        if (r.value === null) return lgRow(label, `${NONE} ${GO}`, 'go lnk');
+        return lgRow(label, r.status === 'flag' ? flagged(signed(r.value, c)) : signed(r.value, c), 'lnk');
+      }
+      case 'flexCut': return lgRow(`${lgOp()}${fieldLink(r.field, r.label)}`, r.value === null ? NONE : `${num(r.value)}%`, 'lnk');
+      case 'fxDrift': return lgRow(`${lgOp()}${fieldLink(r.field, r.label)}`, r.value === null ? `${NONE} 同币种` : `${num(r.value)}%`, 'lnk');
+      case 'cross': return lgRow(`${lgOp()}<span class="est" aria-label="估算">≈</span>${r.label.replace(/^≈/, '')}`);
+      default: return simpleRow(r);
+    }
+  };
+  const rowHtml = r => {
+    if (r.status === 'block' || r.status === 'blank') return stopRow(r);
+    return pro ? proRow(r) : simpleRow(r);
+  };
+  // The rows the ledger draws: not the other view's, not the → rows folded into the first ② row (they are for the
+  // line under the field), not the └ rows under retirement spending (the field line's), not ⇒ and its N.
+  const shown = r => r.views !== (pro ? 'simple' : 'pro') && !r.folded && !r.key.startsWith('ret:') && r.key !== 'need' && r.key !== 'times';
   const head = (title, right = '') => lgRow(`<b>${title}</b>`, right, 'head');
   const sec = (body, cls = '') => `<div class="lg-sec${cls ? ` ${cls}` : ''}">${body}</div>`;
   const more = id => `<div class="lg-more">${methodLink(id)}</div>`;
-  const foot = id => `<div class="lg-foot"><span><span class="est">≈</span> 估算 · 按今天的钱</span> ${methodLink(id)}</div>`;
+  const foot = id => (pro
+    ? `<div class="lg-foot"><span>${TOOL_TAG} · 按今天的钱 · 实际收益</span> ${methodLink(id)}</div>`
+    : `<div class="lg-foot"><span><span class="est">≈</span> 估算 · 按今天的钱</span> ${methodLink(id)}</div>`);
   const none = (label, op) => lgRow(`${lgOp(op)}${label}`, NONE, 'wait');
+  const saveLabel = pro ? '年储蓄' : '每月存下';
+  const afterRight = pro ? '年初取出' : '每月花';
 
   if (held) {
     // Only the stops the page shows (list) stop the ledger; a stop still being typed is drawn as a plain row.
@@ -774,16 +842,24 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
     rows = rows.map(r => (isStopped(r) && r.stop && !live.has(r.stop) ? { ...r, status: null } : r));
     let cut = rows.findIndex(isStopped);
     let drawn = cut < 0 ? [] : rows.slice(0, cut + 1);
-    // A stop on a field with no row of its own (the age, say) stands first, in its own words.
     if (cut < 0) {
       const q = list.find(x => x.kind === 'blank') ?? list.find(x => x.kind === 'block');
-      drawn = q ? [{ key: 'stop', section: 'now', status: q.kind, rel: q.rel, field: q.field, label: FIELD_LABEL.simple[q.field] ?? q.field, op: null }] : [];
+      const stopped = q ? { key: 'stop', section: 'now', status: q.kind, rel: q.rel, field: q.field, label: labels[q.field] ?? q.field, op: null } : null;
+      // A ③ input (the professional view's assumptions): ① and ② as they are, the line waits, ③ stops at the r row.
+      if (pro && stopped && THIRD_FIELDS.includes(q.field)) {
+        const all = s => rows.filter(r => r.section === s && shown(r)).map(rowHtml).join('');
+        const needLabel = rows.find(r => r.key === 'need')?.label ?? '';
+        return sec(head('① 攒钱') + all('now')) + sec(head('② 放假以后', afterRight) + all('after') + none(needLabel, '⇒'))
+          + sec(head(PRO_THIRD, TOOL_TAG) + stopRow(stopped) + none('③ 放假年龄', '⇒')) + foot(METHOD.odds);
+      }
+      // A stop on a field with no row of its own (the age, say) stands first, in its own words.
+      drawn = stopped ? [stopped] : [];
       cut = 0;
     }
     const at = drawn.length ? drawn[drawn.length - 1].section : 'now';
     const draw = s => drawn.filter(r => r.section === s && shown(r)).map(rowHtml).join('');
-    const first = sec(head('① 攒钱') + draw('now') + (at === 'now' ? none('每月存下', '=') : ''));
-    const second = at === 'after' ? sec(head('② 放假以后', '每月花') + draw('after')) : '';
+    const first = sec(head('① 攒钱') + draw('now') + (at === 'now' ? none(saveLabel, '=') : ''));
+    const second = at === 'after' ? sec(head('② 放假以后', afterRight) + draw('after')) : '';
     return first + second + sec(none('② 要有', '⇒') + none('③ 放假年龄', '⇒'), 'wait') + foot(METHOD[at]);
   }
 
@@ -793,33 +869,96 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
   const unreachable = state === 'unreachable';
   const bwd = mode === 'bwd';
   // ② in age order: a row that starts at or before the holiday (the pension, when the holiday comes later) starts at it.
+  // The professional rows with no age follow: the real payment its first row, the cut, the drift and the estimate last.
   const fromHoliday = r => (r.section === 'after' && r.ages && r.ages[0] !== null && r.ages[0] !== undefined && r.ages[0] < holiday
     ? { ...r, ages: [holiday, r.ages[1] !== null && r.ages[1] !== undefined && r.ages[1] < holiday ? holiday : r.ages[1]] } : r);
-  const startOf = r => (r.ages && r.ages[0] !== null && r.ages[0] !== undefined ? r.ages[0] : holiday);
+  const startOf = r => (r.ages && isSet(r.ages[0]) ? r.ages[0] : r.ages || r.key === 'retReal' ? holiday : Infinity);
   const draw = s => rows.filter(r => r.section === s && shown(r)).map(fromHoliday)
     .map((r, i) => [r, i]).sort(([a, i], [b, j]) => (s === 'after' ? startOf(a) - startOf(b) : 0) || i - j).map(([r]) => r)
     .map(rowHtml).join('');
+  const span = pro ? `t = 0…${t - 1}` : `${age} ${OP('→')} ${holiday} 岁`;
   const first = now
     ? sec(head('① 攒钱', '不用再攒'))
-    : sec(head('① 攒钱', `${age} ${OP('→')} ${holiday} 岁`) + draw('now') + more(METHOD.now));
+    : sec(head('① 攒钱', span) + draw('now') + more(METHOD.now));
   const needRow = rows.find(r => r.key === 'need');
   const times = rows.find(r => r.key === 'times')?.value;
-  const line = unreachable || !needRow || needRow.value === null ? '' : lgRow(`${lgOp('⇒')}<b>${needRow.label}</b>`, `<b>${roughMoney(needRow.value, wCur)}</b>`, 'sum')
-    + `<p class="lg-note">${times ? `≈ 年支出 × ${times} 倍 · ` : ''}八成年景够花到 ${p.life} 岁</p>`;
-  const second = sec(head(unreachable ? `② 如果 ${holiday} 岁放假` : '② 放假以后', '每月花') + draw('after') + line + more(METHOD.after));
+  const noLine = unreachable || !needRow || needRow.value === null;
+  let line = '';
+  if (!noLine && pro) {
+    // The implied rate: what the first holiday year takes from savings, over the line (spec §9.2), the N 倍's denominator.
+    line = lgRow(`${lgOp('⇒')}<b>${needRow.label}</b>`, `<b>${wholeMoney(needRow.value, wCur)}</b>`, 'sum')
+      + `<p class="lg-note">${times ? `≈ 年支出 × ${times} 倍 · ` : ''}反推提取率 ${pct(firstDraw(p, t) / needRow.value, 1)} · 对照 3.9%</p>`;
+  } else if (!noLine) {
+    line = lgRow(`${lgOp('⇒')}<b>${needRow.label}</b>`, `<b>${roughMoney(needRow.value, wCur)}</b>`, 'sum')
+      + `<p class="lg-note">${times ? `≈ 年支出 × ${times} 倍 · ` : ''}八成年景够花到 ${p.life} 岁</p>`;
+  }
+  const second = sec(head(unreachable ? `② 如果 ${holiday} 岁放假` : '② 放假以后', afterRight) + draw('after') + line + more(METHOD.after));
   // ③: the years round the holiday; one year when it is today, out of reach, or chosen (working backward).
   const one = now || unreachable || bwd;
   const years = one ? odds.filter(o => o.t === t) : odds;
   const yearLabel = o => (now && o.t === 0 ? '今天' : bwd ? `${o.age} 岁（你定的）` : `${o.age} 岁`);
   const pick = o => o.t === t && !unreachable && !bwd;
-  const oddsRows = years.map(o => lgRow(`${lgOp()}<span class="lg-year">${yearLabel(o)}</span> ${dotsHtml(o.count)}`, chengText(o.share), pick(o) ? 'pick' : '')).join('');
+  const oddsRows = years.map(o => (pro
+    ? lgRow(`${lgOp()}<span class="lg-year">${yearLabel(o)}</span> ${o.count.toLocaleString('en-US')} / ${PATHS_TEXT}`, pct(o.share, 1), pick(o) ? 'pick' : '')
+    : lgRow(`${lgOp()}<span class="lg-year">${yearLabel(o)}</span> ${dotsHtml(o.count)}`, chengText(o.share), pick(o) ? 'pick' : ''))).join('');
   let after = '';
   if (unreachable) after = lgRow(`${lgOp()}规划期内到不了八成`);
   // Working backward with savings already enough, the card's words, not a saving of ¥0.
+  else if (bwd && bwdOdds && pro) after = lgRow(`${lgOp('⇒')}${bwdOdds.enough ? '现在的存款已经够了' : `要 80%：第一年储蓄 ${wholeMoney(bwdOdds.s0, wCur)}`}`, '', 'sum');
   else if (bwd && bwdOdds) after = lgRow(`${lgOp('⇒')}${bwdOdds.enough ? '现在的存款已经够了' : `要八成：第一年每月存 ${wholeMoney(bwdOdds.s0 / 12, wCur)}`}`, '', 'sum');
-  else if (!now) after = lgRow(`${lgOp('⇒')}<b>第一个到八成</b>`, `<b>${holiday} 岁</b>`, 'sum');
-  const third = sec(head('③ 2,000 种年景', `平均每年 ${pct(p.r, 1)} ${TOOL_TAG}`) + oddsRows + after);
-  return first + second + third + foot(METHOD.odds);
+  else if (!now) after = lgRow(`${lgOp('⇒')}<b>${pro ? '第一个到 80%' : '第一个到八成'}</b>`, `<b>${holiday} 岁</b>`, 'sum');
+  if (!pro) return first + second + sec(head('③ 2,000 种年景', `平均每年 ${pct(p.r, 1)} ${TOOL_TAG}`) + oddsRows + after) + foot(METHOD.odds);
+
+  // The professional ③: the return and the spread as the engine forms them, the counts, the year picked, the
+  // interpolated years with the median at the holiday, and the fixed-return age for comparison.
+  const b13 = list.find(q => q.rule === 'B13');
+  const rText = `r = ${num(p.eq)}% × ${num(p.eqReal)}% + ${num(100 - p.eq)}% × (${num(p.bondY)}% − ${num(p.infl)}%) − ${num(p.drag)}%`;
+  const rRow = lgRow(`${lgOp()}${rText}${b13 ? ` ${flagged(b13.note)}` : ''}`, spct(p.r, 2));
+  const sRow = lgRow(`${lgOp()}σ（股 ${num(p.sigEq * 100)}% · 债 ${num(p.sigBd * 100)}% · ρ ${num(p.rho)}）`, pct(p.sigma, 1));
+  const median = mc?.bands?.[t] ? wholeMoney(mc.bands[t][2], wCur) : NONE;
+  const lerp = state === 'ok' && !bwd && t > 0 ? oddsYears(p) : null;
+  const medianRow = unreachable ? '' : lgRow(`${lgOp()}${lerp === null ? '' : `插值 ${lerp.toFixed(1)} 年 · `}${holiday} 岁中位资产`, median);
+  const fixed = fwdSolve(p);
+  const fixedRow = lgRow(`${lgOp()}按固定收益算（约五成）`, fixed === null ? NONE : `${p.age + fixed} 岁`);
+  return first + second + sec(head(PRO_THIRD, TOOL_TAG) + rRow + sRow + oddsRows + after + medianRow + fixedRow) + foot(METHOD.odds);
+}
+
+// The professional fund line, the ledger closed (spec §7.1): the line and the odds; held, no number; out of reach, the
+// headline's words.
+export function proLedgerRowHtml({ held = false, need = null, success = null, cur = 'CNY', open = false } = {}) {
+  let text;
+  if (held) text = `放假线 ${NO_RESULT}`;
+  else if (need === null) text = '规划期内未达到';
+  else text = `放假线 ${wholeMoney(need, cur)}${success === null ? '' : ` · ${pct(success, 1)}`}`;
+  return `<p>${text} ${ledgerToggleHtml(open)}</p>`;
+}
+
+// The professional view's own lines in the form (spec §8.3, §10.3), keyed by where they go: the exchange rate under
+// the region, the mortgage's nominal note under spending, the cross-country estimate under 年支出, the pension cap
+// (and B12) under the pension, and each B11 flag under its own field.
+export function proLinesHtml({ S, p, data, list = [], rows = [] }) {
+  const out = { region: '', expense: '', retExp: '', pension: '' };
+  const wCur = p.wCur, rCur = p.rCur;
+  const rate = p.fx[wCur] / p.fx[rCur];
+  if (wCur !== rCur) out.region = `<p class="row">汇率 1 ${rCur} = ${rate.toFixed(2)} ${wCur}</p>`;
+  // A mortgage counted: its row under spending, plain or in a relation (A2, A3), not ended, not waiting or out of range.
+  const m = rows.find(r => r.key === 'mortgage');
+  const counted = rows.some(r => r.key === 'items') || (m && (m.status === null || (m.status === 'block' && m.rel?.sub)));
+  if (counted) out.expense = `<p class="row">月供按名义值 · 实际 × (1 + ${num(p.infl)}%)^−t</p>`;
+  // The same sum estimateRetireSpend works out, in its order: the rest at local prices, the items at the market rate.
+  if (S.workC !== S.retC && !S.touched?.retExp && isSet(S.expense)) {
+    const ratio = data.countries[S.retC].priceLevel.value / data.countries[S.workC].priceLevel.value;
+    const items = itemsYearly(S);
+    const tail = `× 物价比 ${ratio.toFixed(2)} ÷ 汇率 ${rate.toFixed(2)}`;
+    const est = '<span class="est" aria-label="估算">≈</span>';
+    out.retExp = items > 0
+      ? `<p class="row">${est} (${num(S.expense)} − 月供和孩子 ${num(items)}) ${tail} + 月供和孩子 ${num(items)} ÷ 汇率 ${rate.toFixed(2)}</p>`
+      : `<p class="row">${est} ${num(S.expense)} ${tail}</p>`;
+  }
+  const b12 = list.find(q => q.rule === 'B12');
+  out.pension = `<p class="row">养老金上限 = 年支出</p>${b12 ? `<p class="row warn">${WARN} ${liveHtml(b12.rel)} · ${b12.note}</p>` : ''}`;
+  for (const q of list) if (q.rule === 'B11') out[q.field] = `<p class="row warn">${WARN} ${q.note}</p>`;
+  return out;
 }
 
 export function stickyHtml(h, { p, dispCur, success, pro, chip = '' }) {

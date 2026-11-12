@@ -704,8 +704,9 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
   add('pension', 'after', pro ? '养老金（超出年支出不计）' : '养老金', S.pension > 0 ? yearly(-S.pension) : null,
     { cur: 'retire', per, field: 'pension', ages: [pAge, null], ...(stop(['pension']) ?? (b12 ? { status: 'flag', rel: b12.rel } : {})) });
   if (pro) {
-    add('flexCut', 'after', '一年跌 ≥ 15% 次年少花（只砍生活费，月供、自缴照付）', S.flexCut ?? null, { views: 'pro' });
-    add('fxDrift', 'after', '退休币升值（只算到放假那年）', work === ret ? null : S.fxDrift ?? null, { views: 'pro' });
+    // Their labels go back to their fields; a blocked cut (B7) stops the ledger at its own row.
+    add('flexCut', 'after', '一年跌 ≥ 15% 次年少花（只砍生活费，月供、自缴照付）', S.flexCut ?? null, { field: 'flexCut', views: 'pro', ...stop(['flexCut']) });
+    add('fxDrift', 'after', '退休币升值（只算到放假那年）', work === ret ? null : S.fxDrift ?? null, { field: 'fxDrift', views: 'pro', ...stop(['fxDrift']) });
     if (S.workC !== S.retC) add('cross', 'after', '≈ (年支出 − 月供和孩子) × 物价比 + 月供和孩子', null, { views: 'pro' });
   }
   const need = plan && !plan.unreachable && isSet(plan.need) ? plan.need : null;

@@ -74,11 +74,74 @@ test('held, a stop still being typed does not turn the open ledger red', async (
   await expect(page.locator('#ledger')).toContainText('每月支出 −5');
 });
 
-test('in the professional view the simple ledger is not drawn', async ({ page }) => {
+test('in the professional view the open ledger is the professional one', async ({ page }) => {
   await page.goto('/');
   await page.locator('.ledger-toggle').first().click();
   await expect(page.locator('#ledger')).toBeVisible();
   await page.click('#to-pro');
-  await expect(page.locator('#ledger')).toBeHidden();
-  await expect(page.locator('#ledger')).toBeEmpty();
+  await expect(page.locator('#ledger')).toBeVisible();
+  await expect(page.locator('#ledger')).not.toContainText('③ 2,000 种年景');
+  await expect(page.locator('#ledger')).toContainText('③ 2,000 条路径 · 种子 20261026');
+  await expect(page.locator('#ledger-row .ledger-toggle')).toHaveText('怎么算的 ▾');
+});
+
+// ---- The professional ledger and the professional view's considerations (Task 9).
+
+test('the professional view: its rows, its labels and its checks', async ({ page }) => {
+  await page.goto('/'); await page.click('#to-pro');
+  await expect(page.locator('#ledger-row')).toContainText(/放假线 ¥[\d,]+ · \d+\.\d%/);
+  await expect(page.locator('#pro-form')).toContainText('一年跌 ≥ 15% 后少花');
+  await expect(page.locator('#pro-form')).toContainText('八成 · 2,000 次 · 种子 20261026');
+  await expect(page.locator('#p-growth').locator('xpath=ancestor::div[contains(@class,"f")][1]')).toContainText('本工具设定');
+  await expect(page.locator('#pro-form')).toContainText('养老金上限 = 年支出');
+  await page.fill('#p-eqReal', '12'); await page.locator('#p-eqReal').press('Tab');
+  await expect(page.locator('#pro-form')).toContainText('! 常见 −2 到 10');
+  await expect(page.locator('.chip')).toHaveCount(0);
+  await page.fill('#p-pension', '90000'); await page.locator('#p-pension').press('Tab');
+  await expect(page.locator('#pro-form')).toContainText('! 养老金 90,000 > 年支出 72,000 · 多出 18,000 不计');
+  await page.locator('#ledger-row .ledger-toggle').click();
+  await expect(page.locator('#ledger')).toContainText('③ 2,000 条路径 · 种子 20261026');
+});
+
+// Beyond the brief.
+test('the professional ledger: placed under the tiles, the engine\'s median once simulated, labels back to fields, 390 px', async ({ page }) => {
+  await page.goto('/'); await page.click('#to-pro');
+  await page.locator('#ledger-row .ledger-toggle').click();
+  const ledger = page.locator('#ledger');
+  await expect(ledger).toBeVisible();
+  await expect(page.locator('#ledger-row .ledger-toggle')).toBeFocused();
+  // The ledger follows its row, outside the simple view's hero.
+  expect(await page.evaluate(() => document.getElementById('ledger-row').nextElementSibling?.id)).toBe('ledger');
+  await expect(ledger).toContainText(/岁中位资产 ¥[\d,]+/);
+  await expect(ledger).toContainText(/r = 60% × 5% \+ 40% × \([\d.]+% − [\d.]+%\) − [\d.]+%/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+  await ledger.locator('[data-field="flexCut"]').click();
+  await expect(page.locator('#p-flexCut')).toBeFocused();
+  // An assumption outside the common range: an orange frame, not a red one.
+  await page.fill('#p-growth', '8'); await page.locator('#p-growth').press('Tab');
+  const box = page.locator('#p-growth').locator('xpath=ancestor::div[contains(@class,"f")][1]');
+  await expect(box).toHaveClass(/\bwarn\b/); await expect(box).not.toHaveClass(/\bbad\b/);
+  await expect(box.locator('xpath=following-sibling::div[1]')).toContainText('! 常见 −2 到 5');
+  // Back in the simple view, the ledger is the simple one again, in the hero's column.
+  await page.click('#to-simple');
+  await expect(ledger).toContainText('③ 2,000 种年景');
+  expect(await page.evaluate(() => document.getElementById('hero').nextElementSibling?.id)).toBe('ledger');
+});
+
+test('the professional ledger stopped: 放假线 —, a ③ input stops at the r row', async ({ page }) => {
+  await page.goto('/'); await page.click('#to-pro');
+  await page.fill('#p-eq', '150'); await page.locator('#p-eq').press('Tab');
+  await expect(page.locator('#ledger-row')).toContainText('放假线 — 怎么算的 ▸');
+  await page.locator('#ledger-row .ledger-toggle').click();
+  await expect(page.locator('#ledger')).toContainText('股票占比 150 > 100');
+  await expect(page.locator('#ledger')).toContainText('⇒ ③ 放假年龄 —');
+  await expect(page.locator('#ledger')).not.toContainText('第一个到 80%');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
+test('across currencies the professional form shows the rate and the estimate behind 年支出', async ({ page }) => {
+  await page.goto('/'); await page.click('#to-pro');
+  await page.selectOption('#p-ret', 'TH');
+  await expect(page.locator('#pro-form')).toContainText(/汇率 1 THB = \d\.\d\d CNY/);
+  await expect(page.locator('#pro-form')).toContainText(/≈ 72,000 × 物价比 [\d.]+ ÷ 汇率 [\d.]+/);
 });

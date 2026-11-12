@@ -2,11 +2,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
-import { defaultState, storyRows, problems, toParams } from '../site/js/state.js';
-import { firstDraw } from '../site/js/engine.js';
-import { bwdOdds, oddsAround, oddsSolve, needLine, successAt } from '../site/js/odds.js';
+import { defaultState, storyRows, problems, setRetireCountry, toParams } from '../site/js/state.js';
+import { firstDraw, fwdSolve } from '../site/js/engine.js';
+import { bwdOdds, oddsAround, oddsSolve, oddsYears, needLine, successAt } from '../site/js/odds.js';
 import { heroModel } from '../site/js/holiday.js';
-import { heroHtml, heldHeroHtml, ledgerHtml, tilesHtml } from '../site/js/views.js';
+import { heroHtml, heldHeroHtml, ledgerHtml, proLedgerRowHtml, tilesHtml } from '../site/js/views.js';
 
 const strip = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const S = { ...defaultState(DATA), income: 360000, expense: 180000, retExp: 180000,
@@ -163,4 +163,86 @@ test('ledgerHtml ②: rows in age order; one that starts before the holiday star
   const h = 30 + q.t;
   for (const x of [`${h}–49 退休后`, `${h}–63 自缴`, '50 起 月供', '63 起 养老金']) assert.ok(at(x) >= 0, x);
   assert.ok(at(`${h}–49 退休后`) < at(`${h}–63 自缴`) && at(`${h}–63 自缴`) < at('50 起 月供') && at('50 起 月供') < at('63 起 养老金'));
+});
+
+// ---- The professional ledger (spec §7.3).
+
+test('ledgerHtml pro: every consideration the model uses, in years', () => {
+  const s = { ...S, view: 'pro' };
+  const plan = solve(s); const { p, t, need } = plan;
+  const mc = { bands: Array.from({ length: p.life - p.age + 1 }, () => [0, 0, 4294780, 0, 0]) };
+  const text = strip(ledgerHtml({ rows: storyRows(s, DATA, 2026, plan), list: [], odds: oddsAround(p, t), plan, state: 'ok', view: 'pro', mode: 'fwd', p, dispCur: 'CNY', mc }));
+  for (const x of [`t = 0…${t - 1}`, '税后年收入 · 实际增长 +2%/年 本工具设定', '当前年支出 · 按今天的钱不变 本工具设定', '└ 其中月供 90,000/年 → 2045',
+    `月供实际 × (1 + ${p.infl}%)^−t`, '年末存入 · 资产不低于 0 本工具设定', '年初取出', '一年跌 ≥ 15% 次年少花（只砍生活费，月供、自缴照付）',
+    '退休币升值（只算到放假那年） — 同币种', '放假线（每条路径倒推，取 80 分位）', `反推提取率 ${(firstDraw(p, t) / need * 100).toFixed(1)}% · 对照 3.9%`,
+    '③ 2,000 条路径 · 种子 20261026 本工具设定', `r = 60% × 5% + 40% × (`, ' / 2,000 ', '⇒ 第一个到 80%', '插值', '中位资产 ¥4,294,780', '按固定收益算（约五成）',
+    '本工具设定 · 按今天的钱 · 实际收益', '计算方法 ›']) assert.ok(text.includes(x), x);
+});
+
+test('ledgerHtml pro: a return floored at −50% says so on the r row', () => {
+  const s = { ...S, view: 'pro', eq: 100, eqReal: -60 };
+  const p = toParams(s, DATA, 2026); const T = p.life - p.age - 1;
+  const plan = { p, t: T, need: null, unreachable: true };
+  const text = strip(ledgerHtml({ rows: storyRows(s, DATA, 2026, plan), list: problems(s, DATA, 2026), odds: oddsAround(p, T).slice(-1), plan, state: 'unreachable', view: 'pro', mode: 'fwd', p, dispCur: 'CNY', mc: null }));
+  assert.ok(text.includes('r = 100% × −60%'));
+  assert.ok(text.includes('! 按 −50% 算'));
+  assert.ok(text.includes('−50.00%') && !text.includes('-50'));   // U+2212, beyond the brief
+});
+
+// Beyond the brief: the spec example's numbers, row by row, and the held states.
+test('ledgerHtml pro: the spec example, each number the engine\'s', () => {
+  const s = { ...S, view: 'pro' };
+  const plan = solve(s); const { p, t, need } = plan;
+  const html = ledgerHtml({ rows: storyRows(s, DATA, 2026, plan), list: [], odds: oddsAround(p, t), plan, state: 'ok', view: 'pro', mode: 'fwd', p, dispCur: 'CNY', mc: null });
+  const text = strip(html);
+  const h = 30 + t;
+  for (const x of ['① 攒钱', '可投资资产 ¥200,000', '¥360,000', '− 当前年支出', '¥180,000', `t = ${t - 1} 时 ¥${Math.round(90000 * Math.pow(1 + p.infl / 100, -(t - 1))).toLocaleString('en-US')}`,
+    `= 年储蓄 t0 → t${t - 1} 180,000 → 301,536`, '② 放假以后 年初取出', `${h}–49 退休后年支出 ≈ ¥180,000`, `月供实际变轻，${h} 岁实付 ¥163,066`, '50 起 月供 ¥90,000',
+    '→ 63 自缴（工作地中国大陆且填了养老金才计） —', '养老金（超出年支出不计） — ›', '少花（只砍生活费，月供、自缴照付） 0%',
+    `⇒ 放假线（每条路径倒推，取 80 分位） ¥${Math.round(need).toLocaleString('en-US')}`, `≈ 年支出 × ${Math.round(need / firstDraw(p, t))} 倍`,
+    `r = 60% × 5% + 40% × (${p.bondY}% − ${p.infl}%) − ${p.drag}% ${(p.r * 100).toFixed(2)}%`, `σ（股 17% · 债 6% · ρ 0.2） ${(p.sigma * 100).toFixed(1)}%`,
+    `⇒ 第一个到 80% ${h} 岁`, `按固定收益算（约五成） ${p.age + fwdSolve(p)} 岁`, `${h} 岁中位资产 —`]) assert.ok(text.includes(x), x);
+  for (const o of oddsAround(p, t)) assert.ok(text.includes(`${o.age} 岁 ${o.count.toLocaleString('en-US')} / 2,000 ${(o.share * 100).toFixed(1)}%`), `${o.age}`);
+  assert.match(html, new RegExp(`class="[^"]*\\bpick\\b[^"]*"[^>]*>(?:(?!</div>).)*${h} 岁`));
+  assert.match(text, new RegExp(`插值 ${oddsYears(p).toFixed(1)} 年`));
+  // The labels go back to their fields; the year's spending cut is a field too.
+  for (const f of ['assets', 'income', 'growth', 'expense', 'mortgage.monthly', 'retExp', 'pension', 'flexCut']) assert.match(html, new RegExp(`data-field="${f.replace('.', '\\.')}"`), f);
+  assert.ok(!text.includes('≈ (年支出'));   // one currency: no cross-country estimate
+  assert.ok(!html.includes('-¥') && !/ -\d/.test(text));
+});
+
+test('ledgerHtml pro: two currencies show the drift and the cross-country estimate', () => {
+  const s = { ...setRetireCountry(S, 'TH', DATA), view: 'pro', fxDrift: -1 };
+  const plan = solve(s); const { p, t } = plan;
+  const text = strip(ledgerHtml({ rows: storyRows(s, DATA, 2026, plan), list: [], odds: oddsAround(p, t), plan, state: 'ok', view: 'pro', mode: 'fwd', p, dispCur: 'CNY', mc: null }));
+  assert.ok(text.includes('退休币升值（只算到放假那年） −1%'), text);
+  assert.ok(text.includes('≈ (年支出 − 月供和孩子) × 物价比 + 月供和孩子'));
+});
+
+test('ledgerHtml pro held: a stop in ① cuts there; a ③ input cuts at the r row; spending below 0 says so', () => {
+  const a3 = { ...S, view: 'pro', expense: 84000 };
+  const held = strip(ledgerHtml({ rows: storyRows(a3, DATA, 2026, null), list: problems(a3, DATA, 2026), plan: null, state: 'held', view: 'pro', mode: 'fwd', p: null, dispCur: 'CNY' }));
+  for (const x of ['└ 其中月供 90,000/年 ≥ 当前年支出 84,000 ✕ ›', '= 年储蓄 —', '⇒ ② 要有 —', '⇒ ③ 放假年龄 —']) assert.ok(held.includes(x), x);
+  assert.ok(!held.includes('退休后年支出'));
+  const eq = { ...S, view: 'pro', eq: 150 };
+  const three = strip(ledgerHtml({ rows: storyRows(eq, DATA, 2026, null), list: problems(eq, DATA, 2026), plan: null, state: 'held', view: 'pro', mode: 'fwd', p: null, dispCur: 'CNY' }));
+  for (const x of ['① 攒钱', '② 放假以后', '退休后年支出', '放假线（每条路径倒推，取 80 分位） —', '③ 2,000 条路径 · 种子 20261026', '股票占比 150 &gt; 100 ✕ ›', '⇒ ③ 放假年龄 —']) assert.ok(three.includes(x), x);
+  assert.ok(three.indexOf('② 放假以后') < three.indexOf('股票占比 150'));
+  const flex = { ...S, view: 'pro', flexCut: 150 };
+  const cut = strip(ledgerHtml({ rows: storyRows(flex, DATA, 2026, null), list: problems(flex, DATA, 2026), plan: null, state: 'held', view: 'pro', mode: 'fwd', p: null, dispCur: 'CNY' }));
+  assert.ok(cut.includes('一年跌 ≥ 15% 后少花 150 &gt; 100 ✕ ›'), cut);
+  assert.ok(!cut.includes('150%'));
+  const poor = { ...defaultState(DATA), view: 'pro', income: 60000, expense: 72000 };
+  const p = toParams(poor, DATA, 2026); const T = p.life - p.age - 1;
+  const plan = { p, t: T, need: null, unreachable: true };
+  const un = strip(ledgerHtml({ rows: storyRows(poor, DATA, 2026, plan), list: problems(poor, DATA, 2026), odds: oddsAround(p, T).slice(-1), plan, state: 'unreachable', view: 'pro', mode: 'fwd', p, dispCur: 'CNY' }));
+  for (const x of ['年末存入 · 资产不低于 0 本工具设定 ! 存款用完后按 0 算', `② 如果 ${p.age + T} 岁放假`, '规划期内到不了八成']) assert.ok(un.includes(x), x);
+  for (const x of ['放假线（', '第一个到 80%', '插值']) assert.ok(!un.includes(x), x);
+});
+
+test('proLedgerRowHtml: the professional fund line closed, held and out of reach', () => {
+  assert.equal(strip(proLedgerRowHtml({ need: 3913531, success: 0.819, cur: 'CNY' })), '放假线 ¥3,913,531 · 81.9% 怎么算的 ▸');
+  assert.equal(strip(proLedgerRowHtml({ held: true, open: true })), '放假线 — 怎么算的 ▾');
+  assert.equal(strip(proLedgerRowHtml({ need: null, success: null, cur: 'CNY' })), '规划期内未达到 怎么算的 ▸');
+  assert.match(proLedgerRowHtml({ held: true }), /aria-controls="ledger"/);
 });
