@@ -235,7 +235,7 @@ export function groupStates(S, list, data) {
     if (g && out[g]) out[g][q.kind] += 1;
   }
   const start = defaultState(data);
-  out.now.example = view === 'simple' && ['age', 'assets', 'income', 'expense'].every(k => S[k] === start[k]) && !splitOn(S);
+  out.now.example = ['age', 'assets', 'income', 'expense'].every(k => S[k] === start[k]) && !splitOn(S);
   out.pension.empty = !(S.pension > 0);
   const local = localAssumptions(data.countries[S.workC] ?? data.countries.CN);
   const differs = (k, base) => (S[k] !== base[k] ? 1 : 0);

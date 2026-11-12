@@ -486,6 +486,28 @@ test('我的数字 leads the second row and opens the numbers at the first group
   await page.evaluate(() => { document.getElementById('inputs-box').open = false; });
   await page.locator('#nav-numbers').click();
   expect(await page.locator('#inputs-box').evaluate(el => el.open)).toBe(true);
+  // Two groups stopped: the link lands on the first of them, below the sticky bar.
+  await page.fill('#s-retexp', ''); await page.locator('#s-retexp').press('Tab');
+  await page.fill('#s-age', '120'); await page.locator('#s-age').press('Tab');
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.locator('#nav-numbers').click();
+  await page.waitForTimeout(300);
+  const got = await page.evaluate(() => {
+    const x = document.querySelector('#simple-form .grp-x, #estimate .grp-x');
+    const head = x.closest('fieldset, .grp-legend');
+    const first = [...document.querySelectorAll('#simple-form fieldset, #estimate .grp-legend')].find(g => g.querySelector('.grp-x'));
+    return { top: head.getBoundingClientRect().top, bar: document.getElementById('sticky-bar').getBoundingClientRect().bottom, first: first === head, now: head.querySelector('[data-grp]').dataset.grp };
+  });
+  expect(got.first).toBe(true); expect(got.now).toBe('now');
+  expect(got.top).toBeGreaterThanOrEqual(got.bar - 0.5);
+});
+
+test('the professional 现在 group says 示例 while the numbers are the examples', async ({ page }) => {
+  await page.goto('/'); await page.click('#to-pro');
+  const now = page.locator('#pro-form [data-grp="now"]');
+  await expect(now).toHaveText('示例');
+  await page.fill('#p-assets', '350000'); await page.locator('#p-assets').press('Tab');
+  await expect(now).toHaveText('');
 });
 
 test('the professional assumption groups say 默认 until changed, with the data month', async ({ page }) => {
