@@ -1,5 +1,5 @@
 // Input state for the calculator: what the person typed, before it becomes model parameters.
-import { buildParams, longRunInflation } from './engine.js';
+import { buildParams, conv, eventDelta, firstDraw, longRunInflation, savingsAt } from './engine.js';
 
 const STORAGE_KEY = 'fire-age-v1';
 const MONEY_FIELDS = ['assets', 'income', 'expense', 'retExp', 'pension', 'selfPension', 'selfMedical'];
@@ -279,6 +279,11 @@ export function num(v) {
   const text = NUM.format(Math.abs(v));
   return v < 0 && text !== '0' ? `−${text}` : text;
 }
+// A whole number to show: rounded, and never −0 (Math.round(−0.4) is −0, which other formatters print as "-0").
+const whole = x => {
+  const n = Math.round(x);
+  return n === 0 ? 0 : n;
+};
 
 // Limits the tool sets (本工具设定), all listed on the method page.
 export const LIMITS = {
@@ -433,7 +438,7 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
     const field = pick.includes(last) ? last : sides[1];
     const side = f => (f === 'expense' || SPLIT_KEYS.includes(f) ? 'spend' : f.split('.')[0]);
     add({ id: 'A3', rule: 'A3', kind: 'block', field, compare: sides.filter(f => side(f) !== side(field)), at: 'expense',
-      rel: { sub: true, left: items(v => (pro ? v * 12 : v), pro ? '/年' : null), op: '≥', right: { label: label('expense'), value: pro ? S.expense : Math.round(S.expense / 12) } },
+      rel: { sub: true, left: items(v => (pro ? v * 12 : v), pro ? '/年' : null), op: '≥', right: { label: label('expense'), value: pro ? S.expense : whole(S.expense / 12) } },
       fixes: [
         { text: `改${label('expense')}`, focus: spendField },
         ...(mortgageOn ? [{ text: `改${label('mortgage.monthly')}`, focus: 'mortgage.monthly' }] : []),
@@ -445,11 +450,11 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
   let a4 = false;
   if (S.touched?.retExp && isSet(S.retExp) && itemsY > 0 && toRet(itemsY) >= S.retExp) {
     a4 = true;
-    const shown = v => (work === ret ? v : Math.round(toRet(v)));
+    const shown = v => (work === ret ? v : whole(toRet(v)));
     const est = Math.round(estimateRetireSpend(S.expense ?? 0, S.workC, S.retC, data, itemsYearly(S, thisYear)));
     add({ id: 'A4', rule: 'A4', kind: 'block', field: 'retExp', at: 'retExp',
-      rel: { sub: true, left: items(v => shown(pro ? v * 12 : v), pro ? '/年' : null), op: '≥', right: { label: label('retExp'), value: pro ? S.retExp : Math.round(S.retExp / 12) } },
-      fixes: [{ text: `改回估算 ≈ ${num(pro ? est : Math.round(est / 12))}`, reset: 'retExp' }] });
+      rel: { sub: true, left: items(v => shown(pro ? v * 12 : v), pro ? '/年' : null), op: '≥', right: { label: label('retExp'), value: pro ? S.retExp : whole(S.retExp / 12) } },
+      fixes: [{ text: `改回估算 ≈ ${num(pro ? est : whole(est / 12))}`, reset: 'retExp' }] });
   }
 
   // A9: a town's spend holds the items too; below them only that line stops. Equal is fine.
@@ -476,7 +481,7 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
   for (const f of NEG) {
     const v = valueOf(f);
     if (!isSet(v) || !(v < 0)) continue;
-    const shown = x => (!pro && YEARLY.includes(f) ? Math.round(x / 12) : x);
+    const shown = x => (!pro && YEARLY.includes(f) ? whole(x / 12) : x);
     const fixTo = f === 'assets' ? 0 : Math.abs(v);
     add({ rule: 'B2', kind: 'block', field: f, at: f.includes('.') ? 'expense' : f,
       rel: { sub: false, left: [{ label: label(f), value: shown(v) }], op: '<', right: { label: null, value: 0 } },
@@ -484,7 +489,7 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
   }
   // The age rules wait while the age itself is blocked (B3), so one wrong age is one problem.
   const A = S.age, ageOk = isSet(A) && A >= LIMITS.age[0] && A <= LIMITS.age[1], life = S.life, tAge = S.tAge, bwd = S.mode === 'bwd';
-  const one = (rule, field, v, op, right, fix) => add({ rule, kind: 'block', field, rel: { sub: false, left: [{ label: label(field), value: v }], op, right }, fixes: [to(field, fix)] });
+  const one = (rule, field, v, op, right, fix) => add({ rule, kind: 'block', field, rel: { sub: false, left: [{ label: label(field), value: v }], op, right }, fixes: fix === null ? [] : [to(field, fix)] });
   // B3: age 16 to 85.
   if (isSet(A) && (A < LIMITS.age[0] || A > LIMITS.age[1])) {
     const low = A < LIMITS.age[0], edge = LIMITS.age[low ? 0 : 1];
@@ -492,12 +497,13 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
   }
   // B4: working backward, the age to holiday at is above the age and below the plan end; equal blocks.
   if (bwd && isSet(tAge) && ageOk && tAge <= A) one('B4', 'tAge', tAge, '≤', { label: label('age'), value: A }, A + 1);
-  else if (bwd && isSet(tAge) && isSet(life) && tAge >= life) one('B4', 'tAge', tAge, '≥', { label: label('life'), value: life }, life - 1);
-  // B5: the plan end from age + 2 to 110. Too small goes to 95, or to the least that works.
+  else if (bwd && isSet(tAge) && ageOk && isSet(life) && tAge >= life) one('B4', 'tAge', tAge, '≥', { label: label('life'), value: life }, life - 1);
+  // B5: the plan end from age + 2 to 110. Too small goes to 95, or to the least that works; when nothing up to 110
+  // works there is no value button.
   if (isSet(life) && ageOk && life < A + LIMITS.lifeMin) {
     const back = bwd && isSet(tAge);
     const fix = 95 >= A + LIMITS.lifeMin && (!back || 95 > tAge) ? 95 : Math.max(A + LIMITS.lifeMin, back ? tAge + 1 : 0);
-    one('B5', 'life', life, '<', { label: null, value: A + LIMITS.lifeMin }, fix);
+    one('B5', 'life', life, '<', { label: null, value: A + LIMITS.lifeMin }, fix <= LIMITS.lifeMax ? fix : null);
   } else if (isSet(life) && life > LIMITS.lifeMax) one('B5', 'life', life, '>', { label: null, value: LIMITS.lifeMax }, LIMITS.lifeMax);
   // B6-B9: plain ranges.
   const range = (rule, field, lo, hi, fixLow, fixHigh) => {
@@ -550,12 +556,156 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
   if (isSet(S.income) && isSet(S.expense) && S.income < S.expense) {
     const yearly = S.income - S.expense;
     add({ id: 'B14', rule: 'B14', kind: 'flag', field: 'expense', at: 'expense',
-      rel: { sub: false, left: [{ label: pro ? '年储蓄' : '每月存下', value: pro ? yearly : Math.round(yearly / 12) }], op: null, right: null },
+      rel: { sub: false, left: [{ label: pro ? '年储蓄' : '每月存下', value: pro ? yearly : whole(yearly / 12) }], op: null, right: null },
       note: pro ? '存款用完后按 0 算' : null });
   }
 
   const order = FIELD_ORDER[view];
   return out.map((q, i) => [q, i]).sort(([a, i], [b, j]) => order.indexOf(a.field) - order.indexOf(b.field) || i - j).map(([q]) => q);
+}
+
+// ---- The rows under the fields, the group summaries and the ledger's sections ① ②, from one list, so no number is
+// worked out twice. Amounts are in the view's units (simple monthly, professional yearly) and rounded; cur says which
+// currency. plan = { p, t, need, unreachable } once the result is solved (t the holiday year, need the line at t), null
+// while it is blocked or blank. A row that is blocked carries the very relation problems() draws under the field.
+const TOOL = '本工具设定';
+const ITEM_NAME = { mortgage: '月供', kids: '孩子' };
+export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = null) {
+  const view = S.view === 'pro' ? 'pro' : 'simple';
+  const pro = view === 'pro';
+  const per = pro ? 'year' : 'month';
+  const yearly = v => (isSet(v) ? whole(pro ? v : v / 12) : null);
+  const monthly = v => (isSet(v) ? whole(pro ? v * 12 : v) : null);
+  const work = curOf(data, S.workC), ret = curOf(data, S.retC);
+  const toRet = v => convert(v, work, ret, data);
+  const monthlyRet = v => (isSet(v) ? (work === ret ? monthly(v) : whole(toRet(pro ? v * 12 : v))) : null);
+  const pct = v => `${v >= 0 ? '+' : ''}${num(v)}%`;
+
+  const qs = problems(S, data, thisYear);
+  const rule = id => qs.find(q => q.rule === id);
+  const a2 = rule('A2'), a3 = rule('A3'), a4 = rule('A4'), a10 = rule('A10'), b12 = rule('B12'), b14 = rule('B14');
+  // A blank or a block in one of the row's own fields; the relations between rows (A2-A4) are placed by hand below.
+  const stop = fields => {
+    const q = qs.find(x => (x.kind === 'block' || x.kind === 'blank') && fields.includes(x.field) && !['A2', 'A3', 'A4'].includes(x.rule));
+    return q ? { status: q.kind, ...(q.rel ? { rel: q.rel } : {}) } : null;
+  };
+  const ended = id => qs.find(q => q.id === `end:${id}`);
+
+  const rows = [];
+  const add = (key, section, label, value, o = {}) => rows.push({
+    key, section, label, value, op: null, cur: null, per: null, status: null, field: null, under: null, tag: null, views: 'both', ...o,
+  });
+
+  const { p = null, t = null } = plan ?? {};
+  const growth = isSet(S.growth) ? S.growth : S.lastValid?.growth ?? 0;
+  const { mortgage: m, kids: k } = cleanReal(S.real);
+  const events = itemEvents(S, thisYear);
+  const mOn = events.some(e => e.id === 'mortgage'), kOn = events.some(e => e.id === 'kids');
+
+  // ① Saving.
+  add('have', 'now', pro ? '可投资资产' : '已有', isSet(S.assets) ? whole(S.assets) : null, { cur: 'work', field: 'assets', ...stop(['assets']) });
+  add('income', 'now', pro ? `税后年收入 · 实际增长 ${pct(growth)}/年` : '到手', yearly(S.income),
+    { cur: 'work', per, field: 'income', tag: pro ? TOOL : null, ...stop(['income']) });
+  add('expense', 'now', pro ? '当前年支出 · 按今天的钱不变' : '支出', yearly(S.expense),
+    { op: '−', cur: 'work', per, field: 'expense', tag: pro ? TOOL : null, ...stop(['expense']) });
+  if (splitOn(S)) {
+    const sp = cleanSplit(S.split);
+    const parts = SPLIT_PARTS.map(x => sp[x] ?? 0);
+    add('split', 'now', null, monthly(parts.reduce((a, b) => a + b, 0)),
+      { op: '=', cur: 'work', per, field: 'split.rent', under: 'expense', parts, before: yearly(sp.before), ...stop(SPLIT_KEYS) });
+  }
+  const item = { op: '└', cur: 'work', per, under: 'expense' };
+  if (a3 && mOn && kOn) {
+    add('items', 'now', null, monthly(m.monthly + k.count * k.monthly), { ...item, field: a3.field, status: 'block', rel: a3.rel });
+  } else {
+    const mRel = a2 ?? (a3 && mOn ? a3 : null);
+    const mStop = mRel ? { status: 'block', rel: mRel.rel } : stop(['mortgage.monthly', 'mortgage.endYear']);
+    const mEnd = ended('mortgage');
+    if (mOn || mStop || mEnd) {
+      add('mortgage', 'now', ITEM_NAME.mortgage, monthly(m.monthly),
+        { ...item, field: 'mortgage.monthly', end: m.endYear, ...(mStop ?? (mEnd ? { status: 'ended', rel: mEnd.rel } : {})) });
+    }
+    const kStop = a3 && kOn ? { status: 'block', rel: a3.rel } : stop(['kids.count', 'kids.age', 'kids.monthly']);
+    const kEnd = ended('kids');
+    if (kOn || kStop || kEnd) {
+      const value = kEnd ? kEnd.rel.value : kOn ? k.count * k.monthly : k.monthly;
+      add('kids', 'now', pro ? `${ITEM_NAME.kids} → ${KIDS_END} 岁（按最小的）` : ITEM_NAME.kids, monthly(value),
+        { ...item, field: 'kids.monthly', end: KIDS_END, tag: pro ? TOOL : null, ...(kStop ?? (kEnd ? { status: 'ended', rel: kEnd.rel } : {})) });
+    }
+  }
+  if (pro && plan && mOn) {
+    add('mortgageReal', 'now', `月供实际 × (1 + ${num(p.infl)}%)^−t`, whole(m.monthly * 12 * Math.pow(1 + p.infl / 100, -Math.max(t - 1, 0))),
+      { cur: 'work', per, under: 'expense', views: 'pro' });
+  }
+  const save0 = plan ? savingsAt(p, 0) : isSet(S.income) && isSet(S.expense) ? S.income - S.expense : null;
+  add('save', 'now', pro ? '年储蓄' : '每月存下', yearly(save0), {
+    op: '=', cur: 'work', per, ...(b14 ? { status: 'flag', rel: b14.rel } : {}),
+    ...(pro && plan && t >= 1 ? { values: [whole(savingsAt(p, 0)), whole(savingsAt(p, t - 1))] } : {}),
+  });
+  if (!pro) add('growth', 'now', `收入每年 ${pct(growth)}`, null, { tag: TOOL, views: 'simple' });
+  if (!pro && plan && t > 1) {
+    add('saveLate', 'now', `→ ${p.age + t - 1} 岁每月存下`, whole(savingsAt(p, t - 1) / 12), { cur: 'work', per, views: 'simple' });
+  }
+  if (pro) add('floor', 'now', '年末存入 · 资产不低于 0', null, { tag: TOOL, views: 'pro' });
+
+  // ② After the holiday. The ages come from the items' end ages (at most two, C23) and the claim age.
+  const holiday = plan ? p.age + t : null;
+  const ends = isSet(S.age) ? [...new Set(events.map(e => e.endAge))].sort((a, b) => a - b).slice(0, 2) : [];
+  const nextEnd = ends.find(e => e > (holiday ?? S.age));
+  const retStop = stop(['retExp']) ?? (a4 ? { status: 'block', rel: a4.rel } : !S.touched?.retExp ? { status: 'est' } : null);
+  add('retExp', 'after', pro ? '退休后年支出' : '退休后', yearly(S.retExp),
+    { cur: 'retire', per, field: 'retExp', ages: [holiday, nextEnd === undefined ? null : nextEnd - 1], ...retStop });
+  if (pro && plan && mOn && events.find(e => e.id === 'mortgage').endAge > holiday) {
+    add('retReal', 'after', `月供实际变轻，${holiday} 岁实付`, whole(conv(p.retExp, p.rCur, p.wCur, p.fx) + eventDelta(p, t)),
+      { cur: 'work', per, views: 'pro' });
+  }
+  const retItem = { op: '└', cur: 'retire', per, under: 'retExp' };
+  if (a4) add('ret:items', 'after', null, null, { ...retItem, field: 'retExp', status: 'block', rel: a4.rel });
+  else {
+    if (mOn) add('ret:mortgage', 'after', ITEM_NAME.mortgage, monthlyRet(m.monthly), { ...retItem, field: 'mortgage.monthly' });
+    if (kOn) add('ret:kids', 'after', ITEM_NAME.kids, monthlyRet(k.count * k.monthly), { ...retItem, field: 'kids.monthly' });
+  }
+  for (const age of ends) {
+    const gone = events.filter(e => e.endAge <= age).reduce((total, e) => total + e.amount, 0);
+    const left = isSet(S.retExp) ? S.retExp - toRet(gone) : null;
+    // A10 judges the amount left once every item has ended; each → row is judged on its own amount the same way.
+    const low = a10 && left !== null && convert(whole(left / 12), ret, work, data) < S.expense / 12 * LIMITS.low;
+    add(`after:${age}`, 'after', null, a4 ? null : yearly(left), {
+      op: '→', cur: 'retire', per, under: 'retExp', ages: [age, null], struck: events.filter(e => e.endAge === age).map(e => ITEM_NAME[e.id]),
+      ...(low ? { status: 'flag' } : {}),
+    });
+  }
+  const own = v => (Number.isFinite(Number(v)) ? Math.max(Number(v), 0) : 0);
+  const selfPay = plan ? p.selfPay ?? 0 : S.workC === 'CN' && (S.pension ?? 0) > 0 ? (own(S.selfPension) + own(S.selfMedical)) * 12 : 0;
+  const pAge = plan ? p.pAge : S.pAge ?? S.lastValid?.pAge ?? null;
+  const selfStop = stop(['selfPension', 'selfMedical']);
+  if (pro || selfPay > 0 || selfStop) {
+    add('self', 'after', pro ? '自缴（工作地中国大陆且填了养老金才计）' : '自缴', selfPay > 0 ? yearly(selfPay) : null,
+      { cur: 'work', per, field: 'selfPension', ages: [holiday, pAge], ...selfStop });
+  }
+  add('pension', 'after', pro ? '养老金（超出年支出不计）' : '养老金', S.pension > 0 ? yearly(-S.pension) : null,
+    { cur: 'retire', per, field: 'pension', ages: [pAge, null], ...(stop(['pension']) ?? (b12 ? { status: 'flag', rel: b12.rel } : {})) });
+  if (pro) {
+    add('flexCut', 'after', '一年跌 ≥ 15% 次年少花（只砍生活费，月供、自缴照付）', S.flexCut ?? null, { views: 'pro' });
+    add('fxDrift', 'after', '退休币升值（只算到放假那年）', work === ret ? null : S.fxDrift ?? null, { views: 'pro' });
+    if (S.workC !== S.retC) add('cross', 'after', '≈ (年支出 − 月供和孩子) × 物价比 + 月供和孩子', null, { views: 'pro' });
+  }
+  const need = plan && !plan.unreachable && isSet(plan.need) ? plan.need : null;
+  add('need', 'after', pro ? '放假线（每条路径倒推，取 80 分位）' : holiday === null ? '放假要有' : `${holiday} 岁放假要有`, need, { op: '⇒', cur: 'work' });
+  const draw = need === null ? 0 : firstDraw(p, t);
+  add('times', 'after', null, draw > 0 ? Math.round(need / draw) : null);
+
+  // The cut: the first blocked or blank row keeps its value, every row after it waits. The retirement items only
+  // repeat an amount the person typed, so they stay.
+  const cut = rows.findIndex(r => r.status === 'block' || r.status === 'blank');
+  if (cut >= 0) {
+    for (const r of rows.slice(cut + 1)) {
+      if (r.key === 'ret:mortgage' || r.key === 'ret:kids') continue;
+      r.value = null;
+      if (r.values) r.values = null;
+    }
+  }
+  return rows;
 }
 
 export const commitField =(S, id) => (S[id] === null || S[id] === undefined ? S : { ...S, lastValid: { ...S.lastValid, [id]: S[id] } });

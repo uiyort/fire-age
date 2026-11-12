@@ -376,3 +376,20 @@ test('A9 with a different retirement currency compares the town spend in that cu
   assert.equal(only(S(Math.ceil(cn2us(4000) * 2)), 'A9').length, 0);
 });
 
+test('B4: while the age itself is out of range, the plan-end side waits too', () => {
+  assert.equal(only(S0({ mode: 'bwd', age: 120, tAge: 99, life: 95 }), 'B4').length, 0);
+  assert.equal(only(S0({ mode: 'bwd', age: 120, tAge: 25 }), 'B4').length, 0);
+  assert.equal(only(S0({ mode: 'bwd', tAge: 99, life: 95 }), 'B4').length, 1);
+});
+
+test('B5: the exit never proposes a plan end above 110; with no value in range there is no value button', () => {
+  const [q] = only(S0({ age: 85, life: 86, mode: 'bwd', tAge: 110 }), 'B5');
+  assert.equal(q.kind, 'block'); assert.deepEqual(q.fixes, []);
+  assert.deepEqual(fixTexts(S0({ age: 85, life: 86, mode: 'bwd', tAge: 109 }), 'B5'), ['→ 110']);
+});
+
+test('a value that rounds to −0 is shown as 0', () => {
+  assert.equal(num(-0), '0'); assert.equal(num(-0.001), '0');
+  assert.ok(Object.is(rel(S0({ expense: -5 }), 'B2').left[0].value, 0));
+  assert.ok(Object.is(rel(S0({ income: 72000, expense: 72005 }), 'B14').left[0].value, 0));
+});

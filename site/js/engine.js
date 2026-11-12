@@ -231,6 +231,10 @@ export function planFlows(p, retireT, s0) {
   return { spendAt, sav, full, after };
 }
 
+// What the first holiday year takes from savings (work currency): the year's spending with the mortgage at its real
+// value, plus self-pay, minus the pension. The divisor of "≈ 年支出 × N 倍" and of the withdrawal rate worked back.
+export const firstDraw = (p, t) => planFlows(p, t, null).full[t];
+
 // One path of the same simulation monteCarlo runs: same draws, same order, same rules.
 export function lifePath(p, retireT, s0, seed) {
   const Y = p.life - p.age;
