@@ -84,14 +84,15 @@ test.describe('mortgage and children', () => {
     const withBoth = await ageOf(page);
 
     await page.fill('#life-mortgage', '99999');
-    await expect(page.locator('#life-issue')).toContainText('超过了每月支出');
+    await page.locator('#life-mortgage').press('Tab');
+    await expect(page.locator('#sticky-result .chip')).toHaveText('拦住：房贷 ›');
     await expect(tag).toBeHidden();
     await expect(after).toBeHidden();
     await expect(page.locator('#life-gain')).toBeHidden();
-    await expect.poll(() => ageOf(page)).toBe(before);
 
     await page.fill('#life-mortgage', '7500');
-    await expect(page.locator('#life-issue')).toBeHidden();
+    await expect(page.locator('.chip')).toHaveCount(0);
+    await expect.poll(() => ageOf(page)).toBe(withBoth);
     await page.locator('#to-pro').click();
     await expect(tag).toHaveText(/^已算：房贷到 2045、孩子到 22 岁 · /);
     await expect.poll(() => tag.evaluate(el => el.previousElementSibling?.id)).toBe('headline');

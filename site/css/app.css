@@ -81,11 +81,16 @@ input[type=number], input[type=text], select { font: inherit; font-family: var(-
 select { font-family: var(--f-body); }
 input[type=number]:hover, input[type=text]:hover, select:hover { border-color: var(--ink-3); }
 input:disabled { opacity: .65; }
-.f.missing input, .f.missing input:hover { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
-.f.missing::after { content: '请填写'; font-size: 12px; color: var(--warn); }
-.f.missing:has(.u[data-unit=work])::after, .f.missing:has(.u[data-unit=retire])::after { content: '请填写，没有就填 0'; }
-.missing-note { font-size: 13px; color: var(--warn); margin: 8px 0 0; }
-.inputs-missing .headline, .inputs-missing .results, .inputs-missing .sticky-result { opacity: .45; transition: opacity .2s; }
+/* A stopped result (a rule blocks or a field is blank): the field to fix has a solid red frame, the field it is
+   compared with a dashed one, and everything worked out from the result is hidden, not dimmed. */
+.f.bad input, .f.bad input:hover, label.bad input, label.bad input:hover { border: 2px solid var(--bad); }
+.f.cmp input, .f.cmp input:hover, label.cmp input, label.cmp input:hover { border: 1px dashed var(--bad); }
+.chip { font: inherit; font-size: 13px; font-weight: 700; line-height: 1.2; padding: 4px 12px; border: 0; border-radius: 999px; background: var(--bad); color: #fff; cursor: pointer; white-space: nowrap; flex: none; }
+body.result-held .sticky-age, body.result-held .hero-big { color: var(--ink-3); }
+body.result-held #type-section, body.result-held #type-all, body.result-held #tiles, body.result-held #views-banner,
+body.result-held #life-tag, body.result-held #zone-faster, body.result-held #places-fold, body.result-held #zone-risk,
+body.result-held #share-section, body.result-held #lab-fold, body.result-held #zone-learn .card.pro-only { display: none; }
+body.result-held .hero-grid { grid-template-columns: minmax(0, 1fr); }
 .help { font: inherit; font-size: 12px; width: 22px; height: 22px; flex: none; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--accent); cursor: pointer; line-height: 1; padding: 0; }
 .help[aria-expanded="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .chk { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); grid-column: 1 / -1; }

@@ -3,7 +3,7 @@ import DATA from './data-latest.js';
 import { DEFAULT_SEED, bwdSolve, monteCarlo, walkPath } from './engine.js';
 import { bwdOdds, decilePaths, dualOdds, extendRow, needLine, oddsRuler, oddsSolve, oddsYears, successAt } from './odds.js';
 import { hardestIndex, heroModel, holidayType, oddsText, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking, townPlan, cardPlace, withoutItemsGain } from './holiday.js';
-import { applyPensionEstimate, commitField, defaultState, lifeIssue, lifeSummary, loadState, missingFields, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setTown, setWorkCountry, toParams } from './state.js';
+import { FIELD_LABEL, FIELD_ORDER, applyPensionEstimate, commitField, defaultState, lifeIssue, lifeSummary, loadState, problems, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setTown, setWorkCountry, toParams } from './state.js';
 import { estimateFromForm } from './pension.js';
 import { labPlan, lifeChoices, personalLever, rankLevers, impactOf, smallStep, tryRange } from './levers.js';
 import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody } from './scenario.js';
@@ -14,7 +14,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { assumptionLine, renderCard, summaryCardSpec, typeCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heroHtml, labChangesHtml, leversHtml, lifeAfterText, lifeGainText, lifeTagText, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
+  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, leversHtml, lifeAfterText, lifeGainText, lifeTagText, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -201,6 +201,8 @@ const PRO_FIELDS = [
   ] },
 ];
 
+// An empty money field reads as 0 to the eye; the result still waits for it to be filled in.
+const MONEY_UNITS = ['work', 'retire'];
 function fieldHtml(prefix, f) {
   const id = f.elementId ?? `${prefix}-${f.id}`;
   const cls = `f${f.full ? ' full' : ''}`;
@@ -209,7 +211,7 @@ function fieldHtml(prefix, f) {
   const unit = f.unit ? `<span class="u" data-unit="${f.unit}">${f.unit}</span>` : '';
   const control = f.select
     ? `<select id="${id}"></select>`
-    : `<input type="number" inputmode="decimal" id="${id}" step="${f.step ?? 1}"${f.min === undefined ? '' : ` min="${f.min}"`}>`;
+    : `<input type="number" inputmode="decimal" id="${id}" step="${f.step ?? 1}"${f.min === undefined ? '' : ` min="${f.min}"`}${MONEY_UNITS.includes(f.unit) ? ' placeholder="0"' : ''}>`;
   const flags = `${f.bwdOnly ? ' data-bwd-only' : ''}${f.cnPension ? ' data-cn-pension' : ''}`;
   const note = f.note ? `<p class="fine">${f.note}</p>` : '';
   const wrap = `<div class="${cls}"${flags}><div class="lab"><label for="${id}">${f.label} ${unit}</label>${help}</div>${control}${note}</div>`;
@@ -266,7 +268,7 @@ function renderPen() {
 const SPLIT_PARTS = [['rent', '房租或房贷'], ['food', '吃饭'], ['other', '其他']];
 const SPLIT_NOTE = '三项加起来，自动填进每月支出。';
 const SPLIT_HTML = `<details class="split" id="expense-split"><summary>每月花多少说不准？拆开来加</summary><div class="split-row">${
-  SPLIT_PARTS.map(([key, name]) => `<label>${name}<input type="number" inputmode="decimal" id="split-${key}" step="100" min="0"></label>`).join('')
+  SPLIT_PARTS.map(([key, name]) => `<label>${name}<input type="number" inputmode="decimal" id="split-${key}" step="100" min="0" placeholder="0"></label>`).join('')
 }</div><button type="button" class="split-life" id="split-life" hidden>房贷会还完？填上还到哪年 ›</button><p class="fine" id="split-note">${SPLIT_NOTE}</p></details>`;
 
 // A rent or mortgage in the parts may end one day, so it points at the fold where the end year goes.
@@ -365,21 +367,28 @@ function syncChrome(p) {
   }
 }
 
+// The estimate box is redrawn only when its text changes, so a redraw never swaps the field under the pointer.
+let estimateNow = '';
+const setEstimate = html => {
+  if (html === estimateNow) return;
+  estimateNow = html;
+  $('estimate').innerHTML = html;
+};
 function renderEstimate(p) {
   if (S.view !== 'simple') {
-    $('estimate').innerHTML = `<div class="derived">
+    setEstimate(`<div class="derived">
       <div><span>组合实际年化收益</span><b>${pct(p.r, 2)}</b></div>
       <div><span>组合年化波动</span><b>${pct(p.sigma, 1)}</b></div>
       <div><span>债券实际收益</span><b>${pct(p.bondReal, 2)}</b></div>
-    </div><label class="chk"><input type="checkbox" id="p-autoswr"${S.autoSwr ? ' checked' : ''}> 提取率按退休年限自动调整</label>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}`;
+    </div><label class="chk"><input type="checkbox" id="p-autoswr"${S.autoSwr ? ' checked' : ''}> 提取率按退休年限自动调整</label>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}`);
     return;
   }
   const typing = document.activeElement?.id === 's-retexp';
   if (!typing) {
-    $('estimate').innerHTML = `<div class="f"><div class="lab"><label for="s-retexp">退休后每月想花 <span class="u">${p.rCur}</span></label></div>
-      <input type="number" inputmode="decimal" id="s-retexp" step="500" value="${S.retExp === null ? '' : Math.round(S.retExp / 12)}"></div>
+    setEstimate(`<div class="f"><div class="lab"><label for="s-retexp">退休后每月想花 <span class="u">${p.rCur}</span></label></div>
+      <input type="number" inputmode="decimal" id="s-retexp" step="500" placeholder="0" value="${S.retExp === null ? '' : Math.round(S.retExp / 12)}"></div>
       <p class="fine">估算值，请按你计划的实际生活改写。${p.events.length ? '要包含月供和孩子，到期会自动减掉。' : ''}</p>
-      <p class="fine mix-note">组合按股票 ${p.eq}% / 债券 ${100 - p.eq}% 估算（常见的基准组合，不是建议），扣掉通胀后约 ${pct(p.r, 1)}/年。<a href="sources.html">数据来源</a>，专业模式可以改。</p>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}`;
+      <p class="fine mix-note">组合按股票 ${p.eq}% / 债券 ${100 - p.eq}% 估算（常见的基准组合，不是建议），扣掉通胀后约 ${pct(p.r, 1)}/年。<a href="sources.html">数据来源</a>，专业模式可以改。</p>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}`);
   }
 }
 
@@ -408,6 +417,7 @@ function renderFast() {
   renderEstimate(p);
   const eightAge = t === null ? null : p.age + t;
   const { say, note } = headlineText({ mode: S.mode, p, t, odds, eightAge, dual, dispCur: cur, view: S.view });
+  $('headline').hidden = false;
   $('headline').innerHTML = `<p class="say">${say}</p><p class="say-note">${note}</p>`;
   $('tiles').innerHTML = tilesHtml({ mode: S.mode, p, t, bwd, mc: latest.mc, dispCur: cur, target });
   renderHero();
@@ -448,7 +458,8 @@ const LIFE_INPUTS = [
   ['life-kids', 'kids', 'count'], ['life-kid-age', 'kids', 'age'], ['life-kid-monthly', 'kids', 'monthly'],
 ];
 // The fold's inputs, the warning and the lines under them, and the tag under the big age; typing is left alone.
-function renderLife() {
+// solve: false while the result is stopped, when nothing is worked out from the numbers.
+function renderLife(p = latest.p, { solve = true } = {}) {
   for (const [id, part, field] of LIFE_INPUTS) {
     const el = $(id);
     if (el && el !== document.activeElement) el.value = S.real[part][field] ?? '';
@@ -464,13 +475,13 @@ function renderLife() {
   $('life-issue').hidden = !issue;
   $('life-issue').textContent = issue;
   const sum = lifeSummary(S, DATA, year);
-  const cur = latest.p.rCur;
+  const cur = p.rCur;
   lifeTag.hidden = !sum;
   lifeTag.textContent = sum ? lifeTagText(sum, cur) : '';
   $('life-after').hidden = !sum;
   $('life-after').textContent = sum ? lifeAfterText(sum, cur) : '';
   // One more solve, without the items, for the comparison inside the fold.
-  const gain = sum ? lifeGainText(withoutItemsGain(latest.p)) : '';
+  const gain = solve && sum ? lifeGainText(withoutItemsGain(p)) : '';
   $('life-gain').hidden = !gain;
   $('life-gain').textContent = gain;
 }
@@ -488,6 +499,7 @@ function renderHero() {
   latest.hero = heroModel({ mode, p, t, bwd, success, need: target[retireT ?? 0], ruler: mode === 'bwd' ? null : ruler });
   $('hero').innerHTML = heroHtml(latest.hero, { p, dispCur: cur });
   placeTag();
+  stickyNow = '';
   $('sticky-result').innerHTML = stickyHtml(latest.hero, { p, dispCur: cur, success, pro: S.view === 'pro' });
   const riskLead = S.view === 'pro'
     ? (success === null ? '按计划没有放假年份，不计算成功率。' : `2,000 次模拟，成功率 ${pct(success, 0)}，按本工具假设。`)
@@ -684,64 +696,180 @@ function countCalculation() {
   track('calc_done');
 }
 
-// The blank numbers the result rests on, with their input and their name in the view on screen.
-function blankFields() {
-  const simple = S.view === 'simple';
-  const fields = (simple ? SIMPLE_FIELDS : PRO_FIELDS).flatMap(g => g.fields);
-  return missingFields(S).map(id => {
-    if (simple && id === 'retExp') return { id, el: $('s-retexp'), label: '退休后每月想花' };
-    const f = fields.find(x => x.id === id);
-    return { id, el: $(f.elementId ?? `${simple ? 's' : 'p'}-${id}`), label: f.label };
-  });
+// ---- A stopped result. problems() judges every rule; the page only marks the fields it names and holds the result.
+
+// The input of a field key in a view. A key with no input in that view (a professional-only field in the simple view,
+// or a split part in the professional view before it has one) gives null.
+const LIFE_ID = Object.fromEntries(LIFE_INPUTS.map(([id, part, field]) => [`${part}.${field}`, id]));
+function fieldId(key, view) {
+  const simple = view !== 'pro';
+  if (key in LIFE_ID) return LIFE_ID[key];
+  if (key === 'town.monthly') return 'town-monthly';
+  if (key === 'pen.years') return `pen-${simple ? 's' : 'p'}-years`;
+  if (key.startsWith('split.')) return `${simple ? '' : 'p-'}split-${key.slice(6)}`;
+  if (simple && key === 'retExp') return 's-retexp';
+  if (simple && key === 'tAge') return 's-tage';
+  return `${simple ? 's' : 'p'}-${key}`;
+}
+function fieldEl(key, view = S.view) {
+  return $(fieldId(key, view));
+}
+const FIELD_KEYS = [...new Set([...FIELD_ORDER.simple, ...FIELD_ORDER.pro])];
+// The field key of an input, or null for anything that no rule reads.
+function fieldKeyOf(el) {
+  if (!el?.id) return null;
+  return FIELD_KEYS.find(key => fieldId(key, 'simple') === el.id || fieldId(key, 'pro') === el.id) ?? null;
 }
 
-// Marks the blanks and says what is missing. A field just cleared to type a new number is marked only once the
-// person leaves it; one already marked stays marked until it is filled in.
-function showBlanks(blanks, { all = false } = {}) {
-  const blankEls = blanks.map(b => b.el);
-  document.querySelectorAll('[aria-invalid="true"]').forEach(el => {
-    if (blankEls.includes(el)) return;
-    el.removeAttribute('aria-invalid');
-    el.closest('.f')?.classList.remove('missing');
-  });
-  for (const b of blanks) {
-    if (!b.el || (!all && b.el === document.activeElement)) continue;
-    b.el.setAttribute('aria-invalid', 'true');
-    b.el.closest('.f')?.classList.add('missing');
+// The field the person committed last, which takes the solid frame where a relation has two sides.
+let lastField = null;
+// The ids of the stops now marked on the page.
+let shown = new Set();
+const isStop = q => q.kind === 'blank' || q.kind === 'block';
+const stopsNow = () => problems(S, DATA, new Date().getFullYear(), { last: lastField }).filter(isStop);
+const isHeld = () => document.body.classList.contains('result-held');
+
+// The fields a stop rests on. The mortgage's cells count as one, as do the children's and the split's parts: typing
+// the end year, which brings the mortgage in, is still typing the mortgage.
+const groupKeys = key => {
+  const head = key.split('.')[0];
+  return ['mortgage', 'kids', 'split'].includes(head) ? FIELD_KEYS.filter(k => k.startsWith(`${head}.`)) : [key];
+};
+const restsOn = (q, key) => [q.field, ...q.more, ...q.compare].flatMap(groupKeys).includes(key);
+
+// Solid frame on the field to fix (and on the other blank cells of its group), dashed frame on the fields it is
+// compared with. Marks of stops no longer listed go.
+function markProblems(list) {
+  const view = S.view === 'pro' ? 'pro' : 'simple';
+  const wrap = el => el.closest('.f') ?? el.closest('label') ?? el;
+  document.querySelectorAll('[aria-invalid="true"]').forEach(el => el.removeAttribute('aria-invalid'));
+  document.querySelectorAll('[data-cmp]').forEach(el => { el.removeAttribute('aria-description'); el.removeAttribute('data-cmp'); });
+  document.querySelectorAll('.f.bad, label.bad, .f.cmp, label.cmp').forEach(el => el.classList.remove('bad', 'cmp'));
+  const solid = new Set();
+  for (const q of list) {
+    for (const key of [q.field, ...q.more]) {
+      const el = fieldEl(key);
+      if (!el) continue;
+      solid.add(el);
+      el.setAttribute('aria-invalid', 'true');
+      wrap(el).classList.add('bad');
+    }
   }
-  document.body.classList.toggle('inputs-missing', blanks.length > 0);
-  $('missing-note').hidden = !blanks.length;
-  $('missing-note').textContent = blanks.length ? `请填写${blanks.map(b => b.label).join('、')}，填好后结果再更新。` : '';
+  for (const q of list) {
+    for (const key of q.compare) {
+      const el = fieldEl(key);
+      if (!el || solid.has(el)) continue;
+      el.dataset.cmp = '';
+      el.setAttribute('aria-description', `和${FIELD_LABEL[view][q.field]}比较`);
+      wrap(el).classList.add('cmp');
+    }
+  }
 }
 
-// Before anything goes on from the numbers: stops at the first blank, opens the numbers and puts the cursor there.
-function stopAtBlank() {
-  const blanks = blankFields();
-  if (!blanks.length) return false;
+// The stopped result: — 岁放假 and the chip; nothing is worked out from the numbers. The form is drawn once per set of
+// numbers, so a second call for the same numbers (a change, then a focusout) never swaps an element under the pointer.
+let heldState = null;
+let stickyNow = '';
+function holdResult(stops) {
+  cancelAnimationFrame(frame);
+  clearTimeout(mcTimer);
+  clearTimeout(proTimer);
+  stale = true;
+  const numbers = JSON.stringify({ ...S, lastValid: null });
+  if (heldState !== numbers || !isHeld()) {
+    heldState = numbers;
+    const p = toParams(S, DATA);
+    syncChrome(p);
+    syncInputs();
+    renderPen();
+    renderLife(p, { solve: false });
+    renderEstimate(p);
+    document.body.classList.add('result-held');
+    // Hidden while stopped; emptied too, so no age from the numbers before is left in the page.
+    $('type-now').innerHTML = '';
+    $('tiles').innerHTML = '';
+    $('hero').innerHTML = heldHeroHtml();
+    placeTag();
+    const head = heldHeadHtml(S.view);
+    $('headline').innerHTML = head;
+    $('headline').hidden = !head;
+  }
+  const sticky = stickyHtml(null, { pro: S.view === 'pro', chip: chipText(stops) });
+  if (sticky !== stickyNow) {
+    stickyNow = sticky;
+    $('sticky-result').innerHTML = sticky;
+  }
+  markProblems(stops);
+}
+
+// Puts the cursor in a field: the professional view first if only it has the field, then the numbers opened, every
+// fold around the field opened, the field in the middle of the screen.
+function goToField(key) {
+  if (S.view === 'simple' && !fieldEl(key, 'simple') && fieldEl(key, 'pro')) {
+    S = { ...S, view: 'pro' };
+    refresh({ commit: true });
+    syncChrome(toParams(S, DATA));
+  }
+  const el = fieldEl(key);
+  if (!el) return;
   $('inputs-box').open = true;
-  showBlanks(blanks, { all: true });
-  blanks[0].el?.focus();
-  blanks[0].el?.scrollIntoView({ block: 'center' });
+  for (let d = el.closest('details'); d; d = d.parentElement?.closest('details')) d.open = true;
+  el.scrollIntoView({ block: 'center' });
+  el.focus();
+}
+
+// Before anything goes on from the result: with a blank or a block, every stop is marked, the result holds and the
+// cursor goes to the first blank, else the first block. False when there is none.
+function stopAtProblem() {
+  const stops = stopsNow();
+  if (!stops.length) return false;
+  refresh({ commit: true });
+  goToField((stops.find(q => q.kind === 'blank') ?? stops[0]).field);
   return true;
 }
 
-function refresh() {
+// A field was left: its rules are judged now, or, while a press is still down, right after it ends.
+let pressing = false;
+let judgeAfterPress = false;
+function judgeLeft() {
+  judgeAfterPress = pressing;
+  if (!pressing) refresh({ commit: true });
+}
+
+// commit: the person left a field, pressed a button or jumped. Until then a new stop that rests only on the field
+// being typed in waits, and the result stays as it was, not recomputed.
+function refresh({ commit = false } = {}) {
   // Saved at once, so a reload straight after typing keeps what was typed.
   saveState(S, storage);
-  // A blank would count as zero or as an old value, so the last result stays, dimmed, until it is filled in.
-  if (missingFields(S).length) {
+  const stops = stopsNow();
+  const typing = commit ? null : fieldKeyOf(document.activeElement);
+  const held = typing === null ? [] : stops.filter(q => !shown.has(q.id) && restsOn(q, typing));
+  const live = stops.filter(q => !held.includes(q));
+  if (live.length) {
+    shown = new Set(live.map(q => q.id));
+    holdResult(live);
+    return;
+  }
+  if (held.length) {
+    // Nothing is recomputed with the half-typed number; a mark whose stop was fixed goes at once.
     cancelAnimationFrame(frame);
     clearTimeout(mcTimer);
     clearTimeout(proTimer);
-    syncChrome(toParams(S, DATA));
-    showBlanks(blankFields());
+    stale = true;
+    shown = new Set([...shown].filter(id => stops.some(q => q.id === id)));
+    const still = stops.filter(q => shown.has(q.id));
+    if (still.length) holdResult(still);
+    else markProblems([]);
     return;
   }
-  showBlanks([]);
+  shown.clear();
+  markProblems([]);
   stale = true;
   updateCard();
   cancelAnimationFrame(frame);
   frame = requestAnimationFrame(() => {
+    heldState = null;
+    document.body.classList.remove('result-held');
     renderFast();
     clearTimeout(mcTimer);
     clearTimeout(proTimer);
@@ -808,6 +936,8 @@ function onInput(ev) {
     markPlayed(id);
     if (lifeChoices(S.mode).includes(id)) {
       labValues = { ...labValues, [id]: Number(el.value) };
+      // While the result is stopped there are no lives to write into; the value waits for the next result.
+      if (isHeld()) return;
       updateCard();
       renderLives();
       focusFifth();
@@ -817,7 +947,7 @@ function onInput(ev) {
   if (el.id === 'town-name' || el.id === 'town-monthly') {
     S = setTown(S, el.id === 'town-name' ? { name: el.value } : { monthly: el.value });
     saveState(S, storage);
-    if (latest.p) renderTown();
+    if (latest?.p && !isHeld()) renderTown();
     return;
   }
   labValues = {};
@@ -953,10 +1083,10 @@ function showCard(spec, { scroll = true } = {}) {
   if (scroll) $('share-panel').scrollIntoView({ block: 'nearest' });
 }
 
-// A pending simulation would put a stale success rate on the card, so finish it first. With a number left blank
-// nothing is recounted: the last result stays, dimmed, and false says so. Results already up to date are reused.
+// A pending simulation would put a stale success rate on the card, so finish it first. With a blank or a block
+// nothing is worked out, and false says so. Results already up to date are reused.
 function flushSimulation() {
-  if (missingFields(S).length) return false;
+  if (stopsNow().length) return false;
   if (!stale) return true;
   clearTimeout(mcTimer);
   clearTimeout(proTimer);
@@ -978,6 +1108,15 @@ function download(name, type, text) {
 }
 
 function onClick(ev) {
+  // The chip, and the links that lead to what the result says, go to the problem instead.
+  if (ev.target.closest?.('[data-chip]')) {
+    stopAtProblem();
+    return;
+  }
+  if (ev.target.closest?.('[data-needs-result]') && stopAtProblem()) {
+    ev.preventDefault();
+    return;
+  }
   if (ev.target.closest?.('#life-tag')) {
     $('inputs-box').open = true;
     $('life-fold').open = true;
@@ -1000,7 +1139,7 @@ function onClick(ev) {
     return;
   }
   if (ev.target.id === 'export-csv' || ev.target.id === 'export-json') {
-    if (stopAtBlank()) return;
+    if (stopAtProblem()) return;
     track('export_data');
     flushSimulation();
     if (ev.target.id === 'export-csv') download('fire-age.csv', 'text/csv;charset=utf-8', toCsv(latest));
@@ -1008,7 +1147,7 @@ function onClick(ev) {
     return;
   }
   if (ev.target.id === 'share-btn') {
-    if (stopAtBlank()) return;
+    if (stopAtProblem()) return;
     $('share-btn').closest('.goal-row').hidden = true;
     $('share-title').textContent = '你的放假卡';
     track('card_generate');
@@ -1021,7 +1160,7 @@ function onClick(ev) {
     return;
   }
   if (ev.target.id === 'start-calc') {
-    if (stopAtBlank()) return;
+    if (stopAtProblem()) return;
     endIntro();
     try { storage.setItem(STARTED_KEY, '1'); } catch { /* the start screen shows again next time at worst */ }
     $('inputs-box').open = false;
@@ -1067,7 +1206,7 @@ function onClick(ev) {
     return;
   }
   if (ev.target.id === 'life-draw') {
-    if (stopAtBlank()) return;
+    if (stopAtProblem()) return;
     track('life_draw');
     lifeShift = 1 + Math.floor(Math.random() * 199);
     lifeIndex = 0;
@@ -1145,6 +1284,8 @@ function init() {
       if (!$('share-panel').hidden && flushSimulation()) showCard(cardSpec(), { scroll: false });
       return;
     }
+    const key = fieldKeyOf(ev.target);
+    if (key) lastField = key;
     if (ev.target.closest?.('.pen')) return;
     if (ev.target.tagName === 'SELECT') {
       onSelect(ev);
@@ -1156,10 +1297,21 @@ function init() {
       S = commitField(S, f.id);
       saveState(S, storage);
     }
+    // Leaving a field is when its rules are judged.
+    if (key && (isHeld() || stopsNow().some(q => !shown.has(q.id)))) judgeLeft();
   });
+  // A field left by pressing on a button is judged once the press ends, so the stopped result does not hide or move
+  // the button (生成放假卡, 导出) away from under the pointer before its click; the click then goes to the problem.
+  window.addEventListener('pointerdown', () => { pressing = true; }, true);
+  for (const type of ['pointerup', 'pointercancel']) {
+    window.addEventListener(type, () => {
+      pressing = false;
+      if (judgeAfterPress) setTimeout(judgeLeft);
+    }, true);
+  }
   document.addEventListener('click', onClick);
   // A folded chart has no width to draw in, so the lives are drawn again when their section opens.
-  $('lives-fold').addEventListener('toggle', () => { if ($('lives-fold').open && latest) renderLives(); });
+  $('lives-fold').addEventListener('toggle', () => { if ($('lives-fold').open && latest && !isHeld()) renderLives(); });
   for (const form of [$('simple-form'), $('pro-form')]) form.addEventListener('submit', ev => ev.preventDefault());
   const setMode = mode => () => {
     if (S.mode !== mode) track('mode_switch');
@@ -1181,16 +1333,21 @@ function init() {
   let resizeTimer = 0;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => { if (latest?.mc) renderSimulation(); }, 120);
+    resizeTimer = setTimeout(() => { if (latest?.mc && !isHeld()) renderSimulation(); }, 120);
   });
-  // Leaving a blank field marks it.
-  document.addEventListener('focusout', () => {
-    if (missingFields(S).length) requestAnimationFrame(() => showBlanks(blankFields()));
+  // Leaving a field with a stop not yet shown (one that waited while it was typed) shows it.
+  document.addEventListener('focusout', ev => {
+    if (fieldKeyOf(ev.target) && stopsNow().some(q => !shown.has(q.id))) judgeLeft();
   });
-  renderFast();
-  renderSimulation();
-  // A blank saved from last time: the result shows, dimmed, with the blank pointed out.
-  showBlanks(blankFields());
+  // Numbers saved with a blank or a broken rule open stopped, every mark shown.
+  const stops = stopsNow();
+  if (stops.length) {
+    shown = new Set(stops.map(q => q.id));
+    holdResult(stops);
+  } else {
+    renderFast();
+    renderSimulation();
+  }
   initAnalytics(location.href, DATA.version);
   track('visit');
 }

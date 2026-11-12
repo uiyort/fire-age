@@ -36,10 +36,10 @@
     <div class="sticky" id="sticky-bar">
       <div class="sticky-result" id="sticky-result"></div>
       <nav class="zone-nav" aria-label="页面导航">
-        <a href="#zone-faster">怎么提前</a>
-        <a href="#zone-risk">撑得住吗</a>
+        <a href="#zone-faster" data-needs-result>怎么提前</a>
+        <a href="#zone-risk" data-needs-result>撑得住吗</a>
         <a href="#zone-learn">参数</a>
-        <a href="#share-section" class="simple-only">放假卡</a>
+        <a href="#share-section" class="simple-only" data-needs-result>放假卡</a>
       </nav>
     </div>
 
@@ -72,11 +72,11 @@
             <summary>有房贷或孩子？到期后开销会降</summary>
             <p class="sub">月供和孩子的花销，算在每月支出里，也算在退休后每月想花里。到期以后，这部分自动减掉。</p>
             <div class="pen-grid life-grid">
-              <label><span>月供，每月 <span class="u" data-unit="work">CNY</span></span><input type="number" inputmode="decimal" id="life-mortgage" min="0" step="500" autocomplete="off"></label>
+              <label><span>月供，每月 <span class="u" data-unit="work">CNY</span></span><input type="number" inputmode="decimal" id="life-mortgage" min="0" step="500" autocomplete="off" placeholder="0"></label>
               <label>还到哪年（含这一年）<input type="number" inputmode="numeric" id="life-mortgage-end" min="2026" step="1" autocomplete="off" placeholder="比如 2045"></label>
               <label>孩子几个<input type="number" inputmode="numeric" id="life-kids" min="1" step="1" autocomplete="off"></label>
               <label>最小的孩子几岁<input type="number" inputmode="numeric" id="life-kid-age" min="0" max="22" step="1" autocomplete="off"></label>
-              <label><span>每个孩子每月花多少 <span class="u" data-unit="work">CNY</span></span><input type="number" inputmode="decimal" id="life-kid-monthly" min="0" step="500" autocomplete="off"></label>
+              <label><span>每个孩子每月花多少 <span class="u" data-unit="work">CNY</span></span><input type="number" inputmode="decimal" id="life-kid-monthly" min="0" step="500" autocomplete="off" placeholder="0"></label>
             </div>
             <p class="fine life-issue" id="life-issue" role="status" hidden></p>
             <p class="life-after" id="life-after" role="status" hidden></p>
@@ -86,7 +86,6 @@
           </details>
           <div class="estimate" id="estimate"></div>
         </details>
-        <p class="missing-note" id="missing-note" role="status" hidden></p>
         <div class="goal-row start-row"><button type="button" class="ghost fill" id="start-calc" hidden>算出我的放假年龄</button></div>
       </section>
 

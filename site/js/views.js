@@ -571,7 +571,23 @@ export function labChangesHtml(labels) {
   return `<div class="life-changes"><span>已写入：${labels.join('、')}</span></div>`;
 }
 
-export function stickyHtml(h, { p, dispCur, success, pro }) {
+// The red chip on a stopped result: a blank first (nothing can be worked out without it), else a block.
+export function chipText(list) {
+  const blanks = list.filter(q => q.kind === 'blank');
+  const stops = blanks.length ? blanks : list.filter(q => q.kind === 'block');
+  if (!stops.length) return '';
+  const word = blanks.length ? '待填' : '拦住';
+  return stops.length === 1 ? `${word}：${stops[0].chip} ›` : `${word} ${stops.length} 处 ›`;
+}
+
+const NO_RESULT = '<span aria-label="暂无结果">—</span>';
+// The big age and the fund while the result is stopped.
+export const heldHeroHtml = () => `<div class="hero-big">${NO_RESULT} 岁放假</div><div class="fund"><p>放假资金 —</p></div>`;
+// The headline while the result is stopped; the simple view has only the big age.
+export const heldHeadHtml = view => (view === 'pro' ? `<p class="say">财务独立 ${NO_RESULT} 岁</p>` : '');
+
+export function stickyHtml(h, { p, dispCur, success, pro, chip = '' }) {
+  if (chip) return `<b class="sticky-age">${pro ? `财务独立 ${NO_RESULT} 岁` : `${NO_RESULT} 岁放假`}</b><button type="button" class="chip" data-chip>${chip}</button>`;
   if (pro) {
     const age = h.reachable ? `财务独立 ${h.holidayAge} 岁` : '规划期内未达到';
     const odds = success === null || success === undefined ? '' : `<span>成功率 ${pct(success, 0)}</span>`;

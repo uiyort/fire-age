@@ -11,12 +11,13 @@ test('I1: backspacing an age does not compute with the half-typed digit', async 
   await page.keyboard.press('End');
   await page.keyboard.press('Backspace');
   await page.keyboard.press('Backspace');
-  // A blank age holds the result and asks for the age; it never computes with an old or half-typed age.
-  await expect(page.locator('#missing-note')).toContainText('年龄');
-  await expect(page.locator('body')).toHaveClass(/inputs-missing/);
+  // While the age is being typed the result stays as it was and nothing is red; it never computes with a half-typed age.
+  await expect(page.locator('#headline .say')).toHaveText(settled);
+  await expect(page.locator('[aria-invalid="true"]')).toHaveCount(0);
+  await expect(page.locator('body')).not.toHaveClass(/result-held/);
   await page.keyboard.type('35');
   await page.locator('#s-age').blur();
-  await expect(page.locator('body')).not.toHaveClass(/inputs-missing/);
+  await expect(page.locator('body')).not.toHaveClass(/result-held/);
   await expect(page.locator('#headline .say')).toHaveText(settled);
 });
 

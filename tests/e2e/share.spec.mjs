@@ -70,14 +70,14 @@ test.describe('what the card shows', () => {
 test('with a number cleared, changing a card option does not recount the blank as zero', async ({ page }) => {
   await page.goto('/');
   await page.click('#share-btn');
-  const headline = await page.locator('#headline').textContent();
   const card = await page.locator('#share-img').getAttribute('src');
   await page.locator('#inputs-box').evaluate(d => { d.open = true; });
   await page.fill('#s-assets', '');
   await page.locator('#s-income').focus();
-  await expect(page.locator('#missing-note')).toBeVisible();
-  await page.check('#card-money');
+  // The result stops: the card and its options are hidden, and a changed option redraws nothing.
+  await expect(page.locator('#sticky-result .chip')).toHaveText('待填：存款 ›');
+  await expect(page.locator('#share-section')).toBeHidden();
+  await page.locator('#card-money').evaluate(el => { el.checked = true; el.dispatchEvent(new Event('change', { bubbles: true })); });
   await page.waitForTimeout(500);
-  expect(await page.locator('#headline').textContent()).toBe(headline);
   expect(await page.locator('#share-img').getAttribute('src')).toBe(card);
 });

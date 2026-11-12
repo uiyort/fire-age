@@ -67,9 +67,10 @@ test.describe('a blank number the result rests on', () => {
     await expect(page.locator('#hero')).toBeHidden();
     await expect(page.locator('#s-expense')).toBeFocused();
     await expect(page.locator('#s-expense')).toHaveAttribute('aria-invalid', 'true');
-    await expect(page.locator('#missing-note')).toContainText('每月支出');
+    await expect(page.locator('#sticky-result .chip')).toHaveText('待填：每月支出 ›');
     await page.fill('#s-expense', '6000');
-    await expect(page.locator('#missing-note')).toBeHidden();
+    await expect(page.locator('#s-expense')).not.toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('.chip')).toHaveCount(0);
     await page.click('#start-calc');
     await expect(page.locator('#hero')).toBeVisible();
   });
@@ -78,20 +79,23 @@ test.describe('a blank number the result rests on', () => {
 test.describe('on a computer', () => {
   test.use({ viewport: { width: 1280, height: 900 } });
 
-  test('a blank number holds the last result until it is filled in', async ({ page }) => {
+  test('a blank number keeps the last result while typing, then stops it with — until it is filled in', async ({ page }) => {
     await page.goto('/');
     const initial = await page.locator('#headline').textContent();
     await page.fill('#s-income', '20000');
     await expect(page.locator('#headline')).not.toHaveText(initial);
     const before = await page.locator('#headline').textContent();
     await page.fill('#s-income', '');
-    await expect(page.locator('#missing-note')).toContainText('每月到手收入');
-    await expect(page.locator('body')).toHaveClass(/inputs-missing/);
     await expect(page.locator('#headline')).toHaveText(before);
+    await expect(page.locator('body')).not.toHaveClass(/result-held/);
     await page.locator('#s-age').focus();
     await expect(page.locator('#s-income')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('#sticky-result .chip')).toHaveText('待填：到手收入 ›');
+    await expect(page.locator('body')).toHaveClass(/result-held/);
+    await expect(page.locator('#hero')).toContainText('— 岁放假');
+    await expect(page.locator('#sticky-result')).toContainText('— 岁放假');
     await page.fill('#s-income', '30000');
-    await expect(page.locator('body')).not.toHaveClass(/inputs-missing/);
+    await expect(page.locator('body')).not.toHaveClass(/result-held/);
     await expect(page.locator('#s-income')).not.toHaveAttribute('aria-invalid', 'true');
     await expect(page.locator('#headline')).not.toHaveText(before);
   });
