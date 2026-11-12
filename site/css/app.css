@@ -378,7 +378,15 @@ body.intro .mode-note, body.intro .legend-note { display: none; }
 .split-row input { width: 100%; min-width: 0; padding: 8px; -moz-appearance: textfield; appearance: textfield; }
 .split-row input::-webkit-inner-spin-button, .split-row input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .split .fine { margin-top: 4px; }
-.split-sum { color: var(--ink); font-weight: 700; }
+/* A spending locked to the sum of its parts: a grey dashed frame with = drawn inside, before the number. */
+.f-box { display: block; position: relative; }
+.f-pre { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-family: var(--f-mono); font-size: 16px; color: var(--ink-3); pointer-events: none; }
+.f-pre[hidden] { display: none; }
+input.locked, input.locked:hover { padding-left: 28px; border-style: dashed; border-color: var(--ink-3); background: transparent; color: var(--ink-2); cursor: pointer; }
+.split-line { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; margin: 6px 0 0; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.split-line:empty { display: none; }
+.split-sum { min-width: 0; overflow-wrap: anywhere; }
+button.link { font: inherit; padding: 0; border: 0; background: transparent; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; white-space: nowrap; }
 .fifth-odds { margin: 8px 0 0; font-size: 13px; color: var(--ink-2); }
 #start-calc { font-size: 15px; padding: 10px 22px; }
 @media (max-width: 899px) {

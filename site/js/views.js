@@ -4,6 +4,7 @@ import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn, o
 import { needLine, oddsSolve } from './odds.js';
 import { MIN_SHOWN, SCENARIOS, answerValues, scenarioOptions } from './scenario.js';
 import { impactOf, lifeChoices, tryParam } from './levers.js';
+import { num } from './state.js';
 
 const moneyFormats = {};
 export function money(v, cur) {
@@ -570,6 +571,17 @@ export const fifthSentence = (base, fifth, D = wan) => {
 export function labChangesHtml(labels) {
   if (!labels.length) return '';
   return `<div class="life-changes"><span>已写入：${labels.join('、')}</span></div>`;
+}
+
+// The line under a split spending: what the locked total adds up from (monthly; the professional view's yearly total
+// is the parts × 12), and the way back to the one total typed before the split. before is that total, yearly.
+export function splitLineHtml(row, { view, wCur }) {
+  if (!row) return '';
+  const simple = view !== 'pro';
+  const parts = row.parts.map(v => num(v ?? 0)).join(' + ');
+  const sum = simple ? `= ${parts}` : `(${parts}) × 12`;
+  const back = row.before === null || row.before === undefined ? '' : ` ${wholeMoney(row.before / (simple ? 12 : 1), wCur)}`;
+  return `<span class="split-sum">${sum}</span><button type="button" class="link" data-unsplit>只填总数${back}</button>`;
 }
 
 // The red chip on a stopped result: a blank first (nothing can be worked out without it), else a block.

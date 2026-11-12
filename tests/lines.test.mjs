@@ -1,7 +1,7 @@
 // The views helpers that draw the stopped result and, in later tasks, the lines under the fields.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chipText, heldHeadHtml, heldHeroHtml, stickyHtml } from '../site/js/views.js';
+import { chipText, heldHeadHtml, heldHeroHtml, splitLineHtml, stickyHtml } from '../site/js/views.js';
 
 const b = (kind, chip) => ({ kind, chip });
 test('chipText: blanks first, one names the item, several count', () => {
@@ -26,4 +26,13 @@ test('stickyHtml with a chip: no age, the chip as a button; without one, as befo
   assert.equal(pro, '<b class="sticky-age">财务独立 <span aria-label="暂无结果">—</span> 岁</b><button type="button" class="chip" data-chip>待填 2 处 ›</button>');
   const h = { reachable: false };
   assert.equal(stickyHtml(h, {}), '<b class="sticky-age">还在路上</b><span>先看提前的办法</span>');
+});
+
+test('splitLineHtml: the sum by month, or by month × 12 in the professional view', () => {
+  const row = { key: 'split', parts: [5000, 2000, 0], before: 72000 };
+  const simple = splitLineHtml(row, { view: 'simple', wCur: 'CNY' });
+  assert.match(simple, /= 5,000 \+ 2,000 \+ 0/); assert.match(simple, /只填总数 ¥6,000/);
+  const pro = splitLineHtml({ ...row, parts: [2000, 1500, 1000] }, { view: 'pro', wCur: 'CNY' });
+  assert.match(pro, /\(2,000 \+ 1,500 \+ 1,000\) × 12/); assert.match(pro, /只填总数 ¥72,000/);
+  assert.equal(splitLineHtml(undefined, { view: 'simple', wCur: 'CNY' }), '');
 });

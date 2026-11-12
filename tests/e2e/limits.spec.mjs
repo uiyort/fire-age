@@ -167,3 +167,66 @@ test('no horizontal scroll at 390 px while stopped', async ({ page }) => {
   await page.fill('#s-age', '120'); await page.locator('#s-age').press('Tab');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
+
+test('splitting locks spending to the sum; 只填总数 brings back the old total; a reload keeps the parts', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#expense-split summary').click();
+  await expect(page.locator('#expense-split summary')).toContainText('拆开来加');
+  await expect(page.locator('#expense-split')).toContainText('房租和房贷');
+  for (const [k, v] of [['rent', '5000'], ['food', '2000'], ['other', '1000']]) await page.fill(`#split-${k}`, v);
+  const total = page.locator('#s-expense');
+  await expect(total).toHaveValue('8000');
+  await expect(total).toHaveAttribute('readonly', ''); await expect(total).toHaveAttribute('aria-readonly', 'true');
+  await expect(page.locator('#split-line-s')).toContainText('= 5,000 + 2,000 + 1,000');
+  await expect(page.locator('[data-unsplit]').first()).toHaveText('只填总数 ¥6,000');
+  await total.click(); await expect(page.locator('#split-rent')).toBeFocused();
+  await page.reload();
+  // A returning visitor on a phone starts with the numbers folded.
+  await page.locator('#inputs-box').evaluate(d => { d.open = true; });
+  await expect(page.locator('#split-food')).toHaveValue('2000'); await expect(total).toHaveValue('8000');
+  await page.locator('#split-line-s [data-unsplit]').click();
+  await expect(total).toHaveValue('6000'); await expect(total).toBeFocused();
+  await expect(total).not.toHaveAttribute('readonly', ''); await expect(page.locator('#split-rent')).toHaveValue('');
+});
+
+test('clearing all three parts by hand unlocks with the old total', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#expense-split summary').click();
+  await page.fill('#split-rent', '5000'); await page.fill('#split-food', '2000');
+  await page.fill('#split-rent', ''); await page.fill('#split-food', '');
+  await expect(page.locator('#s-expense')).toHaveValue('6000');
+  await expect(page.locator('#s-expense')).not.toHaveAttribute('readonly', '');
+});
+
+test('the professional view splits by month, shows × 12 and can leave the split', async ({ page }) => {
+  await page.goto('/'); await page.click('#to-pro');
+  await page.locator('#p-expense-split summary').click();
+  for (const [k, v] of [['rent', '2000'], ['food', '1500'], ['other', '1000']]) await page.fill(`#p-split-${k}`, v);
+  await expect(page.locator('#p-expense')).toHaveValue('54000');
+  await expect(page.locator('#split-line-p')).toContainText('(2,000 + 1,500 + 1,000) × 12');
+  await page.locator('#split-line-p [data-unsplit]').click();
+  await expect(page.locator('#p-expense')).toHaveValue('72000');
+});
+
+test('a mortgage above the rent part stops the result', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#expense-split summary').click();
+  for (const [k, v] of [['rent', '5000'], ['food', '2000'], ['other', '1000']]) await page.fill(`#split-${k}`, v);
+  await page.locator('#life-fold summary').click();
+  await page.fill('#life-mortgage', '9000'); await page.fill('#life-mortgage-end', '2045');
+  await page.locator('#life-mortgage-end').press('Tab');
+  await expect(page.locator('#sticky-result .chip')).toHaveText('拦住：房贷 ›');
+});
+
+test('the two views share one split: parts typed in the simple view lock the professional total', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#expense-split summary').click();
+  await page.fill('#split-rent', '5000'); await page.fill('#split-food', '1000');
+  await expect(page.locator('#s-expense')).toHaveAttribute('aria-label', '每月支出，三项合计');
+  await page.click('#to-pro');
+  await expect(page.locator('#p-split-food')).toHaveValue('1000');
+  await expect(page.locator('#p-expense')).toHaveValue('72000');
+  await expect(page.locator('#p-expense')).toHaveAttribute('aria-label', '当前年支出，三项合计');
+  await expect(page.locator('#p-expense-split')).toHaveAttribute('open', '');
+  await page.locator('#p-expense').click(); await expect(page.locator('#p-split-rent')).toBeFocused();
+});

@@ -3,7 +3,7 @@ import DATA from './data-latest.js';
 import { DEFAULT_SEED, bwdSolve, monteCarlo, walkPath } from './engine.js';
 import { bwdOdds, decilePaths, dualOdds, extendRow, needLine, oddsRuler, oddsSolve, oddsYears, successAt } from './odds.js';
 import { hardestIndex, heroModel, holidayType, oddsText, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking, townPlan, cardPlace, withoutItemsGain } from './holiday.js';
-import { FIELD_LABEL, FIELD_ORDER, applyPensionEstimate, commitField, defaultState, lifeIssue, lifeSummary, loadState, problems, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setTown, setWorkCountry, toParams } from './state.js';
+import { FIELD_LABEL, FIELD_ORDER, applyPensionEstimate, cleanSplit, commitField, defaultState, lifeIssue, lifeSummary, loadState, problems, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setSplit, setTown, setWorkCountry, splitOn, storyRows, toParams, unsplit } from './state.js';
 import { estimateFromForm } from './pension.js';
 import { labPlan, lifeChoices, personalLever, rankLevers, impactOf, smallStep, tryRange } from './levers.js';
 import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody } from './scenario.js';
@@ -14,7 +14,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { assumptionLine, renderCard, summaryCardSpec, typeCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, leversHtml, lifeAfterText, lifeGainText, lifeTagText, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
+  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, leversHtml, lifeAfterText, lifeGainText, lifeTagText, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, splitLineHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -214,8 +214,10 @@ function fieldHtml(prefix, f) {
     : `<input type="number" inputmode="decimal" id="${id}" step="${f.step ?? 1}"${f.min === undefined ? '' : ` min="${f.min}"`}${MONEY_UNITS.includes(f.unit) ? ' placeholder="0"' : ''}>`;
   const flags = `${f.bwdOnly ? ' data-bwd-only' : ''}${f.cnPension ? ' data-cn-pension' : ''}`;
   const note = f.note ? `<p class="fine">${f.note}</p>` : '';
-  const wrap = `<div class="${cls}"${flags}><div class="lab"><label for="${id}">${f.label} ${unit}</label>${help}</div>${control}${note}</div>`;
-  const extra = id === 's-expense' ? SPLIT_HTML : f.id === 'pension' ? penFoldHtml(prefix) : '';
+  // Spending can be a locked sum, drawn with = inside the box, in front of the number and not part of it.
+  const box = f.id === 'expense' ? `<span class="f-box"><span class="f-pre" aria-hidden="true" hidden>=</span>${control}</span>` : control;
+  const wrap = `<div class="${cls}"${flags}><div class="lab"><label for="${id}">${f.label} ${unit}</label>${help}</div>${box}${note}</div>`;
+  const extra = f.id === 'expense' ? splitHtml(prefix) : f.id === 'pension' ? penFoldHtml(prefix) : '';
   return (hasCard ? `${wrap}<div class="lcard" id="card-${f.id}" hidden></div>` : wrap) + extra;
 }
 
@@ -264,23 +266,46 @@ function renderPen() {
   }
 }
 
-// Monthly spending is hard to guess as one number, so it can be added up from three parts.
-const SPLIT_PARTS = [['rent', '房租或房贷'], ['food', '吃饭'], ['other', '其他']];
-const SPLIT_NOTE = '三项加起来，自动填进每月支出。';
-const SPLIT_HTML = `<details class="split" id="expense-split"><summary>每月花多少说不准？拆开来加</summary><div class="split-row">${
-  SPLIT_PARTS.map(([key, name]) => `<label>${name}<input type="number" inputmode="decimal" id="split-${key}" step="100" min="0" placeholder="0"></label>`).join('')
-}</div><button type="button" class="split-life" id="split-life" hidden>房贷会还完？填上还到哪年 ›</button><p class="fine" id="split-note">${SPLIT_NOTE}</p></details>`;
+// Monthly spending is hard to guess as one number, so it can be added up from three monthly parts, in both views;
+// the two views share one stored split (S.split). Once a part is used, spending is their sum and locked.
+const SPLIT_PARTS = [['rent', '房租和房贷'], ['food', '吃饭'], ['other', '其他']];
+function splitHtml(prefix) {
+  const simple = prefix === 's';
+  const parts = SPLIT_PARTS.map(([key, name]) => `<label>${name}<input type="number" inputmode="decimal" id="${simple ? '' : 'p-'}split-${key}" step="100" min="0" placeholder="0"></label>`).join('');
+  const life = simple ? '<button type="button" class="split-life" id="split-life" hidden>房贷会还完？填上还到哪年 ›</button>' : '';
+  return `<details class="split" id="${simple ? '' : 'p-'}expense-split"><summary>每月花多少说不准？拆开来加</summary><div class="split-row">${parts}</div><p class="split-line" id="split-line-${prefix}"></p>${life}</details>`;
+}
 
-// A rent or mortgage in the parts may end one day, so it points at the fold where the end year goes.
-const showSplitLife = () => { $('split-life').hidden = !(Number($('split-rent').value) > 0); };
-
-// Typing straight into monthly spending makes the parts stale, so they are cleared rather than left disagreeing.
-function clearSplit() {
-  const parts = SPLIT_PARTS.map(([key]) => $(`split-${key}`));
-  if (parts.every(el => el.value === '')) return;
-  parts.forEach(el => { el.value = ''; });
-  $('split-note').textContent = SPLIT_NOTE;
-  showSplitLife();
+// The split as stored, written into both views: the parts (except the one being typed in), the locked total, the
+// line under it. A rent or mortgage in the parts may end one day, so the simple view points at the fold for the end year.
+function syncSplit() {
+  const sp = cleanSplit(S.split);
+  const on = splitOn(S);
+  const row = storyRows(S, DATA, new Date().getFullYear(), null).find(r => r.key === 'split');
+  const wCur = DATA.countries[S.workC].cur;
+  for (const view of ['simple', 'pro']) {
+    const simple = view === 'simple';
+    for (const [key] of SPLIT_PARTS) {
+      const el = fieldEl(`split.${key}`, view);
+      if (el !== document.activeElement) el.value = sp[key] ?? '';
+    }
+    const total = fieldEl('expense', view);
+    if (total !== document.activeElement) total.value = S.expense === null ? '' : simple ? Math.round(S.expense / 12) : S.expense;
+    total.readOnly = on;
+    total.classList.toggle('locked', on);
+    total.previousElementSibling.hidden = !on;
+    if (on) {
+      total.setAttribute('aria-readonly', 'true');
+      total.setAttribute('aria-label', simple ? '每月支出，三项合计' : '当前年支出，三项合计');
+      $(simple ? 'expense-split' : 'p-expense-split').open = true;
+    } else {
+      total.removeAttribute('aria-readonly');
+      total.removeAttribute('aria-label');
+    }
+    // The row's before is in the view's units; the line takes the stored yearly total.
+    $(`split-line-${simple ? 's' : 'p'}`).innerHTML = splitLineHtml(row && { ...row, before: sp.before }, { view, wCur });
+  }
+  $('split-life').hidden = !(sp.rent > 0);
 }
 
 function buildForm(el, prefix, groups) {
@@ -322,13 +347,14 @@ function syncInputs() {
   set('p-disp', S.dispCur);
   if ($('s-retexp')) set('s-retexp', S.retExp === null ? '' : Math.round(S.retExp / 12));
   $('p-swr').disabled = S.autoSwr;
+  syncSplit();
 }
 
 // The fold sits under the spending field of the form on screen. It is one node, moved only when the view
 // changes, so its inputs keep their values and typing keeps its focus.
 function placeFold() {
   const fold = $('life-fold');
-  const anchor = S.view === 'simple' ? $('expense-split') : $('p-expense').closest('.f');
+  const anchor = $(S.view === 'simple' ? 'expense-split' : 'p-expense-split');
   if (fold.previousElementSibling !== anchor) anchor.after(fold);
 }
 
@@ -899,11 +925,6 @@ function fieldFromElement(id) {
   return null;
 }
 
-let splitting = false;
-const sumText = sum => {
-  const cur = toParams(S, DATA).wCur;
-  return wholeMoney(sum, cur);
-};
 function onInput(ev) {
   const el = ev.target;
   if (el.closest?.('.pen')) {
@@ -924,19 +945,16 @@ function onInput(ev) {
     refresh();
     return;
   }
-  if (el.closest?.('#expense-split')) {
-    showSplitLife();
-    const parts = SPLIT_PARTS.map(([key]) => $(`split-${key}`).value);
-    if (parts.every(v => v === '')) return;
-    const expense = $('s-expense');
-    const sum = parts.reduce((total, v) => total + (Number(v) || 0), 0);
-    expense.value = String(sum);
-    $('split-note').innerHTML = `合计 <span class="split-sum">${sumText(sum)}</span>，已填进每月支出。`;
-    splitting = true;
-    try { expense.dispatchEvent(new Event('input', { bubbles: true })); } finally { splitting = false; }
+  const part = /^(?:p-)?split-(rent|food|other)$/.exec(el.id)?.[1];
+  if (part) {
+    labValues = {};
+    S = setSplit(S, part, el.value, DATA);
+    countCalculation();
+    // The total and its line follow every keystroke, also while a stop on the parts waits for the field to be left.
+    syncSplit();
+    refresh();
     return;
   }
-  if (el.id === 's-expense' && !splitting) clearSplit();
   if (el.dataset.try) {
     const id = el.dataset.try;
     const p = toParams(S, DATA);
@@ -1133,6 +1151,16 @@ function onClick(ev) {
     $('inputs-box').open = true;
     $('life-fold').open = true;
     $('life-fold').scrollIntoView({ block: 'start', behavior: 'smooth' });
+    return;
+  }
+  // 只填总数: the parts go, spending is the total from before the split again and takes the cursor.
+  if (ev.target.closest?.('[data-unsplit]')) {
+    labValues = {};
+    S = unsplit(S, DATA);
+    countCalculation();
+    syncSplit();
+    refresh({ commit: true });
+    fieldEl('expense').focus();
     return;
   }
   if (ev.target.id === 'split-life') {
@@ -1346,6 +1374,10 @@ function init() {
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => { if (latest?.mc && !isHeld()) renderSimulation(); }, 120);
+  });
+  // A locked total is not typed in: the cursor goes to the first part, where the total comes from.
+  document.addEventListener('focusin', ev => {
+    if (splitOn(S) && (ev.target.id === 's-expense' || ev.target.id === 'p-expense')) fieldEl('split.rent', ev.target.id === 'p-expense' ? 'pro' : 'simple').focus();
   });
   // Leaving a field with a stop not yet shown (one that waited while it was typed) shows it.
   document.addEventListener('focusout', ev => {

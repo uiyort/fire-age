@@ -49,7 +49,7 @@ test.describe('mortgage and children', () => {
 
     await page.locator('#to-pro').click();
     await expect.poll(() => fold.evaluate(el => el.parentElement.closest('form')?.id)).toBe('pro-form');
-    expect(await fold.evaluate(el => el.previousElementSibling?.querySelector('#p-expense') !== null)).toBe(true);
+    expect(await fold.evaluate(el => el.previousElementSibling?.id)).toBe('p-expense-split');
     await expect(fold).toBeVisible();
     await page.locator('#to-simple').click();
     await expect.poll(() => fold.evaluate(el => el.previousElementSibling?.id)).toBe('expense-split');
@@ -141,7 +141,7 @@ test.describe('mortgage and children', () => {
     await link.click();
     expect(await page.locator('#life-fold').evaluate(el => el.open)).toBe(true);
     await expect(page.locator('#life-mortgage')).toBeFocused();
-    await page.fill('#s-expense', '9000');
+    await page.locator('#split-line-s [data-unsplit]').click();
     await expect(link).toBeHidden();
   });
 

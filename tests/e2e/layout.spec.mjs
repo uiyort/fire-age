@@ -146,7 +146,7 @@ test('the empty fifth life points at what really writes it', async ({ page }) =>
 test.describe('UI review fixes', () => {
   test.use(phone);
 
-  test('the spending split spans the row, shows its total, and clears when spending is typed by hand', async ({ page }) => {
+  test('the spending split spans the row and locks the total', async ({ page }) => {
     await page.goto('/');
     await page.evaluate(() => { document.getElementById('inputs-box').open = true; document.getElementById('expense-split').open = true; });
     const split = await page.locator('#expense-split').boundingBox();
@@ -158,10 +158,8 @@ test.describe('UI review fixes', () => {
     await page.fill('#split-food', '3200');
     await page.fill('#split-other', '7633');
     await expect(page.locator('#s-expense')).toHaveValue('23333');
-    await expect(page.locator('#split-note')).toHaveText('合计 ¥23,333，已填进每月支出。');
-    await page.fill('#s-expense', '9000');
-    await expect(page.locator('#split-rent')).toHaveValue('');
-    await expect(page.locator('#split-note')).toHaveText('三项加起来，自动填进每月支出。');
+    await expect(page.locator('#s-expense')).toHaveAttribute('readonly', '');
+    await expect(page.locator('#split-line-s')).toContainText('= 12,500 + 3,200 + 7,633');
   });
 
   test('the view note stays when the view changes, and names the other view', async ({ page }) => {
