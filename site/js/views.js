@@ -4,7 +4,7 @@ import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn, o
 import { needLine, oddsSolve, oddsYears } from './odds.js';
 import { MIN_SHOWN, SCENARIOS, answerValues, scenarioOptions } from './scenario.js';
 import { impactOf, lifeChoices, tryParam } from './levers.js';
-import { FIELD_LABEL, LIMITS, itemsYearly, num } from './state.js';
+import { FIELD_LABEL, LIMITS, itemsYearly, num, splitOn } from './state.js';
 
 const moneyFormats = {};
 export function money(v, cur) {
@@ -935,16 +935,20 @@ export function proLedgerRowHtml({ held = false, need = null, success = null, cu
   return `<p>${text} ${ledgerToggleHtml(open)}</p>`;
 }
 
+// One retirement-currency unit in the work currency, as printed: two decimals from 0.1, else three significant digits
+// (1 JPY = 0.00667 USD, never 0.00). The ≈ line divides by this same printed value.
+function rateText(p) {
+  const value = p.fx[p.wCur] / p.fx[p.rCur];
+  return value >= 0.1 ? value.toFixed(2) : value.toPrecision(3);
+}
+
 // The professional view's own lines in the form (spec §8.3, §10.3), keyed by where they go: the exchange rate under
 // the region, the mortgage's nominal note under spending, the cross-country estimate under 年支出, the pension cap
 // (and B12) under the pension, and each B11 flag under its own field.
 export function proLinesHtml({ S, p, data, list = [], rows = [] }) {
   const out = { region: '', expense: '', retExp: '', pension: '' };
   const wCur = p.wCur, rCur = p.rCur;
-  // The rate as printed: two decimals from 0.1, else three significant digits (1 JPY = 0.00667 USD, never 0.00). The
-  // ≈ line divides by this same printed value.
-  const value = p.fx[wCur] / p.fx[rCur];
-  const rate = value >= 0.1 ? value.toFixed(2) : value.toPrecision(3);
+  const rate = rateText(p);
   if (wCur !== rCur) out.region = `<p class="row">汇率 1 ${rCur} = ${rate} ${wCur}</p>`;
   // A mortgage counted: its row under spending, plain or in a relation (A2, A3), not ended, not waiting or out of range.
   const m = rows.find(r => r.key === 'mortgage');
@@ -1076,15 +1080,99 @@ export { bwdSolve };
 
 // The state at the right of a form group's header: ✕ N for the stops shown in it, else 示例, ＋ for an empty optional
 // group, 默认 / 已改 N for the assumptions; the two assumption groups also say which data month they stand on.
-export function groupStatusHtml(st, { version }) {
+// mark: inside a sidebar row's header, which is itself a button, the ＋ is a mark, not a button of its own; there the
+// data month is in the 地区与币种 row's summary instead (spec §6.3), so month: false leaves it out.
+export function groupStatusHtml(st, { version, mark = false, month = true }) {
   const stops = st.blank + st.block;
-  const data = st.changed === null ? '' : ` <span class="grp-data">${version} 数据</span>`;
+  const data = st.changed === null || !month ? '' : ` <span class="grp-data">${version} 数据</span>`;
   if (stops > 0) {
     const parts = [st.block ? `拦住 ${st.block} 处` : '', st.blank ? `待填 ${st.blank} 处` : ''].filter(Boolean).join('，');
     return `<span class="grp-x" aria-label="${parts}">✕ ${stops}</span>${data}`;
   }
   if (st.example) return '示例';
-  if (st.empty) return '<button type="button" class="grp-plus" aria-label="可以不填，点此填写">＋</button>';
+  if (st.empty) return mark ? '<span class="grp-plus" aria-label="可以不填">＋</span>' : '<button type="button" class="grp-plus" aria-label="可以不填，点此填写">＋</button>';
   if (st.changed !== null) return `${st.changed === 0 ? '默认' : `已改 ${st.changed}`}${data}`;
   return '';
+}
+
+// ---- The sidebar at 1024 px and wider (spec §6.3): each row's name, its one-line summary while closed, and the
+// result card at the bottom.
+
+const SIDE_NAME = {
+  simple: { tage: '想几岁放假', now: '现在', spend: '每月支出', where: '在哪里', pension: '养老金', retire: '退休后每月想花' },
+  pro: { region: '地区与币种', now: '现在', spend: '当前年支出', retire: '退休后', returns: '收益假设', risk: '风险假设', sim: '模拟' },
+};
+// The row's name; the spending row carries its total, with = while it is the sum of the split.
+export function sideHeadName(row, S) {
+  const pro = S.view === 'pro';
+  const name = SIDE_NAME[pro ? 'pro' : 'simple'][row];
+  if (row !== 'spend') return name;
+  const total = isSet(S.expense) ? num(pro ? Math.round(S.expense) : Math.round(S.expense / 12)) : '—';
+  return `${name} ${splitOn(S) ? '= ' : ''}${total}`;
+}
+
+const SIDE_EST = '<span class="est" aria-label="估算">≈</span> ';
+const SIDE_WARN = '<span class="warn" aria-label="提示">!</span>';
+// An amount that may be negative: the sign as U+2212 in front of the currency, with an orange ! before it.
+const signedMoney = (v, fmt) => (v < 0 ? `${SIDE_WARN} −${fmt(-v)}` : fmt(v));
+const orNone = (v, fmt) => (isSet(v) ? fmt(v) : NONE);
+
+// The closed row's summary, from the numbers as typed and the rows under the fields (spec §6.3 tables).
+export function sideSummary(row, { S, p, rows, data }) {
+  const pro = S.view === 'pro';
+  const wCur = p.wCur, rCur = p.rCur;
+  // 万 figures to three digits; below ¥10,000 the whole amount, grouped.
+  const W = v => wholeMoney(v, wCur), R = v => (Math.abs(v) < 10000 ? wholeMoney : roughMoney)(v, wCur);
+  const save = isSet(S.income) && isSet(S.expense) ? S.income - S.expense : null;
+  const pAge = S.pAge ?? S.lastValid?.pAge;
+  const retRow = rows.find(r => r.key === 'retExp');
+  const est = S.touched?.retExp ? '' : SIDE_EST;
+  if (row === 'tage') return `${orNone(S.tAge, num)} 岁`;
+  if (row === 'now') {
+    const age = `${orNone(S.age, num)} 岁 · ${orNone(S.assets, R)}`;
+    if (pro) return `${age} · ${orNone(S.income, R)}/年 · 涨 ${num(p.growth)}%/年 · 存 ${orNone(save, v => signedMoney(v, R))}/年`;
+    return `${age} · 到手 ${orNone(S.income, v => R(v / 12))}/月 · 存下 ${orNone(save, v => signedMoney(Math.round(v / 12), W))}/月`;
+  }
+  if (row === 'spend') {
+    // The items still in today's spending; one that has ended is no longer part of it.
+    const items = rows.filter(r => r.under === 'expense' && r.op === '└' && r.status !== 'ended' && isSet(r.value));
+    const label = r => (r.key === 'items' ? '月供和孩子' : r.label.split(' → ')[0]);
+    return items.length ? `其中${items.map(r => `${label(r)} ${num(r.value)}${pro ? '/年' : ''}`).join(' · ')}` : '';
+  }
+  if (row === 'where') return `${data.countries[S.workC].name} → ${data.countries[S.retC].name}`;
+  if (row === 'pension') return S.pension > 0 ? `${wholeMoney(Math.round(S.pension / 12), rCur)}/月 · ${pAge} 岁起` : NONE;
+  if (row === 'retire') {
+    const typed = retRow?.typed;
+    if (pro) {
+      const pension = S.pension > 0 ? ` · 养老金 ${pAge} 岁起` : '';
+      return `${est}${orNone(typed, v => wholeMoney(v, rCur))}/年 · 到 ${orNone(S.life, num)}${pension}`;
+    }
+    const after = rows.filter(r => r.key.startsWith('after:') && !r.folded)
+      .map(r => ` → ${r.ages[0]} 岁起 ${orNone(r.value, v => wholeMoney(v, rCur))}`).join('');
+    return `${est}${orNone(typed, num)}${after}`;
+  }
+  if (row === 'region') {
+    const rate = wCur === rCur ? '' : ` · 1 ${rCur} = ${rateText(p)} ${wCur}`;
+    return `${S.workC} → ${S.retC}${rate} · <span class="grp-data">${data.version} 数据</span>`;
+  }
+  if (row === 'returns') return `股 ${num(p.eq)}% · 实际 ${p.eqReal.toFixed(1)}% · 通胀 ${p.infl.toFixed(1)}% → r ${(p.r * 100).toFixed(1)}%`;
+  if (row === 'risk') return `σ ${num(p.sigEq)}/${num(p.sigBd)} · ρ ${num(p.rho)} · 一年跌 ≥ 15% 后少花 ${num(p.flexCut)}%`;
+  if (row === 'sim') return `八成 · ${DEFAULT_PATHS.toLocaleString('en-US')} 次 · 种子 ${DEFAULT_SEED}`;
+  return '';
+}
+
+const HOW = '<button type="button" class="link" data-how>怎么算的 ›</button>';
+// The result card at the bottom of the sidebar (spec §6.3): the age, the odds and the way to the ledger; held, no age
+// and the chip. The simple view says X 成, never a percentage.
+export function sideCardHtml(h, { view, mode, success, chip = '', p = null }) {
+  const pro = view === 'pro';
+  if (chip) return `<p class="side-line"><b class="side-age">${NO_RESULT} 岁</b><button type="button" class="chip" data-chip>${chip}</button></p>`;
+  const line = parts => `<p class="side-line">${parts.filter(Boolean).join(' · ')} · ${HOW}</p>`;
+  const odds = success === null || success === undefined ? '' : pro ? pct(success, 1) : oddsText(success);
+  if (!h.reachable) return line([`<b class="side-age">${pro ? '规划期内未达到' : '还在路上'}</b>`]);
+  if (mode === 'bwd') return line([`<b class="side-age">${pro ? '目标' : '想'} ${p?.tAge ?? h.holidayAge} 岁</b>`, odds]);
+  if (pro) return line([`<b class="side-age">财务独立 ${h.holidayAge} 岁</b>`, odds]);
+  const age = h.workYears === 0 ? '现在就能放假' : `${h.holidayAge} 岁放假`;
+  const bar = `<span class="sticky-bar-mini" aria-hidden="true"><i style="width:${(h.workYears / (h.workYears + h.holidayYears) * 100).toFixed(1)}%"></i></span>`;
+  return `<p class="side-line"><b class="side-age">${age}</b>${bar}</p><p class="side-line">${h.label ? `<span>${h.label}</span> · ` : ''}${HOW}</p>`;
 }

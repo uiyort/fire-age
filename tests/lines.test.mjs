@@ -1,9 +1,9 @@
 // The views helpers that draw the stopped result and, in later tasks, the lines under the fields.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chipText, heldHeadHtml, heldHeroHtml, splitLineHtml, stickyHtml, relText, fieldLinesHtml, fieldLineHtml, fixesHtml, lifeTagText, pensionEstimateHtml, groupStatusHtml, proLinesHtml } from '../site/js/views.js';
+import { chipText, heldHeadHtml, heldHeroHtml, splitLineHtml, stickyHtml, relText, fieldLinesHtml, fieldLineHtml, fixesHtml, lifeTagText, pensionEstimateHtml, groupStatusHtml, proLinesHtml, sideSummary, sideHeadName, sideCardHtml } from '../site/js/views.js';
 import DATA from '../site/js/data-latest.js';
-import { defaultState, estimateRetireSpend, storyRows, problems, resetRetExp, toParams } from '../site/js/state.js';
+import { defaultState, estimateRetireSpend, groupStates, storyRows, problems, resetRetExp, toParams } from '../site/js/state.js';
 
 const b = (kind, chip) => ({ kind, chip });
 test('chipText: blanks first, one names the item, several count', () => {
@@ -231,4 +231,73 @@ test('proLinesHtml: the rate prints to 2 decimals from 0.1, else to 3 significan
   assert.equal(strip(uk.out.region), `汇率 1 JPY = ${ukRate} GBP`);
   assert.ok(strip(uk.out.retExp).endsWith(`÷ 汇率 ${ukRate}`));
   for (const o of [us.out, uk.out]) assert.ok(!/= 0\.00 |汇率 0\.00(?!\d)/.test(strip(o.region + o.retExp)));
+});
+
+test('sideSummary: the closed rows in the spec\'s words', () => {
+  const S = defaultState(DATA); const p = toParams(S, DATA, 2026);
+  const at = (row, s = S) => strip(sideSummary(row, { S: s, p: toParams(s, DATA, 2026), rows: storyRows(s, DATA, 2026, null), data: DATA }));
+  assert.equal(at('now'), '30 岁 · ¥20万 · 到手 ¥1.2万/月 · 存下 ¥6,000/月');
+  assert.equal(at('where'), '中国大陆 → 中国大陆');
+  assert.equal(at('pension'), '—');
+  assert.equal(at('retire'), '≈ 6,000');
+  assert.equal(at('spend'), '');
+  assert.equal(at('now', { ...S, income: 120000, expense: 132000 }), '30 岁 · ¥20万 · 到手 ¥1万/月 · 存下 ! −¥1,000/月');
+  assert.equal(at('returns', { ...S, view: 'pro' }), `股 60% · 实际 5.0% · 通胀 ${S.infl.toFixed(1)}% → r ${(p.r * 100).toFixed(1)}%`);
+  assert.equal(at('sim', { ...S, view: 'pro' }), '八成 · 2,000 次 · 种子 20261026');
+  // Beyond the brief's cases: the rows a person fills in.
+  assert.equal(at('tage'), '45 岁');
+  assert.equal(at('now', { ...S, income: 96000, expense: 60000, assets: 5000 }), '30 岁 · ¥5,000 · 到手 ¥8,000/月 · 存下 ¥3,000/月');
+  assert.equal(at('pension', { ...S, pension: 36000 }), '¥3,000/月 · 63 岁起');
+  const items = { ...S, income: 240000, expense: 180000, retExp: 180000, real: { mortgage: { monthly: 7500, endYear: 2045 }, kids: { count: 1, age: 10, monthly: 3200 } } };
+  assert.equal(at('spend', items), '其中月供 7,500 · 孩子 3,200');
+  assert.match(at('retire', items), /^≈ 15,000 → \d+ 岁起 ¥[\d,]+ → \d+ 岁起 ¥[\d,]+$/);
+  assert.equal(at('retire', { ...S, touched: { retExp: true } }), '6,000');
+  assert.equal(at('spend', { ...items, view: 'pro' }), '其中月供 90,000/年 · 孩子 38,400/年');
+  assert.equal(at('now', { ...S, view: 'pro' }), '30 岁 · ¥20万 · ¥14.4万/年 · 涨 2%/年 · 存 ¥7.2万/年');
+  assert.equal(at('retire', { ...S, view: 'pro', pension: 36000 }), '≈ ¥72,000/年 · 到 95 · 养老金 63 岁起');
+  assert.equal(at('risk', { ...S, view: 'pro' }), 'σ 0.17/0.06 · ρ 0.2 · 一年跌 ≥ 15% 后少花 0%');
+  assert.equal(at('region', { ...S, view: 'pro' }), `CN → CN · ${DATA.version} 数据`);
+  assert.match(at('region', { ...S, view: 'pro', retC: 'TH' }), new RegExp(`^CN → TH · 1 THB = \\d\\.\\d\\d CNY · ${DATA.version} 数据$`));
+});
+
+test('sideHeadName: the spending row names its total, with = while it is the sum of the split', () => {
+  const S = defaultState(DATA);
+  assert.equal(sideHeadName('spend', S), '每月支出 6,000');
+  assert.equal(sideHeadName('spend', { ...S, split: { rent: 5000, food: 2000, other: 1000, before: 72000 }, expense: 96000 }), '每月支出 = 8,000');
+  assert.equal(sideHeadName('spend', { ...S, view: 'pro' }), '当前年支出 72,000');
+  assert.equal(sideHeadName('now', S), '现在');
+  assert.equal(sideHeadName('region', { ...S, view: 'pro' }), '地区与币种');
+});
+
+test('groupStatusHtml in a sidebar header: the ＋ is no nested button, and no data month', () => {
+  const st = o => ({ blank: 0, block: 0, example: false, empty: false, changed: null, ...o });
+  assert.ok(!groupStatusHtml(st({ empty: true }), { version: '2026-11', mark: true }).includes('<button'));
+  assert.equal(strip(groupStatusHtml(st({ empty: true }), { version: '2026-11', mark: true })), '＋');
+  assert.equal(strip(groupStatusHtml(st({ changed: 1 }), { version: '2026-11', mark: true, month: false })), '已改 1');
+});
+
+test('groupStates by row: spending and the age to holiday at count their own stops', () => {
+  const S = { ...defaultState(DATA), mode: 'bwd', expense: null, tAge: 20 };
+  const list = problems(S, DATA, 2026);
+  const form = groupStates(S, list, DATA);
+  const rows = groupStates(S, list, DATA, { by: 'row' });
+  assert.equal(form.now.blank, 1); assert.equal(form.pension.block, 1);
+  assert.equal(rows.spend.blank, 1); assert.equal(rows.now.blank, 0);
+  assert.equal(rows.tage.block, 1); assert.equal(rows.pension.block, 0);
+  assert.equal(rows.sim.changed, null);
+});
+
+test('sideCardHtml: normal, unreachable and held', () => {
+  const h = { reachable: true, holidayAge: 50, workYears: 20, holidayYears: 45, label: '八成把握' };
+  const simple = strip(sideCardHtml(h, { view: 'simple', mode: 'fwd', success: 0.81, chip: '', p: null }));
+  for (const x of ['50 岁放假', '八成把握', '怎么算的 ›']) assert.ok(simple.includes(x), x);
+  assert.ok(!simple.includes('%'));
+  assert.equal(strip(sideCardHtml(h, { view: 'pro', mode: 'fwd', success: 0.819, chip: '', p: null })), '财务独立 50 岁 · 81.9% · 怎么算的 ›');
+  assert.equal(strip(sideCardHtml({ reachable: false }, { view: 'simple', mode: 'fwd', success: null, chip: '', p: null })), '还在路上 · 怎么算的 ›');
+  assert.equal(strip(sideCardHtml({ reachable: false }, { view: 'pro', mode: 'fwd', success: null, chip: '', p: null })), '规划期内未达到 · 怎么算的 ›');
+  const held = strip(sideCardHtml(h, { view: 'simple', mode: 'fwd', success: null, chip: '拦住：房贷 ›', p: null }));
+  assert.ok(held.includes('— 岁') && held.includes('拦住：房贷 ›') && !held.includes('50'));
+  const bwd = { ...h, holidayAge: 45, label: '6 成把握' };
+  assert.equal(strip(sideCardHtml(bwd, { view: 'simple', mode: 'bwd', success: 0.62, chip: '', p: { tAge: 45 } })), '想 45 岁 · 6 成把握 · 怎么算的 ›');
+  assert.equal(strip(sideCardHtml(bwd, { view: 'pro', mode: 'bwd', success: 0.632, chip: '', p: { tAge: 45 } })), '目标 45 岁 · 63.2% · 怎么算的 ›');
 });

@@ -70,12 +70,20 @@ test('each zone leads with its takeaway', async ({ page }) => {
   await expect(page.locator('#lead-risk')).toContainText('10 个');
 });
 
-test('on a wide screen the inputs stay open and beside the result, and lives sit beside the quiz', async ({ page }) => {
+test('on a wide screen the inputs are a sidebar beside the result, and lives sit beside the quiz', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/'); await openFolds(page);
   await page.fill('#s-assets', '800000');
   await page.reload(); await openFolds(page);
+  // A returning visit folds the rows to their summaries; the column stays 330 px wide, left of the result.
+  const side = await page.locator('.inputs').boundingBox();
+  const result = await page.locator('.headline').boundingBox();
+  expect(Math.round(side.width)).toBe(330);
+  expect(result.x).toBeGreaterThan(side.x + side.width);
+  await expect(page.locator('.grp-head[data-row="now"]')).toContainText('¥80万');
+  await page.locator('.grp-head[data-row="now"]').click();
   await expect(page.locator('#s-assets')).toBeVisible();
+  await expect(page.locator('#s-assets')).toHaveValue('800000');
   const lives = await page.locator('#lives').boundingBox();
   const box = await page.locator('#scenario').boundingBox();
   expect(box.x).toBeGreaterThan(lives.x + lives.width - 1);

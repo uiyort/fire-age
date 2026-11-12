@@ -3,7 +3,7 @@ import DATA from './data-latest.js';
 import { DEFAULT_PATHS, DEFAULT_SEED, bwdSolve, monteCarlo, walkPath } from './engine.js';
 import { bwdOdds, decilePaths, dualOdds, extendRow, needLine, oddsAround, oddsRuler, oddsSolve, oddsYears, successAt } from './odds.js';
 import { hardestIndex, heroModel, holidayType, oddsText, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking, townPlan, cardPlace, withoutItemsGain } from './holiday.js';
-import { FIELD_LABEL, FIELD_ORDER, LIMITS, applyPensionEstimate, cleanReal, cleanSplit, commitField, defaultState, groupStates, loadState, problems, resetRetExp, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setSplit, setTown, setWorkCountry, splitOn, storyRows, toParams, unsplit } from './state.js';
+import { FIELD_LABEL, FIELD_ORDER, LIMITS, applyPensionEstimate, cleanReal, cleanSplit, commitField, defaultState, groupStates, loadState, problems, resetRetExp, rowOf, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setSplit, setTown, setWorkCountry, splitOn, storyRows, toParams, unsplit } from './state.js';
 import { estimateFromForm } from './pension.js';
 import { labPlan, lifeChoices, personalLever, rankLevers, impactOf, smallStep, tryRange } from './levers.js';
 import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody } from './scenario.js';
@@ -14,7 +14,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { assumptionLine, renderCard, summaryCardSpec, typeCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, ledgerHtml, leversHtml, proLedgerRowHtml, proLinesHtml, lifeGainText, lifeTagText, fieldLineHtml, fieldLinesHtml, fixesHtml, groupStatusHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
+  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, ledgerHtml, leversHtml, proLedgerRowHtml, proLinesHtml, lifeGainText, lifeTagText, fieldLineHtml, fieldLinesHtml, fixesHtml, groupStatusHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, sideCardHtml, sideHeadName, sideSummary, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -145,13 +145,16 @@ function markPlayed(id) {
   renderPlayed();
 }
 
+// Each group is a form group (its legend counts the problems) and a sidebar row; subs are rows of their own inside the
+// group (spec §6.3): spending with its split and the fold, and the age to holiday at, which the sidebar lists first.
 const SIMPLE_FIELDS = [
   { legend: '现在', grp: 'now', fields: [
     { id: 'age', label: '年龄', unit: '岁' },
     { id: 'assets', label: '已有存款和投资', unit: 'work', step: 10000 },
     { id: 'income', label: '每月到手收入', unit: 'work', monthly: true, step: 1000 },
+  ], subs: [{ row: 'spend', fields: [
     { id: 'expense', label: '每月支出', unit: 'work', monthly: true, step: 500 },
-  ] },
+  ] }] },
   { legend: '在哪里', grp: 'where', fields: [
     { id: 'work', label: '现在生活的地方', select: 'work' },
     { id: 'ret', label: '想在哪里退休', select: 'retire' },
@@ -160,8 +163,9 @@ const SIMPLE_FIELDS = [
     { id: 'pension', label: '预计每月养老金', unit: 'retire', monthly: true, step: 500, full: true },
     { id: 'selfPension', label: '放假后每月自缴养老保险', unit: 'work', step: 100, min: 0, full: true, cnPension: true },
     { id: 'selfMedical', label: '放假后每月自缴医保', unit: 'work', step: 100, min: 0, full: true, cnPension: true, note: '各地不同，缴满当地规定的年限后可以停，这里一直算到领取养老金那年。' },
+  ], subs: [{ row: 'tage', bwdOnly: true, fields: [
     { id: 'tAge', elementId: 's-tage', label: '想几岁放假', unit: '岁', bwdOnly: true, full: true },
-  ] },
+  ] }] },
 ];
 
 const PRO_FIELDS = [
@@ -174,9 +178,10 @@ const PRO_FIELDS = [
     { id: 'age', label: '年龄', unit: '岁' },
     { id: 'assets', label: '可投资资产', unit: 'work', step: 10000 },
     { id: 'income', label: '税后年收入', unit: 'work', step: 10000 },
-    { id: 'expense', label: '当前年支出', unit: 'work', step: 5000 },
     { id: 'growth', label: '收入实际增长', unit: '%', step: 0.5, full: true, tool: true },
-  ] },
+  ], subs: [{ row: 'spend', fields: [
+    { id: 'expense', label: '当前年支出', unit: 'work', step: 5000 },
+  ] }] },
   { legend: '退休后', grp: 'retire', fields: [
     { id: 'retExp', label: '年支出', unit: 'retire', step: 5000 },
     { id: 'life', label: '规划到', unit: '岁' },
@@ -328,8 +333,15 @@ function syncSplit() {
   renderLines();
 }
 
+// Every field of a group, its sub-rows included.
+const fieldsOf = g => [...g.fields, ...(g.subs ?? []).flatMap(s => s.fields)];
+// A row's fields sit in a body the sidebar folds; below 1024 px the body and the sub-row add no box of their own, so
+// the form is laid out as before. The row headers are added by syncSide, for the view on screen only.
 function buildForm(el, prefix, groups) {
-  el.innerHTML = groups.map(g => `<fieldset><legend>${g.legend}<span class="grp-status" data-grp="${g.grp}"></span></legend>${g.fields.map(f => fieldHtml(prefix, f)).join('')}${g.html ?? ''}</fieldset>`).join('');
+  const body = (row, html) => `<div class="grp-body" id="side-${prefix}-${row}">${html}</div>`;
+  const fields = list => list.map(f => fieldHtml(prefix, f)).join('');
+  const sub = s => `<div class="grp-sub" data-row="${s.row}"${s.bwdOnly ? ' data-bwd-only' : ''}>${body(s.row, fields(s.fields))}</div>`;
+  el.innerHTML = groups.map(g => `<fieldset data-row="${g.grp}"><legend>${g.legend}<span class="grp-status" data-grp="${g.grp}"></span></legend>${body(g.grp, fields(g.fields) + (g.html ?? ''))}${(g.subs ?? []).map(sub).join('')}</fieldset>`).join('');
 }
 
 function fillCountrySelects() {
@@ -354,12 +366,12 @@ function syncInputs() {
     if (!el || el === document.activeElement) return;
     el.value = value === null || value === undefined ? '' : value;
   };
-  for (const g of SIMPLE_FIELDS) for (const f of g.fields) {
+  for (const g of SIMPLE_FIELDS) for (const f of fieldsOf(g)) {
     if (f.select) continue;
     const v = S[f.id];
     set(f.elementId ?? `s-${f.id}`, v === null ? '' : f.monthly ? Math.round(v / 12) : v);
   }
-  for (const g of PRO_FIELDS) for (const f of g.fields) {
+  for (const g of PRO_FIELDS) for (const f of fieldsOf(g)) {
     if (!f.select) set(`p-${f.id}`, S[f.id]);
   }
   set('s-work', S.workC); set('p-work', S.workC);
@@ -413,6 +425,7 @@ function syncChrome(p) {
   document.querySelectorAll('.simple-only').forEach(e => { e.hidden = S.view !== 'simple'; });
   $('simple-form').hidden = S.view !== 'simple';
   $('pro-form').hidden = S.view !== 'pro';
+  placeRows();
   $('solve-card').hidden = S.mode !== 'bwd';
   // The note names the other view, so it stays in place when the view changes.
   $('mode-note').textContent = S.view === 'simple' ? '专业版：改收益、通胀等全部假设' : '简单版：只填几个数';
@@ -443,9 +456,9 @@ function renderEstimate(p) {
   const typing = document.activeElement?.id === 's-retexp';
   if (!typing) {
     setEstimate(`<h3 class="grp-legend"><label for="s-retexp">退休后每月想花</label><span class="grp-status" data-grp="retire"></span></h3>
-      <div class="f"><div class="lab"><span class="u">${p.rCur}</span>${EST_BACK}</div>
+      <div class="grp-body" id="side-s-retire"><div class="f"><div class="lab"><span class="u">${p.rCur}</span>${EST_BACK}</div>
       <span class="f-box">${EST_PRE}<input type="number" inputmode="decimal" id="s-retexp" step="500" placeholder="0" value="${S.retExp === null ? '' : Math.round(S.retExp / 12)}"></span></div>
-      <p class="fine mix-note">组合按股票 ${p.eq}% / 债券 ${100 - p.eq}% 估算（常见的基准组合，不是建议），扣掉通胀后约 ${pct(p.r, 1)}/年。<a href="sources.html">数据来源</a>，专业模式可以改。</p>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}`);
+      <p class="fine mix-note">组合按股票 ${p.eq}% / 债券 ${100 - p.eq}% 估算（常见的基准组合，不是建议），扣掉通胀后约 ${pct(p.r, 1)}/年。<a href="sources.html">数据来源</a>，专业模式可以改。</p>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}</div>`);
   }
   placeRetLines();
   renderLines();
@@ -488,6 +501,7 @@ function renderFast() {
   const reached = S.mode === 'fwd' && t === 0;
   $('levers').innerHTML = leversHtml(levers, p, { pro: S.view === 'pro', small, dispCur: cur, reached });
   $('lead-faster').textContent = fasterLead(levers, { reached });
+  renderSideLinks();
   renderGoal(p);
   saveState(S, storage);
 }
@@ -558,6 +572,7 @@ function renderHero() {
   placeTag();
   stickyNow = '';
   $('sticky-result').innerHTML = stickyHtml(latest.hero, { p, dispCur: cur, success, pro: S.view === 'pro' });
+  renderSideCard();
   const riskLead = S.view === 'pro'
     ? (success === null ? '按计划没有放假年份，不计算成功率。' : `2,000 次模拟，成功率 ${pct(success, 0)}，按本工具假设。`)
     : (latest.hero.people === null ? '先到得了，再看撑不撑得住。' : `10 个平行的你，${latest.hero.people} 个的钱够花到 ${p.life} 岁。`);
@@ -869,11 +884,111 @@ function markProblems(list) {
 // being typed), the rest reads the numbers. Redrawn only when it changes, so a button under the pointer stays.
 function syncGroups() {
   const states = groupStates(S, markedNow, DATA);
-  for (const el of document.querySelectorAll('.grp-status')) {
+  for (const el of document.querySelectorAll('.grp-status[data-grp]')) {
     if ($('pro-form').contains(el) !== (S.view === 'pro')) continue;
     const html = groupStatusHtml(states[el.dataset.grp], { version: DATA.version });
     if (el.innerHTML !== html) el.innerHTML = html;
   }
+  syncSide();
+}
+
+// ---- The sidebar at 1024 px and wider (spec §6.3). Each row has a header (name, summary while closed, state, › or ▾)
+// that opens and closes it on its own (C36). A first visit opens every row; a returning one opens only the rows with a
+// ✕, and a row opens again whenever a ✕ newly shows in it. Below 1024 px the headers are not shown and nothing folds.
+const sideWide = window.matchMedia('(min-width: 1024px)');
+const SIDE_ROWS = ['tage', 'now', 'spend', 'where', 'pension', 'retire', 'region', 'returns', 'risk', 'sim'];
+const openRows = new Set(returning ? [] : SIDE_ROWS);
+let xRows = new Set();
+
+// The rows of the view on screen, in page order, with the element holding each: its header goes right before its body.
+function rowBoxes() {
+  const pro = S.view === 'pro';
+  const boxes = [...$(pro ? 'pro-form' : 'simple-form').querySelectorAll('[data-row]')]
+    .filter(el => el.querySelector(':scope > .grp-body'))
+    .map(el => [el.dataset.row, el]);
+  if (!pro && $('side-s-retire')) boxes.push(['retire', $('estimate')]);
+  return boxes;
+}
+
+function openRow(row) {
+  if (!row || openRows.has(row)) return;
+  openRows.add(row);
+  syncSide();
+}
+
+function syncSide() {
+  const boxes = rowBoxes();
+  const homes = new Set(boxes.map(([, el]) => el));
+  document.querySelectorAll('.grp-head').forEach(head => { if (!homes.has(head.parentElement)) head.remove(); });
+  const states = groupStates(S, markedNow, DATA, { by: 'row' });
+  const x = new Set(boxes.filter(([row]) => states[row] && states[row].blank + states[row].block > 0).map(([row]) => row));
+  for (const row of x) if (!xRows.has(row)) openRows.add(row);
+  xRows = x;
+  const year = new Date().getFullYear();
+  const at = { S, p: toParams(S, DATA, year), rows: storyRows(S, DATA, year, null), data: DATA };
+  for (const [row, el] of boxes) {
+    const body = el.querySelector(':scope > .grp-body');
+    let head = el.querySelector(':scope > .grp-head');
+    if (!head) {
+      head = document.createElement('button');
+      head.type = 'button';
+      head.className = 'grp-head';
+      head.dataset.row = row;
+      head.setAttribute('aria-controls', body.id);
+      head.innerHTML = '<b></b><span class="grp-sum"></span><span class="grp-status"></span><span class="grp-arrow" aria-hidden="true"></span>';
+      body.before(head);
+    }
+    const open = openRows.has(row);
+    head.setAttribute('aria-expanded', String(open));
+    el.classList.toggle('row-closed', !open);
+    const [name, sum, status, arrow] = head.children;
+    setHtml(name, sideHeadName(row, S));
+    setHtml(sum, sideSummary(row, at));
+    setHtml(status, row === 'sim' ? '<span class="tool">本工具设定</span>' : groupStatusHtml(states[row], { version: DATA.version, mark: true, month: false }));
+    arrow.textContent = open ? '▾' : '›';
+  }
+}
+
+// At 1024 px and wider the age to holiday at is the first row, and the professional view's derived returns sit in the
+// 收益假设 row; below, both stay where the two-column form has them. Moved only when the view or the width changes.
+function placeRows() {
+  const wide = sideWide.matches;
+  const tage = $('simple-form').querySelector('.grp-sub[data-row="tage"]');
+  const home = wide ? $('simple-form') : $('simple-form').querySelector('fieldset[data-row="pension"]');
+  if (wide && home.firstElementChild !== tage) home.prepend(tage);
+  if (!wide && home.lastElementChild !== tage) home.append(tage);
+  const estimate = $('estimate');
+  const at = wide && S.view === 'pro' ? $('side-p-returns') : $('inputs-box');
+  if (at.lastElementChild !== estimate) at.append(estimate);
+}
+
+// The whole column stays on screen, from where it starts down to 16 px above the bottom: below the header at the top of
+// the page, 16 px from the top once it sticks (calc(100vh - 32px) in the stylesheet). So the links and the card at its
+// bottom are in view from the start.
+let sideFrame = 0;
+function fitSide() {
+  sideFrame = 0;
+  const box = document.querySelector('.inputs');
+  if (!sideWide.matches) {
+    box.style.removeProperty('height');
+    return;
+  }
+  const height = `${Math.round(window.innerHeight - Math.max(16, box.getBoundingClientRect().top) - 16)}px`;
+  if (box.style.height !== height) box.style.height = height;
+}
+const fitSideSoon = () => { sideFrame ||= requestAnimationFrame(fitSide); };
+
+// The links and the result card at the bottom of the sidebar. The links are the top bar's, with the count of ways
+// to holiday sooner; while the result is stopped nothing is worked out, so there is no count.
+function renderSideLinks() {
+  const n = isHeld() ? 0 : document.querySelectorAll('#levers .lever').length;
+  const links = [`<a href="#zone-faster" data-needs-result>怎么提前${n ? ` ${n}` : ''}</a>`, '<a href="#zone-risk" data-needs-result>撑得住吗</a>', '<a href="#zone-learn">参数</a>'];
+  if (S.view !== 'pro') links.push('<a href="#share-section" data-needs-result>放假卡</a>');
+  setHtml($('side-links'), links.join('<span class="side-dot" aria-hidden="true"> · </span>'));
+}
+function renderSideCard(chip = '') {
+  const { hero, success, p } = latest ?? {};
+  setHtml($('side-card'), sideCardHtml(chip ? null : hero, { view: S.view, mode: S.mode, success, chip, p }));
 }
 
 // 我的数字: the numbers opened, at the first group with a ✕ shown, else at the top of the form.
@@ -1078,6 +1193,8 @@ function holdResult(stops, marks = stops) {
     stickyNow = sticky;
     $('sticky-result').innerHTML = sticky;
   }
+  renderSideCard(chipText(stops));
+  renderSideLinks();
   markProblems(marks);
   renderLedger();
 }
@@ -1093,6 +1210,7 @@ function goToField(key) {
   const el = fieldEl(key);
   if (!el) return;
   $('inputs-box').open = true;
+  openRow(rowOf(key, S.view === 'pro' ? 'pro' : 'simple'));
   for (let d = el.closest('details'); d; d = d.parentElement?.closest('details')) d.open = true;
   el.scrollIntoView({ block: 'center' });
   el.focus();
@@ -1164,7 +1282,7 @@ function refresh({ commit = false } = {}) {
 function fieldFromElement(id) {
   for (const prefix of ['s', 'p']) {
     const groups = prefix === 's' ? SIMPLE_FIELDS : PRO_FIELDS;
-    for (const g of groups) for (const f of g.fields) {
+    for (const g of groups) for (const f of fieldsOf(g)) {
       if ((f.elementId ?? `${prefix}-${f.id}`) === id) return f;
     }
   }
@@ -1386,6 +1504,23 @@ function download(name, type, text) {
 }
 
 function onClick(ev) {
+  // A sidebar row opens or closes on its own (C36).
+  const head = ev.target.closest?.('.grp-head');
+  if (head) {
+    const row = head.dataset.row;
+    if (openRows.has(row)) openRows.delete(row);
+    else openRows.add(row);
+    syncSide();
+    return;
+  }
+  // 怎么算的 on the sidebar's card: the ledger opened under the fund line, which comes into view.
+  if (ev.target.closest?.('[data-how]')) {
+    ledgerOpen = true;
+    if (!isHeld()) flushSimulation();
+    renderLedger();
+    (S.view === 'pro' ? $('ledger-row') : $('hero').querySelector('.fund') ?? $('hero')).scrollIntoView({ block: 'start' });
+    return;
+  }
   // The chip, and the links that lead to what the result says, go to the problem instead.
   if (ev.target.closest?.('[data-chip]')) {
     stopAtProblem();
@@ -1429,6 +1564,7 @@ function onClick(ev) {
   }
   if (ev.target.closest?.('#life-tag')) {
     $('inputs-box').open = true;
+    openRow('spend');
     $('life-fold').open = true;
     $('life-fold').scrollIntoView({ block: 'start', behavior: 'smooth' });
     return;
@@ -1600,6 +1736,13 @@ function init() {
     $('inputs-box').open = true;
     endIntro();
   });
+  sideWide.addEventListener('change', () => {
+    placeRows();
+    syncSide();
+    fitSide();
+  });
+  window.addEventListener('scroll', fitSideSoon, { passive: true });
+  window.addEventListener('resize', fitSideSoon);
   $('type-all').innerHTML = allTypesHtml();
   document.addEventListener('input', onInput);
   document.addEventListener('change', ev => {
@@ -1683,6 +1826,7 @@ function init() {
     renderFast();
     renderSimulation();
   }
+  fitSide();
   initAnalytics(location.href, DATA.version);
   track('visit');
 }

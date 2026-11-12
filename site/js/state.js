@@ -222,16 +222,18 @@ export function formGroupOf(row, view) {
 }
 
 // What each form group's header says: the stops in it (counted by kind), whether it still holds the examples, whether
-// an optional group is empty, and how many assumptions the person changed.
+// an optional group is empty, and how many assumptions the person changed. by: 'row' counts the stops by sidebar row
+// instead (spec §6.3), where spending and the age to holiday at are rows of their own.
 const FORM_GROUPS = ['now', 'where', 'pension', 'retire', 'region', 'returns', 'risk', 'sim'];
 const RETURN_FIELDS = ['eq', 'eqReal', 'fxDrift'];
 const RISK_FIELDS = ['sigEq', 'sigBd', 'rho', 'flexCut'];
 const LOCAL_FIELDS = ['bondY', 'infl', 'drag'];
-export function groupStates(S, list, data) {
+export function groupStates(S, list, data, { by = 'group' } = {}) {
   const view = S.view === 'pro' ? 'pro' : 'simple';
-  const out = Object.fromEntries(FORM_GROUPS.map(g => [g, { blank: 0, block: 0, example: false, empty: false, changed: null }]));
+  const names = by === 'row' ? [...FORM_GROUPS, 'spend', 'tage'] : FORM_GROUPS;
+  const out = Object.fromEntries(names.map(g => [g, { blank: 0, block: 0, example: false, empty: false, changed: null }]));
   for (const q of list) {
-    const g = q.kind === 'blank' || q.kind === 'block' ? formGroupOf(q.row, view) : null;
+    const g = q.kind === 'blank' || q.kind === 'block' ? (by === 'row' ? q.row : formGroupOf(q.row, view)) : null;
     if (g && out[g]) out[g][q.kind] += 1;
   }
   const start = defaultState(data);

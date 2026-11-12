@@ -546,3 +546,55 @@ fieldset, .pen-grid, .split-row, .town-row { grid-auto-flow: row dense; }
 input.has-pre { padding-left: 28px; }
 .f .lab .link { font-size: 12px; margin-left: auto; }
 .split-life { display: block; margin: 6px 0 0; padding: 0; border: 0; background: transparent; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer; text-align: left; }
+
+/* The sidebar (spec §6.3). Below 1024 px a row's body and a sub-row add no box, so the form keeps its two-column
+   layout, and the row headers, links and result card are not shown. */
+.grp-head, .side-foot { display: none; }
+.grp-body, .grp-sub { display: contents; }
+@media (min-width: 1024px) {
+  /* The result and the links are at the bottom of the sidebar, so the top bar goes (C17). */
+  #sticky-bar { display: none; }
+  .inputs { top: 16px; height: calc(100vh - 32px); max-height: none; overflow: hidden; display: flex; flex-direction: column; padding: 0; }
+  #inputs-box { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  .inputs form { gap: 0; }
+  .zone, #share-section, #headline, #life-fold { scroll-margin-top: 16px; }
+  /* The legends stay for screen readers; the row headers show the names and the states (the legend's ＋ is not a
+     second, invisible button). */
+  .inputs legend .grp-status, .inputs .grp-legend .grp-status { display: none; }
+  .inputs legend, .inputs .grp-legend { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  /* Each row spans the column, with a line above it. */
+  .inputs fieldset, .inputs form > .grp-sub, #inputs-box > .estimate { padding: 0 16px 12px; border-top: 1px solid var(--line); margin: 0; }
+  .inputs fieldset .grp-sub { margin: 0 -16px; padding: 0 16px 12px; border-top: 1px solid var(--line); }
+  .grp-sub { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; grid-column: 1 / -1; grid-auto-flow: row dense; min-width: 0; }
+  .inputs form > :first-child, .inputs form > .grp-sub[hidden] + fieldset { border-top: 0; }
+  .inputs fieldset:has(> .grp-sub:last-child) { padding-bottom: 0; }
+  .inputs fieldset.row-closed, .inputs form > .grp-sub.row-closed, .inputs fieldset .grp-sub.row-closed, #inputs-box > .estimate.row-closed { padding-bottom: 0; }
+  .inputs fieldset.row-closed > .grp-sub { margin-top: -10px; }
+  .row-closed > .grp-body { display: none; }
+  #inputs-box > .estimate { gap: 8px; }
+  .grp-body > .estimate { grid-column: 1 / -1; margin: 0; padding: 0; border: 0; }
+  .grp-head { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "name status arrow" "sum status arrow"; align-items: center; gap: 0 8px; grid-column: 1 / -1; width: 100%; padding: 10px 0; margin: 0; border: 0; background: none; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+  .grp-head > b { grid-area: name; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .grp-sum { grid-area: sum; min-width: 0; font-size: 12px; color: var(--ink-2); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+  .grp-sum:empty, .grp-head[aria-expanded="true"] .grp-sum { display: none; }
+  .grp-sum .est { color: var(--s1); }
+  .grp-sum .warn { color: var(--warn); }
+  .grp-sum .grp-data { margin-left: 2px; }
+  .grp-head .grp-status { grid-area: status; }
+  .grp-head .grp-plus { padding: 0 4px; }
+  .grp-arrow { grid-area: arrow; color: var(--ink-3); font-size: 13px; }
+  .grp-head:hover > b { color: var(--accent); }
+  /* The read-only 模拟 line: its 本工具设定 is the row's state. */
+  .sim-line .tool { display: none; }
+  /* At the bottom: the links, then the result card. */
+  .side-foot { display: block; flex: none; border-top: 1px solid var(--line); }
+  .side-links { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; padding: 8px 16px; font-size: 13px; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  .side-links a { text-decoration: none; }
+  .side-dot { color: var(--ink-3); }
+  .side-card { padding: 10px 16px 14px; }
+  .side-line { margin: 0; font-size: 13px; color: var(--ink-2); }
+  .side-line + .side-line { margin-top: 2px; }
+  .side-age { font-family: var(--f-display); font-weight: 900; font-size: 22px; line-height: 1.3; color: var(--accent); }
+  body.result-held .side-age { color: var(--ink-3); }
+  .side-card .sticky-bar-mini, .side-card .chip { margin-left: 10px; vertical-align: 3px; }
+}
