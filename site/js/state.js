@@ -592,9 +592,10 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
   const rule = id => qs.find(q => q.rule === id);
   const a2 = rule('A2'), a3 = rule('A3'), a4 = rule('A4'), a10 = rule('A10'), b12 = rule('B12'), b14 = rule('B14');
   // A blank or a block in one of the row's own fields; the relations between rows (A2-A4) are placed by hand below.
+  // stop is the problem's id, so a view can tell a stop it shows from one still being typed.
   const stop = fields => {
     const q = qs.find(x => (x.kind === 'block' || x.kind === 'blank') && fields.includes(x.field) && !['A2', 'A3', 'A4'].includes(x.rule));
-    return q ? { status: q.kind, ...(q.rel ? { rel: q.rel } : {}) } : null;
+    return q ? { status: q.kind, stop: q.id, ...(q.rel ? { rel: q.rel } : {}) } : null;
   };
   const ended = id => qs.find(q => q.id === `end:${id}`);
 
@@ -623,16 +624,16 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
   }
   const item = { op: '└', cur: 'work', per, under: 'expense' };
   if (a3 && mOn && kOn) {
-    add('items', 'now', null, monthly(m.monthly + k.count * k.monthly), { ...item, field: a3.field, status: 'block', rel: a3.rel });
+    add('items', 'now', null, monthly(m.monthly + k.count * k.monthly), { ...item, field: a3.field, status: 'block', stop: a3.id, rel: a3.rel });
   } else {
     const mRel = a2 ?? (a3 && mOn ? a3 : null);
-    const mStop = mRel ? { status: 'block', rel: mRel.rel } : stop(['mortgage.monthly', 'mortgage.endYear']);
+    const mStop = mRel ? { status: 'block', stop: mRel.id, rel: mRel.rel } : stop(['mortgage.monthly', 'mortgage.endYear']);
     const mEnd = ended('mortgage');
     if (mOn || mStop || mEnd) {
       add('mortgage', 'now', ITEM_NAME.mortgage, monthly(m.monthly),
         { ...item, field: 'mortgage.monthly', end: m.endYear, ...(mStop ?? (mEnd ? { status: 'ended', rel: mEnd.rel } : {})) });
     }
-    const kStop = a3 && kOn ? { status: 'block', rel: a3.rel } : stop(['kids.count', 'kids.age', 'kids.monthly']);
+    const kStop = a3 && kOn ? { status: 'block', stop: a3.id, rel: a3.rel } : stop(['kids.count', 'kids.age', 'kids.monthly']);
     const kEnd = ended('kids');
     if (kOn || kStop || kEnd) {
       const value = kEnd ? kEnd.rel.value : kOn ? k.count * k.monthly : k.monthly;
@@ -665,7 +666,7 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
   const nextEnd = ends.find(e => e > (holiday ?? S.age));
   const leftAfter = gone => (isSet(S.retExp) ? S.retExp - toRet(gone.reduce((total, e) => total + e.amount, 0)) : null);
   const goneAtHoliday = holiday === null ? [] : events.filter(e => e.endAge <= holiday);
-  const retStop = stop(['retExp']) ?? (a4 ? { status: 'block', rel: a4.rel } : !S.touched?.retExp ? { status: 'est' } : null);
+  const retStop = stop(['retExp']) ?? (a4 ? { status: 'block', stop: a4.id, rel: a4.rel } : !S.touched?.retExp ? { status: 'est' } : null);
   add('retExp', 'after', pro ? '退休后年支出' : '退休后', yearly(leftAfter(goneAtHoliday)), {
     cur: 'retire', per, field: 'retExp', ages: [holiday, nextEnd === undefined ? null : nextEnd - 1], typed: yearly(S.retExp),
     ...(goneAtHoliday.length ? { struck: goneAtHoliday.map(e => ITEM_NAME[e.id]) } : {}), ...retStop,
@@ -676,7 +677,7 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
       { cur: 'work', per, views: 'pro' });
   }
   const retItem = { op: '└', cur: 'retire', per, under: 'retExp' };
-  if (a4) add('ret:items', 'after', null, null, { ...retItem, field: 'retExp', status: 'block', rel: a4.rel });
+  if (a4) add('ret:items', 'after', null, null, { ...retItem, field: 'retExp', status: 'block', stop: a4.id, rel: a4.rel });
   else {
     if (mOn) add('ret:mortgage', 'after', ITEM_NAME.mortgage, monthlyRet(m.monthly), { ...retItem, field: 'mortgage.monthly' });
     if (kOn) add('ret:kids', 'after', ITEM_NAME.kids, monthlyRet(k.count * k.monthly), { ...retItem, field: 'kids.monthly' });

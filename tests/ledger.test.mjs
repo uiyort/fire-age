@@ -112,3 +112,55 @@ test('ledgerHtml held, unreachable, today and backward', () => {
   for (const x of ['30 → 45 岁', `45 岁（你定的） `, `⇒ 要八成：第一年每月存 ¥${Math.round(bo.s0 / 12).toLocaleString('en-US')}`]) assert.ok(bwd.includes(x), x);
   for (const x of ['44 岁 ●', '46 岁 ●', '第一个到八成']) assert.ok(!bwd.includes(x), x);
 });
+
+// ---- Review round 1.
+
+test('ledgerHtml: a saving below zero later on is written with U+2212 and the orange !', () => {
+  const s = { ...defaultState(DATA), income: 60000, expense: 360000 };
+  const p = toParams(s, DATA, 2026); const T = p.life - p.age - 1;
+  const plan = { p, t: T, need: null, unreachable: true };
+  const html = ledgerHtml({ rows: storyRows(s, DATA, 2026, plan), list: [], odds: oddsAround(p, T), plan, state: 'unreachable', view: 'simple', mode: 'fwd', p, dispCur: 'CNY' });
+  assert.ok(!html.includes('¥-'), 'no ASCII minus');
+  assert.match(strip(html), new RegExp(`→ ${p.age + T - 1} 岁每月存下 ! −¥[0-9,]+`));
+  assert.match(html, /<span class="warn"><span aria-label="提示">!<\/span> −¥[\d,]+<\/span>/);
+});
+
+test('ledgerHtml held: only the stops shown on the page stop it; one still being typed is a plain row', () => {
+  const s = { ...S, expense: 84000, pension: -1200 };
+  const all = problems(s, DATA, 2026);
+  assert.ok(all.some(q => q.rule === 'A3') && all.some(q => q.rule === 'B2' && q.field === 'pension'));
+  const shownOnly = all.filter(q => q.rule === 'B2');
+  const text = strip(ledgerHtml({ rows: storyRows(s, DATA, 2026, null), list: shownOnly, odds: [], plan: null, state: 'held', view: 'simple', mode: 'fwd', p: null, dispCur: 'CNY' }));
+  assert.ok(!text.includes('≥ 每月支出'), text);
+  assert.ok(text.includes('└ 其中月供 7,500 → 2045'), text);
+  assert.ok(text.includes('② 放假以后') && text.includes('预计每月养老金 −100 &lt; 0 ✕ ›'), text);
+  assert.equal((text.match(/✕/g) ?? []).length, 1);
+});
+
+test('ledgerHtml backward: savings already enough say so, not ¥0', () => {
+  const back = { ...S, assets: 20000000, mode: 'bwd', tAge: 45 };
+  const p = toParams(back, DATA, 2026); const n = 15;
+  const plan = { p, t: n, need: needLine(p)[n] };
+  const bo = bwdOdds(p);
+  assert.equal(bo.enough, true);
+  const text = strip(ledgerHtml({ rows: storyRows(back, DATA, 2026, plan), list: [], odds: oddsAround(p, n), plan, state: 'ok', view: 'simple', mode: 'bwd', p, dispCur: 'CNY', bwdOdds: bo }));
+  assert.ok(text.includes('⇒ 现在的存款已经够了'), text);
+  assert.ok(!text.includes('¥0') && !text.includes('要八成'));
+});
+
+test('ledgerHtml ②: rows in age order; one that starts before the holiday starts at it', () => {
+  const poor = { ...defaultState(DATA), income: 72000, expense: 72000, pension: 36000, pAge: 63 };
+  const p = toParams(poor, DATA, 2026); const T = p.life - p.age - 1;
+  const plan = { p, t: T, need: null, unreachable: true };
+  const un = strip(ledgerHtml({ rows: storyRows(poor, DATA, 2026, plan), list: [], odds: oddsAround(p, T), plan, state: 'unreachable', view: 'simple', mode: 'fwd', p, dispCur: 'CNY' }));
+  assert.ok(un.includes(`${p.age + T} 起 养老金 −¥3,000`), un);
+  assert.ok(!un.includes('63 起'));
+  assert.ok(un.indexOf('退休后') < un.indexOf('养老金'));
+  const s = { ...S, pension: 48000, pAge: 63, selfPension: 1000, selfMedical: 500 };
+  const q = solve(s);
+  const text = strip(ledgerHtml({ rows: storyRows(s, DATA, 2026, q), list: [], odds: oddsAround(q.p, q.t), plan: q, state: 'ok', view: 'simple', mode: 'fwd', p: q.p, dispCur: 'CNY' }));
+  const at = x => text.indexOf(x);
+  const h = 30 + q.t;
+  for (const x of [`${h}–49 退休后`, `${h}–63 自缴`, '50 起 月供', '63 起 养老金']) assert.ok(at(x) >= 0, x);
+  assert.ok(at(`${h}–49 退休后`) < at(`${h}–63 自缴`) && at(`${h}–63 自缴`) < at('50 起 月供') && at('50 起 月供') < at('63 起 养老金'));
+});

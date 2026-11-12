@@ -705,7 +705,8 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
   const wCur = p ? p.wCur : dispCur;
   const retCur = p ? p.rCur : rCur ?? dispCur;
   const curOf = r => (r.cur === 'retire' ? retCur : wCur);
-  const signed = (v, c) => (v < 0 ? `−${wholeMoney(-v, c)}` : wholeMoney(v, c));
+  const signed = (v, c) => (v === null || v === undefined ? NONE : v < 0 ? `−${wholeMoney(-v, c)}` : wholeMoney(v, c));
+  const flagged = amount => `<span class="warn"><span aria-label="提示">!</span> ${amount}</span>`;
   const held = state === 'held';
 
   // A stopped or blank row: the very relation drawn under the field, or its label and 待填.
@@ -724,22 +725,23 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
     if (r.value === 0 && r.key !== 'pension') return '';
     const c = curOf(r);
     switch (r.key) {
-      case 'have': return lgRow(`${lgOp()}${fieldLink(r.field, r.label)}`, roughMoney(r.value, c));
+      case 'have': return lgRow(`${lgOp()}${fieldLink(r.field, r.label)}`, r.value === null ? NONE : r.value < 0 ? `−${roughMoney(-r.value, c)}` : roughMoney(r.value, c));
       case 'income':
-      case 'expense': return lgRow(`${lgOp(r.op)}${fieldLink(r.field, r.label)}`, `${wholeMoney(r.value, c)}/月`);
+      case 'expense': return lgRow(`${lgOp(r.op)}${fieldLink(r.field, r.label)}`, r.value === null ? NONE : `${signed(r.value, c)}/月`);
       case 'split': return lgRow(fieldLink(r.field, `${OP('=')} ${r.parts.map(v => num(v ?? 0)).join(` ${OP('+')} `)}`), '', 'sub');
       case 'mortgage':
       case 'kids': {
         if (r.status === 'ended') return lgRow(relText({ ...r.rel, value: r.value ?? r.rel.value }), '', 'sub ended');
         const end = r.key === 'kids' ? `${r.end} 岁` : r.end;
-        return lgRow(fieldLink(r.field, `${OP('└')} 其中${r.label} ${num(r.value)} ${OP('→')} ${end}`), '', 'sub');
+        return lgRow(fieldLink(r.field, `${OP('└')} 其中${r.label} ${r.value === null ? NONE : num(r.value)} ${OP('→')} ${end}`), '', 'sub');
       }
       case 'save': {
         const amount = signed(r.value, c);
-        return lgRow(`${lgOp('=')}<b>${r.label}</b>`, r.status === 'flag' ? `<span class="warn"><span aria-label="提示">!</span> ${amount}</span>` : `<b>${amount}</b>`, 'sum');
+        return lgRow(`${lgOp('=')}<b>${r.label}</b>`, r.status === 'flag' ? flagged(amount) : `<b>${amount}</b>`, 'sum');
       }
       case 'growth': return lgRow(`${lgOp()}${r.label} ${TOOL_TAG}`);
-      case 'saveLate': return lgRow(`${lgOp()}${r.label.replace(/^→ /, `${OP('→')} `)}`, wholeMoney(r.value, c));
+      // Below zero it is written with U+2212 and the orange ! of the 每月存下 row.
+      case 'saveLate': return lgRow(`${lgOp()}${r.label.replace(/^→ /, `${OP('→')} `)}`, r.value < 0 ? flagged(signed(r.value, c)) : signed(r.value, c));
       case 'retExp': {
         const est = r.status === 'est' ? '<span class="est" aria-label="估算">≈</span> ' : '';
         return lgRow(`${lgOp()}${agesText(r.ages)}${fieldLink(r.field, r.label)}${r.struck ? ` ${struckHtml(r.struck)}` : ''}`, r.value === null ? NONE : `${est}${wholeMoney(r.value, c)}`);
@@ -751,7 +753,7 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
       default:
         if (r.key.startsWith('after:')) {
           const amount = r.value === null ? NONE : signed(r.value, c);
-          return lgRow(`${lgOp()}${agesText(r.ages)}${struckHtml(r.struck)}`, r.status === 'flag' && r.value !== null ? `<span class="warn"><span aria-label="提示">!</span> ${amount}</span>` : amount);
+          return lgRow(`${lgOp()}${agesText(r.ages)}${struckHtml(r.struck)}`, r.status === 'flag' && r.value !== null ? flagged(amount) : amount);
         }
         return '';
     }
@@ -766,7 +768,11 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
   const none = (label, op) => lgRow(`${lgOp(op)}${label}`, NONE, 'wait');
 
   if (held) {
-    let cut = rows.findIndex(r => r.status === 'block' || r.status === 'blank');
+    // Only the stops the page shows (list) stop the ledger; a stop still being typed is drawn as a plain row.
+    const live = new Set(list.filter(q => q.kind === 'block' || q.kind === 'blank').map(q => q.id));
+    const isStopped = r => r.status === 'block' || r.status === 'blank';
+    rows = rows.map(r => (isStopped(r) && r.stop && !live.has(r.stop) ? { ...r, status: null } : r));
+    let cut = rows.findIndex(isStopped);
     let drawn = cut < 0 ? [] : rows.slice(0, cut + 1);
     // A stop on a field with no row of its own (the age, say) stands first, in its own words.
     if (cut < 0) {
@@ -786,7 +792,13 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
   const now = state === 'now';
   const unreachable = state === 'unreachable';
   const bwd = mode === 'bwd';
-  const draw = s => rows.filter(r => r.section === s && shown(r)).map(rowHtml).join('');
+  // ② in age order: a row that starts at or before the holiday (the pension, when the holiday comes later) starts at it.
+  const fromHoliday = r => (r.section === 'after' && r.ages && r.ages[0] !== null && r.ages[0] !== undefined && r.ages[0] < holiday
+    ? { ...r, ages: [holiday, r.ages[1] !== null && r.ages[1] !== undefined && r.ages[1] < holiday ? holiday : r.ages[1]] } : r);
+  const startOf = r => (r.ages && r.ages[0] !== null && r.ages[0] !== undefined ? r.ages[0] : holiday);
+  const draw = s => rows.filter(r => r.section === s && shown(r)).map(fromHoliday)
+    .map((r, i) => [r, i]).sort(([a, i], [b, j]) => (s === 'after' ? startOf(a) - startOf(b) : 0) || i - j).map(([r]) => r)
+    .map(rowHtml).join('');
   const first = now
     ? sec(head('① 攒钱', '不用再攒'))
     : sec(head('① 攒钱', `${age} ${OP('→')} ${holiday} 岁`) + draw('now') + more(METHOD.now));
@@ -803,7 +815,8 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
   const oddsRows = years.map(o => lgRow(`${lgOp()}<span class="lg-year">${yearLabel(o)}</span> ${dotsHtml(o.count)}`, chengText(o.share), pick(o) ? 'pick' : '')).join('');
   let after = '';
   if (unreachable) after = lgRow(`${lgOp()}规划期内到不了八成`);
-  else if (bwd) after = bwdOdds ? lgRow(`${lgOp('⇒')}要八成：第一年每月存 ${wholeMoney(bwdOdds.s0 / 12, wCur)}`, '', 'sum') : '';
+  // Working backward with savings already enough, the card's words, not a saving of ¥0.
+  else if (bwd && bwdOdds) after = lgRow(`${lgOp('⇒')}${bwdOdds.enough ? '现在的存款已经够了' : `要八成：第一年每月存 ${wholeMoney(bwdOdds.s0 / 12, wCur)}`}`, '', 'sum');
   else if (!now) after = lgRow(`${lgOp('⇒')}<b>第一个到八成</b>`, `<b>${holiday} 岁</b>`, 'sum');
   const third = sec(head('③ 2,000 种年景', `平均每年 ${pct(p.r, 1)} ${TOOL_TAG}`) + oddsRows + after);
   return first + second + third + foot(METHOD.odds);

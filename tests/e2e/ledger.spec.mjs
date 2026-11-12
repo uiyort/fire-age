@@ -49,3 +49,36 @@ test('stopped, the ledger still opens and stops at the stopped row', async ({ pa
   await expect(page.locator('#ledger')).toContainText('② 放假以后');
   await expect(page.locator('#ledger')).toContainText('└ 其中月供 7,500 → 2045');
 });
+
+// ---- Review round 1.
+
+test('held, a stop still being typed does not turn the open ledger red', async ({ page }) => {
+  await page.goto('/');
+  await page.fill('#s-expense', '7000');
+  await page.locator('#life-fold summary').click();
+  await page.fill('#life-mortgage', '7500'); await page.fill('#life-mortgage-end', '2045'); await page.locator('#life-mortgage-end').press('Tab');
+  await page.locator('.ledger-toggle').first().click();
+  await expect(page.locator('#ledger')).toContainText('≥ 每月支出 7,000');
+  await page.locator('#s-expense').focus();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('-5');
+  await expect(page.locator('#s-expense')).not.toHaveAttribute('aria-invalid', 'true');
+  const chip = (await page.locator('#sticky-result .chip').textContent()) ?? '';
+  await expect(page.locator('#ledger')).not.toContainText('每月支出 −5');
+  // Each red row in the ledger is a stop the chip counts.
+  const red = await page.locator('#ledger .lg-row.bad').count();
+  expect(red).toBeLessThanOrEqual(/(\d+) 处/.test(chip) ? Number(chip.match(/(\d+) 处/)[1]) : 1);
+  // Left, the stop is shown on the page and in the ledger alike.
+  await page.locator('#s-expense').press('Tab');
+  await expect(page.locator('#s-expense')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#ledger')).toContainText('每月支出 −5');
+});
+
+test('in the professional view the simple ledger is not drawn', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('.ledger-toggle').first().click();
+  await expect(page.locator('#ledger')).toBeVisible();
+  await page.click('#to-pro');
+  await expect(page.locator('#ledger')).toBeHidden();
+  await expect(page.locator('#ledger')).toBeEmpty();
+});

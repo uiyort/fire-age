@@ -557,11 +557,14 @@ function renderHero() {
 // The ledger, while open, from the numbers as they are: held, the rows stop at the first stop and nothing is worked
 // out; otherwise from the solved plan (the year chosen, working backward; the last year, out of reach).
 function ledgerNow() {
+  // The professional ledger comes with Task 9; until then nothing is worked out for it.
+  if (S.view === 'pro') return '';
   const year = new Date().getFullYear();
-  const view = S.view === 'pro' ? 'pro' : 'simple';
+  const view = 'simple';
   if (isHeld()) {
     const { wCur, rCur } = toParams(S, DATA);
-    return ledgerHtml({ rows: storyRows(S, DATA, year, null), list: stopsNow(), odds: [], plan: null, state: 'held', view, mode: S.mode, p: null, dispCur: wCur, rCur });
+    // Only the stops marked on the page; one still being typed waits there too (the field is not red yet).
+    return ledgerHtml({ rows: storyRows(S, DATA, year, null), list: stopsNow().filter(q => shown.has(q.id)), odds: [], plan: null, state: 'held', view, mode: S.mode, p: null, dispCur: wCur, rCur });
   }
   const { p, t, bwd, target, odds, mc, mode, dispCur: cur } = latest;
   const unreachable = mode !== 'bwd' && t === null;
@@ -1048,8 +1051,7 @@ function holdResult(stops, marks = stops) {
     $('sticky-result').innerHTML = sticky;
   }
   markProblems(marks);
-  // A stop still being typed is not drawn yet, in the ledger either: it follows once the field is left.
-  if (marks === stops) renderLedger();
+  renderLedger();
 }
 
 // Puts the cursor in a field: the professional view first if only it has the field, then the numbers opened, every
