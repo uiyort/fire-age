@@ -83,8 +83,9 @@ input[type=number]:hover, input[type=text]:hover, select:hover { border-color: v
 input:disabled { opacity: .65; }
 /* A stopped result (a rule blocks or a field is blank): the field to fix has a solid red frame, the field it is
    compared with a dashed one, and everything worked out from the result is hidden, not dimmed. */
-.f.bad input, .f.bad input:hover, label.bad input, label.bad input:hover { border: 2px solid var(--bad); }
-.f.cmp input, .f.cmp input:hover, label.cmp input, label.cmp input:hover { border: 1px dashed var(--bad); }
+/* The frames keep the 1 px border, so a mark never changes the field's size. */
+.f.bad input, .f.bad input:hover, label.bad input, label.bad input:hover { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); }
+.f.cmp input, .f.cmp input:hover, label.cmp input, label.cmp input:hover { border-style: dashed; border-color: var(--bad); }
 .chip { font: inherit; font-size: 13px; font-weight: 700; line-height: 1.2; padding: 4px 12px; border: 0; border-radius: 999px; background: var(--bad); color: #fff; cursor: pointer; white-space: nowrap; flex: none; }
 body.result-held .sticky-age, body.result-held .hero-big { color: var(--ink-3); }
 body.result-held #type-section, body.result-held #type-all, body.result-held #tiles, body.result-held #views-banner,

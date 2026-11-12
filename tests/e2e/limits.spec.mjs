@@ -110,6 +110,58 @@ test('a plan end saved above 110: the chip names 规划到 in the simple view an
   await expect(page.locator('#sticky-result')).toContainText('财务独立 — 岁');
 });
 
+test('a help card shows nothing worked out from blocked numbers, and its numbers come back once fixed', async ({ page }) => {
+  await page.goto('/');
+  await page.click('#help-expense');
+  await expect(page.locator('#card-expense')).toContainText('岁放假');
+  await page.fill('#s-expense', '7000');
+  await page.locator('#life-fold summary').click();
+  await page.fill('#life-mortgage', '7500'); await page.fill('#life-mortgage-end', '2045');
+  await page.locator('#life-mortgage-end').press('Tab');
+  await expect(page.locator('#sticky-result .chip')).toHaveText('拦住：房贷 ›');
+  // A card open when the hold starts is drawn again without its numbers.
+  await expect(page.locator('#card-expense')).toBeVisible();
+  await expect(page.locator('#card-expense')).not.toContainText('岁放假');
+  // A card opened while held has none either.
+  await page.click('#help-income');
+  await expect(page.locator('#card-income')).toBeVisible();
+  for (const id of ['#card-income', '#card-expense']) {
+    await expect(page.locator(id)).not.toContainText('岁放假');
+    await expect(page.locator(id)).not.toContainText('提前');
+  }
+  await page.fill('#life-mortgage', '5000');
+  await expect(page.locator('.chip')).toHaveCount(0);
+  await expect(page.locator('#card-income')).toContainText('岁放假');
+  await expect(page.locator('#card-expense')).toContainText('岁放假');
+});
+
+test('typing that fixes the shown stop and breaks another rule in the same field never leaves the fixed stop on the chip', async ({ page }) => {
+  await page.goto('/');
+  await page.fill('#s-age', ''); await page.locator('#s-age').press('Tab');
+  await expect(page.locator('#sticky-result .chip')).toHaveText('待填：年龄 ›');
+  await page.locator('#s-age').fill('3');
+  await expect(page.locator('#sticky-result .chip')).not.toHaveText('待填：年龄 ›');
+  await expect(page.locator('[aria-invalid="true"]')).toHaveCount(0);
+  await page.locator('#s-age').press('Tab');
+  await expect(page.locator('#sticky-result .chip')).toHaveText('拦住：年龄 ›');
+  await expect(page.locator('#s-age')).toHaveAttribute('aria-invalid', 'true');
+});
+
+test('a mark does not change the size of the field', async ({ page }) => {
+  await page.goto('/');
+  const size = sel => page.locator(sel).evaluate(el => { const r = el.getBoundingClientRect(); return [r.width, r.height]; });
+  const age = await size('#s-age'), expense = await size('#s-expense');
+  await page.fill('#s-age', '12');
+  await page.fill('#s-expense', '7000');
+  await page.locator('#life-fold summary').click();
+  await page.fill('#life-mortgage', '7500'); await page.fill('#life-mortgage-end', '2045');
+  await page.locator('#life-mortgage-end').press('Tab');
+  await expect(page.locator('#s-age')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#s-expense').locator('xpath=ancestor::div[contains(@class,"f")][1]')).toHaveClass(/cmp/);
+  expect(await size('#s-age')).toEqual(age);
+  expect(await size('#s-expense')).toEqual(expense);
+});
+
 test('no horizontal scroll at 390 px while stopped', async ({ page }) => {
   await page.goto('/');
   await page.fill('#s-age', '120'); await page.locator('#s-age').press('Tab');

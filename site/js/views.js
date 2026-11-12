@@ -322,11 +322,12 @@ export function viewsBannerHtml(answers, base, params, applied, sliders = []) {
   return `<h2>你在简单模式里的判断</h2><p class="sub">来自年景题和"等你来写"的滑杆，带入后可以继续手动调整。</p><ul class="scn-summary">${[...views, ...chosen].join('')}</ul><div class="goal-row">${action}</div>`;
 }
 
+// impact null (the result is stopped): the card says what the number is, without anything worked out from it.
 export function cardBody(param, impact, tryBlock = '') {
   const ref = param.range
     ? `${param.range.text} <a href="${param.range.sourceUrl}" target="_blank" rel="noopener">出处</a>`
     : param.noRangeReason;
-  return `<p>${param.what}</p><p class="imp">${impactSentence(impact)}</p>${tryBlock}<p>${param.improve}</p><p class="ref">参考：${ref}</p>`;
+  return `<p>${param.what}</p>${impact === null ? '' : `<p class="imp">${impactSentence(impact)}</p>`}${tryBlock}<p>${param.improve}</p><p class="ref">参考：${ref}</p>`;
 }
 
 export function pctTableHtml({ p, mc, target, dispCur }) {

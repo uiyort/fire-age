@@ -666,13 +666,21 @@ function renderGoal(p) {
   $('goal-body').innerHTML = goalHtml(goal, compareVisit(goal, p, today()));
 }
 
-const fullCard = (param, p) => cardBody(param, impactOf(p, param.id), tryHtml(param.id, tryRange(p, param.id), labValues[param.id], { mode: S.mode, p }));
-
-function renderCards(p) {
+// While a blank or a block stops the result, a card leaves out its impact and its slider: both are worked out from
+// the numbers, which must not reach the model.
+const fullCard = (param, p) => (isHeld() || stopsNow().length
+  ? cardBody(param, null)
+  : cardBody(param, impactOf(p, param.id), tryHtml(param.id, tryRange(p, param.id), labValues[param.id], { mode: S.mode, p })));
+// Redraws the help cards open in the form, when the result stops or starts again.
+function renderOpenCards(p) {
   for (const param of PARAMS) {
     const inline = $(`card-${param.id}`);
     if (inline && !inline.hidden) inline.innerHTML = fullCard(param, p);
   }
+}
+
+function renderCards(p) {
+  renderOpenCards(p);
   // The simple list keeps only what writes the last life; every parameter stays in the professional view.
   const box = $('cards');
   if (box.dataset.mode !== S.mode) {
@@ -766,11 +774,12 @@ function markProblems(list) {
   }
 }
 
-// The stopped result: — 岁放假 and the chip; nothing is worked out from the numbers. The form is drawn once per set of
-// numbers, so a second call for the same numbers (a change, then a focusout) never swaps an element under the pointer.
+// The stopped result: — 岁放假, the chip naming stops, frames for marks (the stops shown, by default all of them).
+// Nothing is worked out from the numbers. The form is drawn once per set of numbers, so a second call for the same numbers (a change, then a
+// focusout) never swaps an element under the pointer.
 let heldState = null;
 let stickyNow = '';
-function holdResult(stops) {
+function holdResult(stops, marks = stops) {
   cancelAnimationFrame(frame);
   clearTimeout(mcTimer);
   clearTimeout(proTimer);
@@ -793,13 +802,14 @@ function holdResult(stops) {
     const head = heldHeadHtml(S.view);
     $('headline').innerHTML = head;
     $('headline').hidden = !head;
+    renderOpenCards(p);
   }
   const sticky = stickyHtml(null, { pro: S.view === 'pro', chip: chipText(stops) });
   if (sticky !== stickyNow) {
     stickyNow = sticky;
     $('sticky-result').innerHTML = sticky;
   }
-  markProblems(stops);
+  markProblems(marks);
 }
 
 // Puts the cursor in a field: the professional view first if only it has the field, then the numbers opened, every
@@ -856,9 +866,10 @@ function refresh({ commit = false } = {}) {
     clearTimeout(mcTimer);
     clearTimeout(proTimer);
     stale = true;
+    // Already stopped, the chip names what is wrong now, never a stop just fixed; only the shown stops keep marks.
     shown = new Set([...shown].filter(id => stops.some(q => q.id === id)));
     const still = stops.filter(q => shown.has(q.id));
-    if (still.length) holdResult(still);
+    if (isHeld()) holdResult([...still, ...held], still);
     else markProblems([]);
     return;
   }
@@ -871,6 +882,7 @@ function refresh({ commit = false } = {}) {
     heldState = null;
     document.body.classList.remove('result-held');
     renderFast();
+    renderOpenCards(latest.p);
     clearTimeout(mcTimer);
     clearTimeout(proTimer);
     mcTimer = setTimeout(() => renderSimulation({ chunked: true }), MC_DELAY_MS);
