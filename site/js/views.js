@@ -592,13 +592,13 @@ export function splitLineHtml(row, { view, wCur }) {
 // ---- The lines under the fields: what a number holds, why it is stopped, and what is left once the items end.
 
 // A relation as one line of text: the names and amounts on the left, then the operator and the other side. An item
-// that has ended is struck through with its fact (HTML, read as 已结束，不计入). Years are written without grouping.
-const YEAR_LABEL = FIELD_LABEL.simple['mortgage.endYear'];
+// that has ended is struck through with its fact (HTML, read as 已结束，不计入). A year (left item flagged year: true)
+// is written without grouping, on both sides.
 const plainYear = v => (v < 0 ? `−${Math.abs(v)}` : String(v));
 export function relText(rel) {
   if (rel.ended) return `<span aria-label="已结束，不计入">└ 其中<s>${rel.label} ${num(rel.value)}${rel.unit ?? ''}</s> ${rel.fact}</span>`;
   const { sub, left, op, right } = rel;
-  const fmt = left.length === 1 && left[0].label === YEAR_LABEL ? plainYear : num;
+  const fmt = left.length === 1 && left[0].year ? plainYear : num;
   const sum = left.reduce((total, x) => total + x.value, 0);
   const lhs = `${left.map(x => x.label).join(' + ')} ${fmt(sum)}${left[0].unit ?? ''}`;
   const rhs = op ? ` ${op} ${right.label ? `${right.label} ` : ''}${fmt(right.value)}${right.unit ?? ''}` : '';

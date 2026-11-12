@@ -60,8 +60,11 @@ const strip = h => h.replace(/<\/(p|div|li|button)>/g, ' ').replace(/<[^>]+>/g, 
 test('relText writes the relation the way the spec does', () => {
   assert.equal(relText({ sub: true, left: [{ label: '月供', value: 7500 }], op: '≥', right: { label: '每月支出', value: 7000 } }), '└ 其中月供 7,500 ≥ 每月支出 7,000');
   assert.equal(relText({ sub: true, left: [{ label: '月供', value: 7500 }, { label: '孩子', value: 1700 }], op: '≥', right: { label: '每月支出', value: 8000 } }), '└ 其中月供 + 孩子 9,200 ≥ 每月支出 8,000');
-  assert.equal(relText({ sub: false, left: [{ label: '还到哪年', value: 2200 }], op: '>', right: { label: null, value: 2066 } }), '还到哪年 2200 > 2066');
-  assert.equal(relText({ sub: false, left: [{ label: '还到哪年', value: 20 }], op: '<', right: { label: null, value: 1976 } }), '还到哪年 20 < 1976');
+  assert.equal(relText({ sub: false, left: [{ label: '还到哪年', value: 2200, year: true }], op: '>', right: { label: null, value: 2066 } }), '还到哪年 2200 > 2066');
+  // The flag, not the label, keeps a year ungrouped.
+  assert.equal(relText({ sub: false, left: [{ label: '还清那年', value: 2200, year: true }], op: '>', right: { label: null, value: 2066 } }), '还清那年 2200 > 2066');
+  assert.equal(relText({ sub: false, left: [{ label: '还到哪年', value: 2200 }], op: '>', right: { label: null, value: 2066 } }), '还到哪年 2,200 > 2,066');
+  assert.equal(relText({ sub: false, left: [{ label: '还到哪年', value: 20, year: true }], op: '<', right: { label: null, value: 1976 } }), '还到哪年 20 < 1976');
   assert.equal(relText({ sub: false, left: [{ label: '孩子几个', value: 1.5 }], op: null, right: null }), '孩子几个 1.5');
   assert.equal(relText({ sub: false, left: [{ label: '每月支出', value: -500 }], op: '<', right: { label: null, value: 0 } }), '每月支出 −500 < 0');
   assert.equal(relText({ sub: true, left: [{ label: '月供', value: 108000, unit: '/年' }], op: '≥', right: { label: '当前年支出', value: 96000 } }), '└ 其中月供 108,000/年 ≥ 当前年支出 96,000');

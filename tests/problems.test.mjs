@@ -82,14 +82,14 @@ test('A5: a half-filled group waits; children counted as 0 need nothing more', (
 
 test('A6: the end year is a whole year from 50 years back to 40 ahead; before this year it has ended', () => {
   const at = endYear => P(S0({ real: real({ monthly: 3000, endYear }) }));
-  assert.deepEqual(at(20)[0].rel, { sub: false, left: [{ label: '还到哪年', value: 20 }], op: '<', right: { label: null, value: 1976 } });
+  assert.deepEqual(at(20)[0].rel, { sub: false, left: [{ label: '还到哪年', value: 20, year: true }], op: '<', right: { label: null, value: 1976 } });
   assert.deepEqual(at(20)[0].fixes, []); assert.equal(at(20)[0].chip, '房贷');
   assert.equal(at(1975)[0].kind, 'block');
   assert.deepEqual(at(1976)[0].rel, { sub: true, ended: true, label: '月供', value: 3000, fact: '1976 已还完' });
   assert.equal(at(2025)[0].kind, 'ended');
   assert.deepEqual(at(2026), []); assert.deepEqual(at(2066), []);
   assert.deepEqual(at(2067)[0].rel.right, { label: null, value: 2066 }); assert.equal(at(2067)[0].rel.op, '>');
-  assert.deepEqual(at(2045.5)[0].rel, { sub: false, left: [{ label: '还到哪年', value: 2045.5 }], op: null, right: null });
+  assert.deepEqual(at(2045.5)[0].rel, { sub: false, left: [{ label: '还到哪年', value: 2045.5, year: true }], op: null, right: null });
 });
 
 test('A7: children are a whole number, not negative; 0 has ended', () => {

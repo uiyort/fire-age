@@ -148,12 +148,22 @@ test.describe('mortgage and children', () => {
     await page.fill('#split-rent', '5000');
     await expect(link).toBeVisible();
     await expect(link).toHaveText('房贷会还完？填上还到哪年 ›');
+    // The = line follows the parts directly; the link comes after the lines under spending.
+    expect(await page.locator('#expense-split').evaluate(el => el.lastElementChild.classList.contains('split-row'))).toBe(true);
+    expect(await page.locator('#lines-expense').evaluate(el => el.previousElementSibling.id)).toBe('expense-split');
+    expect(await page.locator('#lines-expense').evaluate(el => el.firstElementChild.id)).toBe('split-line-s');
+    expect(await page.evaluate(() => Boolean(document.getElementById('split-line-s').compareDocumentPosition(document.getElementById('split-life')) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
     await page.fill('#split-rent', '0');
     await expect(link).toBeHidden();
     await page.fill('#split-rent', '5000');
     await link.click();
     expect(await page.locator('#life-fold').evaluate(el => el.open)).toBe(true);
     await expect(page.locator('#life-mortgage')).toBeFocused();
+    // Once a mortgage is filled the link only repeats the box below; cleared, it is back.
+    await page.fill('#life-mortgage', '3000');
+    await expect(link).toBeHidden();
+    await page.fill('#life-mortgage', '');
+    await expect(link).toBeVisible();
     await page.locator('#split-line-s [data-unsplit]').click();
     await expect(link).toBeHidden();
   });

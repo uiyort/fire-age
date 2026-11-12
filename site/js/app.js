@@ -3,7 +3,7 @@ import DATA from './data-latest.js';
 import { DEFAULT_SEED, bwdSolve, monteCarlo, walkPath } from './engine.js';
 import { bwdOdds, decilePaths, dualOdds, extendRow, needLine, oddsRuler, oddsSolve, oddsYears, successAt } from './odds.js';
 import { hardestIndex, heroModel, holidayType, oddsText, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking, townPlan, cardPlace, withoutItemsGain } from './holiday.js';
-import { FIELD_LABEL, FIELD_ORDER, LIMITS, applyPensionEstimate, cleanSplit, commitField, defaultState, loadState, problems, resetRetExp, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setSplit, setTown, setWorkCountry, splitOn, storyRows, toParams, unsplit } from './state.js';
+import { FIELD_LABEL, FIELD_ORDER, LIMITS, applyPensionEstimate, cleanReal, cleanSplit, commitField, defaultState, loadState, problems, resetRetExp, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setSplit, setTown, setWorkCountry, splitOn, storyRows, toParams, unsplit } from './state.js';
 import { estimateFromForm } from './pension.js';
 import { labPlan, lifeChoices, personalLever, rankLevers, impactOf, smallStep, tryRange } from './levers.js';
 import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody } from './scenario.js';
@@ -288,13 +288,11 @@ function splitHtml(prefix) {
   // The professional total is yearly, so its parts say they are monthly.
   const unit = simple ? '' : ' <span class="u">/月</span>';
   const parts = SPLIT_PARTS.map(([key, name]) => `<label><span>${name}${unit}</span><input type="number" inputmode="decimal" id="${simple ? '' : 'p-'}split-${key}" step="100" min="0" placeholder="0"></label>`).join('');
-  const life = simple ? '<button type="button" class="split-life" id="split-life" hidden>房贷会还完？填上还到哪年 ›</button>' : '';
-  return `<details class="split" id="${simple ? '' : 'p-'}expense-split"><summary>每月花多少说不准？拆开来加</summary><div class="split-row">${parts}</div>${life}</details>`;
+  return `<details class="split" id="${simple ? '' : 'p-'}expense-split"><summary>每月花多少说不准？拆开来加</summary><div class="split-row">${parts}</div></details>`;
 }
 
 // The split as stored, written into both views: the parts (except the one being typed in) and the locked total; its
-// line is drawn with the lines under spending. A rent or mortgage in the parts may end one day, so the simple view
-// points at the fold for the end year.
+// line is drawn with the lines under spending.
 function syncSplit() {
   const sp = cleanSplit(S.split);
   const on = splitOn(S);
@@ -321,7 +319,6 @@ function syncSplit() {
       total.removeAttribute('aria-label');
     }
   }
-  $('split-life').hidden = !(sp.rent > 0);
   renderLines();
 }
 
@@ -870,7 +867,11 @@ function renderLines() {
     const html = list.filter(q => isStop(q) && q.rel?.sub && q.field === key).map(q => fixesHtml(q.fixes)).join('');
     return html ? `<div class="fixes">${html}</div>` : '';
   };
-  setHtml(linesExp, lines('expense') + ownFixes('expense'));
+  // A rent or mortgage in the parts may end one day, so the simple view points at the fold for the end year, after the
+  // lines; once a mortgage is filled the box below already says it.
+  const lifeLink = view === 'simple' && sp.rent > 0 && !(cleanReal(S.real).mortgage.monthly > 0)
+    ? '<button type="button" class="split-life" id="split-life">房贷会还完？填上还到哪年 ›</button>' : '';
+  setHtml(linesExp, lines('expense') + ownFixes('expense') + lifeLink);
   setHtml(linesRet, lines('retExp') + ownFixes('retExp'));
   // Everything else goes right after its solid field: a range rule's line and its exits, or the exits alone.
   const after = new Map();

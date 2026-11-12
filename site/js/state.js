@@ -350,7 +350,7 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
   // A6: the end year is a whole year in range; before this year the mortgage has ended.
   if (m.endYear !== null) {
     const y = m.endYear, back = thisYear - LIMITS.endYearBack, ahead = thisYear + LIMITS.endYearAhead;
-    const left = [{ label: label('mortgage.endYear'), value: y }];
+    const left = [{ label: label('mortgage.endYear'), value: y, year: true }];
     const rel = !Number.isInteger(y) ? { sub: false, left, op: null, right: null }
       : y < back ? { sub: false, left, op: '<', right: { label: null, value: back } }
         : y > ahead ? { sub: false, left, op: '>', right: { label: null, value: ahead } } : null;
