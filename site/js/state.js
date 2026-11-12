@@ -310,6 +310,8 @@ export function setSplit(S, part, rawText, data) {
   if (SPLIT_PARTS.every(k => split[k] === null)) return unsplit({ ...S, split }, data);
   if (SPLIT_PARTS.every(k => old[k] === null)) split.before = S.expense ?? null;
   const next = { ...S, split };
+  // Every part now blank or 0 after the split was on: the same as 只填总数. A negative part stays, for B2 to stop.
+  if (splitOn(S) && !splitOn(next) && SPLIT_PARTS.every(k => !(split[k] < 0))) return unsplit(next, data);
   if (splitOn(next)) next.expense = splitTotal(split);
   return reestimate(next, data);
 }
@@ -431,7 +433,7 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
     const field = pick.includes(last) ? last : sides[1];
     const side = f => (f === 'expense' || SPLIT_KEYS.includes(f) ? 'spend' : f.split('.')[0]);
     add({ id: 'A3', rule: 'A3', kind: 'block', field, compare: sides.filter(f => side(f) !== side(field)), at: 'expense',
-      rel: { sub: true, left: items(v => (pro ? v * 12 : v), pro ? '/年' : null), op: '≥', right: { label: label('expense'), value: pro ? S.expense : S.expense / 12 } },
+      rel: { sub: true, left: items(v => (pro ? v * 12 : v), pro ? '/年' : null), op: '≥', right: { label: label('expense'), value: pro ? S.expense : Math.round(S.expense / 12) } },
       fixes: [
         { text: `改${label('expense')}`, focus: spendField },
         ...(mortgageOn ? [{ text: `改${label('mortgage.monthly')}`, focus: 'mortgage.monthly' }] : []),
@@ -446,7 +448,7 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
     const shown = v => (work === ret ? v : Math.round(toRet(v)));
     const est = Math.round(estimateRetireSpend(S.expense ?? 0, S.workC, S.retC, data, itemsYearly(S, thisYear)));
     add({ id: 'A4', rule: 'A4', kind: 'block', field: 'retExp', at: 'retExp',
-      rel: { sub: true, left: items(v => shown(pro ? v * 12 : v), pro ? '/年' : null), op: '≥', right: { label: label('retExp'), value: pro ? S.retExp : S.retExp / 12 } },
+      rel: { sub: true, left: items(v => shown(pro ? v * 12 : v), pro ? '/年' : null), op: '≥', right: { label: label('retExp'), value: pro ? S.retExp : Math.round(S.retExp / 12) } },
       fixes: [{ text: `改回估算 ≈ ${num(pro ? est : Math.round(est / 12))}`, reset: 'retExp' }] });
   }
 
@@ -462,11 +464,93 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
     if (convert(afterMonthly, ret, work, data) < S.expense / 12 * LIMITS.low) add({ id: 'A10', rule: 'A10', kind: 'flag', field: 'retExp', at: 'retExp' });
   }
 
+  // ---- Ranges (B2-B10), the same in both views; only the labels and units follow the view.
+  const NEG = ['assets', 'income', 'expense', 'retExp', 'pension', 'selfPension', 'selfMedical', ...SPLIT_KEYS, 'mortgage.monthly', 'kids.monthly'];
+  const YEARLY = ['income', 'expense', 'retExp', 'pension'];
+  const valueOf = f => {
+    const [head, tail] = f.split('.');
+    if (tail === undefined) return S[f];
+    return head === 'split' ? split[tail] : head === 'pen' ? cleanPen(S.pen)[tail] : cleanReal(S.real)[head][tail];
+  };
+  // B2: no amount below 0. The exit drops the minus sign; savings go to 0.
+  for (const f of NEG) {
+    const v = valueOf(f);
+    if (!isSet(v) || !(v < 0)) continue;
+    const shown = x => (!pro && YEARLY.includes(f) ? Math.round(x / 12) : x);
+    const fixTo = f === 'assets' ? 0 : Math.abs(v);
+    add({ rule: 'B2', kind: 'block', field: f, at: f.includes('.') ? 'expense' : f,
+      rel: { sub: false, left: [{ label: label(f), value: shown(v) }], op: '<', right: { label: null, value: 0 } },
+      fixes: [{ text: `→ ${num(shown(fixTo))}`, aria: `${label(f)}改成 ${num(shown(fixTo))}`, set: { [f]: fixTo } }] });
+  }
+  // The age rules wait while the age itself is blocked (B3), so one wrong age is one problem.
+  const A = S.age, ageOk = isSet(A) && A >= LIMITS.age[0] && A <= LIMITS.age[1], life = S.life, tAge = S.tAge, bwd = S.mode === 'bwd';
+  const one = (rule, field, v, op, right, fix) => add({ rule, kind: 'block', field, rel: { sub: false, left: [{ label: label(field), value: v }], op, right }, fixes: [to(field, fix)] });
+  // B3: age 16 to 85.
+  if (isSet(A) && (A < LIMITS.age[0] || A > LIMITS.age[1])) {
+    const low = A < LIMITS.age[0], edge = LIMITS.age[low ? 0 : 1];
+    one('B3', 'age', A, low ? '<' : '>', { label: null, value: edge }, edge);
+  }
+  // B4: working backward, the age to holiday at is above the age and below the plan end; equal blocks.
+  if (bwd && isSet(tAge) && ageOk && tAge <= A) one('B4', 'tAge', tAge, '≤', { label: label('age'), value: A }, A + 1);
+  else if (bwd && isSet(tAge) && isSet(life) && tAge >= life) one('B4', 'tAge', tAge, '≥', { label: label('life'), value: life }, life - 1);
+  // B5: the plan end from age + 2 to 110. Too small goes to 95, or to the least that works.
+  if (isSet(life) && ageOk && life < A + LIMITS.lifeMin) {
+    const back = bwd && isSet(tAge);
+    const fix = 95 >= A + LIMITS.lifeMin && (!back || 95 > tAge) ? 95 : Math.max(A + LIMITS.lifeMin, back ? tAge + 1 : 0);
+    one('B5', 'life', life, '<', { label: null, value: A + LIMITS.lifeMin }, fix);
+  } else if (isSet(life) && life > LIMITS.lifeMax) one('B5', 'life', life, '>', { label: null, value: LIMITS.lifeMax }, LIMITS.lifeMax);
+  // B6-B9: plain ranges.
+  const range = (rule, field, lo, hi, fixLow, fixHigh) => {
+    const v = S[field];
+    if (!isSet(v) || (v >= lo && v <= hi)) return;
+    const low = v < lo;
+    one(rule, field, v, low ? '<' : '>', { label: null, value: low ? lo : hi }, low ? fixLow(v) : fixHigh(v));
+  };
+  range('B6', 'pAge', LIMITS.pAge[0], LIMITS.pAge[1], () => LIMITS.pAge[0], () => LIMITS.pAge[1]);
+  range('B7', 'eq', 0, 100, () => 0, () => 100);
+  range('B7', 'flexCut', 0, 100, () => 0, () => 100);
+  range('B8', 'rho', -1, 1, () => -1, () => 1);
+  for (const f of ['sigEq', 'sigBd']) range('B9', f, 0, 1, v => Math.abs(v), v => Math.round(v / 100 * 1e6) / 1e6);
+  // B10: a typed withdrawal rate above 0 and up to 10.
+  if (!S.autoSwr && isSet(S.swr) && (S.swr <= 0 || S.swr > LIMITS.swrMax)) {
+    const low = S.swr <= 0;
+    one('B10', 'swr', S.swr, low ? '≤' : '>', { label: null, value: low ? 0 : LIMITS.swrMax }, low ? 3.9 : LIMITS.swrMax);
+  }
+
+  // ---- Judgement flags, professional view only (the simple view has only A10 and B14).
+  if (pro) {
+    // B11: a changed assumption outside the common range. A default, or a value that follows the monthly data, never flags.
+    const own = defaultState(data), follow = localAssumptions(data.countries[S.workC]);
+    for (const [f, [lo, hi]] of Object.entries(LIMITS.common)) {
+      const def = f in follow ? follow[f] : own[f];
+      if (!isSet(S[f]) || S[f] === def || (S[f] >= lo && S[f] <= hi)) continue;
+      add({ rule: 'B11', kind: 'flag', field: f, note: `常见 ${num(lo)} 到 ${num(hi)}` });
+    }
+    // B12: a pension above the year's spending: the rest is not counted.
+    if (isSet(S.pension) && isSet(S.retExp) && S.pension > S.retExp) {
+      add({ rule: 'B12', kind: 'flag', field: 'pension', rel: { sub: false, left: [{ label: '养老金', value: S.pension }], op: '>', right: { label: '年支出', value: S.retExp } }, note: `多出 ${num(S.pension - S.retExp)} 不计` });
+    }
+    // B13: the mix return, worked out as buildParams does before its floor, below −50%.
+    if ([S.eq, S.eqReal, S.bondY, S.infl, S.drag].every(isSet)) {
+      const w = Math.min(Math.max(S.eq, 0), 100) / 100;
+      const r = w * S.eqReal / 100 + (1 - w) * (S.bondY - S.infl) / 100 - S.drag / 100;
+      if (r < -0.5) add({ rule: 'B13', kind: 'flag', field: 'eqReal', at: 'ledger', note: '按 −50% 算' });
+    }
+  }
+
+  // B15: the claim's years of payment cannot be fewer than the years already paid; only that line stops.
+  const pen = cleanPen(S.pen);
+  if (isSet(pen.paidYears) && isSet(pen.years) && pen.years < pen.paidYears) {
+    add({ rule: 'B15', kind: 'local', field: 'pen.years',
+      rel: { sub: false, left: [{ label: label('pen.years'), value: pen.years, unit: ' 年' }], op: '<', right: { label: '已缴', value: pen.paidYears, unit: ' 年' } },
+      fixes: [to('pen.years', pen.paidYears)] });
+  }
+
   // B14: spending above income still counts (savings stay at 0 or above), with an orange line under spending.
   if (isSet(S.income) && isSet(S.expense) && S.income < S.expense) {
     const yearly = S.income - S.expense;
     add({ id: 'B14', rule: 'B14', kind: 'flag', field: 'expense', at: 'expense',
-      rel: { sub: false, left: [{ label: pro ? '年储蓄' : '每月存下', value: pro ? yearly : yearly / 12 }], op: null, right: null },
+      rel: { sub: false, left: [{ label: pro ? '年储蓄' : '每月存下', value: pro ? yearly : Math.round(yearly / 12) }], op: null, right: null },
       note: pro ? '存款用完后按 0 算' : null });
   }
 

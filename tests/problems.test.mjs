@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
-import { defaultState, loadState, problems, setSplit, unsplit, splitOn, cleanSplit, itemsYearly, setWorkCountry, num } from '../site/js/state.js';
+import { defaultState, loadState, problems, setSplit, unsplit, splitOn, cleanSplit, itemsYearly, setWorkCountry, setRetireCountry, num } from '../site/js/state.js';
 
 const real = (m = {}, k = {}) => ({ mortgage: { monthly: null, endYear: null, ...m }, kids: { count: null, age: null, monthly: null, ...k } });
 const S0 = o => ({ ...defaultState(DATA), ...o });
@@ -222,3 +222,157 @@ test('a broken saved split: no split, the saved spending kept, no problems', () 
     assert.deepEqual(P(S), []);
   }
 });
+
+const rel = (S, rule) => only(S, rule)[0]?.rel;
+const fixTexts = (S, rule) => only(S, rule)[0]?.fixes.map(f => f.text);
+
+test('B2: amounts below 0 block; 0 is fine; the exit drops the minus sign, savings go to 0', () => {
+  assert.deepEqual(rel(S0({ expense: -6000 }), 'B2'), { sub: false, left: [{ label: '每月支出', value: -500 }], op: '<', right: { label: null, value: 0 } });
+  assert.deepEqual(only(S0({ expense: -6000 }), 'B2')[0].fixes, [{ text: '→ 500', aria: '每月支出改成 500', set: { expense: 6000 } }]);
+  assert.deepEqual(fixTexts(S0({ assets: -1 }), 'B2'), ['→ 0']);
+  assert.equal(only(S0({ assets: 0 }), 'B2').length, 0);
+  assert.equal(rel(S0({ view: 'pro', expense: -6000 }), 'B2').left[0].label, '当前年支出');
+  assert.equal(only(S0({ selfPension: -100 }), 'B2')[0].chip, '自缴');
+  let S = setSplit(defaultState(DATA), 'rent', '-500', DATA);
+  assert.equal(only(S, 'B2')[0].field, 'split.rent');
+});
+
+test('B3: age from 16 to 85', () => {
+  assert.deepEqual(rel(S0({ age: 120 }), 'B3'), { sub: false, left: [{ label: '年龄', value: 120 }], op: '>', right: { label: null, value: 85 } });
+  assert.deepEqual(fixTexts(S0({ age: 120 }), 'B3'), ['→ 85']);
+  assert.deepEqual(fixTexts(S0({ age: 12 }), 'B3'), ['→ 16']);
+  assert.equal(only(S0({ age: 16 }), 'B3').length + only(S0({ age: 85 }), 'B3').length, 0);
+});
+
+test('B4: the age to holiday at sits strictly between age and the plan end; equal blocks', () => {
+  const bwd = o => S0({ mode: 'bwd', ...o });
+  assert.deepEqual(rel(bwd({ tAge: 25 }), 'B4'), { sub: false, left: [{ label: '想几岁放假', value: 25 }], op: '≤', right: { label: '年龄', value: 30 } });
+  assert.deepEqual(fixTexts(bwd({ tAge: 25 }), 'B4'), ['→ 31']);
+  assert.equal(only(bwd({ tAge: 30 }), 'B4').length, 1);
+  assert.equal(only(bwd({ tAge: 31 }), 'B4').length, 0);
+  assert.deepEqual(rel(bwd({ tAge: 95 }), 'B4').right, { label: '规划到', value: 95 });
+  assert.deepEqual(fixTexts(bwd({ tAge: 99 }), 'B4'), ['→ 94']);
+  assert.equal(only(S0({ tAge: 25 }), 'B4').length, 0);
+  assert.equal(only(bwd({ view: 'pro', tAge: 25 }), 'B4')[0].chip, '目标年龄');
+});
+
+test('B5: the plan end is at least age + 2 and at most 110; too small goes to 95 or the least that works', () => {
+  assert.deepEqual(rel(S0({ life: 31 }), 'B5'), { sub: false, left: [{ label: '规划到', value: 31 }], op: '<', right: { label: null, value: 32 } });
+  assert.deepEqual(fixTexts(S0({ life: 31 }), 'B5'), ['→ 95']);
+  assert.deepEqual(fixTexts(S0({ life: 111 }), 'B5'), ['→ 110']);
+  assert.equal(only(S0({ life: 32 }), 'B5').length + only(S0({ life: 110 }), 'B5').length, 0);
+  assert.deepEqual(fixTexts(S0({ age: 85, life: 86, mode: 'bwd', tAge: 100 }), 'B5'), ['→ 101']);
+});
+
+test('B6–B10: claim age, shares, correlation, volatilities, withdrawal rate', () => {
+  assert.deepEqual(fixTexts(S0({ pAge: 30 }), 'B6'), ['→ 45']); assert.deepEqual(fixTexts(S0({ pAge: 80 }), 'B6'), ['→ 75']);
+  assert.equal(only(S0({ pAge: 45 }), 'B6').length + only(S0({ pAge: 75 }), 'B6').length, 0);
+  assert.deepEqual(rel(S0({ eq: 150 }), 'B7').left, [{ label: '股票占比', value: 150 }]); assert.deepEqual(fixTexts(S0({ eq: -5 }), 'B7'), ['→ 0']);
+  assert.equal(only(S0({ flexCut: 150 }), 'B7')[0].chip, '少花');
+  assert.deepEqual(rel(S0({ flexCut: 150 }), 'B7').left[0].label, '一年跌 ≥ 15% 后少花');
+  assert.deepEqual(fixTexts(S0({ rho: 3 }), 'B8'), ['→ 1']); assert.deepEqual(fixTexts(S0({ rho: -2 }), 'B8'), ['→ −1']);
+  assert.equal(only(S0({ rho: 1 }), 'B8').length + only(S0({ rho: -1 }), 'B8').length, 0);
+  assert.deepEqual(only(S0({ sigEq: 17 }), 'B9')[0].fixes, [{ text: '→ 0.17', aria: '股票波动率改成 0.17', set: { sigEq: 0.17 } }]);
+  assert.deepEqual(fixTexts(S0({ sigBd: -0.2 }), 'B9'), ['→ 0.2']);
+  assert.equal(only(S0({ sigEq: 1 }), 'B9').length + only(S0({ sigEq: 0 }), 'B9').length, 0);
+  assert.deepEqual(rel(S0({ autoSwr: false, swr: 0 }), 'B10'), { sub: false, left: [{ label: '安全提取率', value: 0 }], op: '≤', right: { label: null, value: 0 } });
+  assert.deepEqual(fixTexts(S0({ autoSwr: false, swr: 0 }), 'B10'), ['→ 3.9']);
+  assert.deepEqual(fixTexts(S0({ autoSwr: false, swr: 12 }), 'B10'), ['→ 10']);
+  assert.equal(only(S0({ autoSwr: false, swr: 10 }), 'B10').length + only(S0({ autoSwr: true, swr: 0 }), 'B10').length, 0);
+});
+
+test('B11: a changed assumption outside the common range is flagged in the professional view; defaults never are', () => {
+  const pro = o => S0({ view: 'pro', ...o });
+  const [g] = only(pro({ growth: 6 }), 'B11');
+  assert.equal(g.kind, 'flag'); assert.equal(g.note, '常见 −2 到 5'); assert.equal(g.field, 'growth');
+  assert.equal(only(pro({ growth: 5 }), 'B11').length, 0);
+  assert.equal(only(pro({ eqReal: 11 }), 'B11')[0].note, '常见 −2 到 10');
+  assert.equal(only(pro({ infl: 7, touched: { infl: true } }), 'B11')[0].note, '常见 0 到 6');
+  assert.equal(only(pro({}), 'B11').length, 0);
+  assert.equal(only(S0({ growth: 6 }), 'B11').length, 0);
+});
+
+test('B12: a pension above the year\'s spending has the rest not counted; equal is fine', () => {
+  const [q] = only(S0({ view: 'pro', pension: 60000, retExp: 54000 }), 'B12');
+  assert.deepEqual(q.rel, { sub: false, left: [{ label: '养老金', value: 60000 }], op: '>', right: { label: '年支出', value: 54000 } });
+  assert.equal(q.note, '多出 6,000 不计'); assert.equal(q.field, 'pension');
+  assert.equal(only(S0({ view: 'pro', pension: 54000, retExp: 54000 }), 'B12').length, 0);
+});
+
+test('B13: a mix return below −50% is counted at −50%', () => {
+  const [q] = only(S0({ view: 'pro', eq: 100, eqReal: -60 }), 'B13');
+  assert.equal(q.kind, 'flag'); assert.equal(q.note, '按 −50% 算'); assert.equal(q.at, 'ledger');
+  assert.equal(only(S0({ view: 'pro' }), 'B13').length, 0);
+});
+
+test('B15: the years paid by the claim cannot be fewer than the years already paid; equal is fine', () => {
+  const pen = (paidYears, years) => S0({ pen: { ...defaultState(DATA).pen, paidYears, years } });
+  const [q] = only(pen(15, 12), 'B15');
+  assert.equal(q.kind, 'local'); assert.equal(q.field, 'pen.years'); assert.equal(q.chip, null);
+  assert.deepEqual(q.rel, { sub: false, left: [{ label: '累计缴费', value: 12, unit: ' 年' }], op: '<', right: { label: '已缴', value: 15, unit: ' 年' } });
+  assert.deepEqual(q.fixes, [{ text: '→ 15', aria: '累计缴费改成 15', set: { 'pen.years': 15 } }]);
+  assert.equal(only(pen(15, 15), 'B15').length + only(pen(15, null), 'B15').length, 0);
+});
+
+test('a range problem and a blank sort by page order', () => {
+  assert.deepEqual(P(S0({ age: 120, expense: null })).map(q => q.field), ['age', 'expense']);
+});
+
+// Task 1 review items.
+test('the split: typing 0 into the only filled part ends the split like 只填总数; a negative part stays so B2 can stop it', () => {
+  let S = setSplit(defaultState(DATA), 'rent', '5000', DATA);
+  assert.equal(splitOn(S), true);
+  const zero = setSplit(S, 'rent', '0', DATA);
+  assert.deepEqual(zero, unsplit(S, DATA));
+  assert.equal(zero.expense, 72000); assert.equal(zero.retExp, 72000);
+  assert.deepEqual(zero.split, { rent: null, food: null, other: null, before: null });
+  const two = setSplit(setSplit(S, 'food', '1000', DATA), 'rent', '0', DATA);
+  assert.equal(splitOn(two), true); assert.equal(two.expense, 12000);
+  const neg = setSplit(S, 'rent', '-500', DATA);
+  assert.equal(only(neg, 'B2')[0].field, 'split.rent');
+});
+
+test('simple-view monthly numbers are rounded the way the form shows them', () => {
+  const S = S0({ expense: 10050, real: real({ monthly: 838, endYear: 2045 }) });
+  const [a3] = only(S, 'A3');
+  assert.equal(a3.rel.right.value, 838);
+  assert.deepEqual(rel(S0({ income: 60000, expense: 60007 }), 'B14').left, [{ label: '每月存下', value: -1 }]);
+  assert.deepEqual(rel(S0({ expense: -6005 }), 'B2').left, [{ label: '每月支出', value: -500 }]);
+  assert.deepEqual(only(S0({ expense: -6005 }), 'B2')[0].fixes, [{ text: '→ 500', aria: '每月支出改成 500', set: { expense: 6005 } }]);
+  const typed = S0({ expense: 120000, retExp: 74395, touched: { retExp: true }, real: real({ monthly: 4000, endYear: 2045 }, { count: 1, age: 5, monthly: 2200 }) });
+  assert.equal(only(typed, 'A4')[0].rel.right.value, 6200);
+});
+
+test('A4 fix text is a yearly figure in the professional view; a monthly one in the simple view', () => {
+  const items = real({ monthly: 4000, endYear: 2045 }, { count: 1, age: 5, monthly: 2200 });
+  const typed = view => S0({ view, expense: 120000, retExp: 74400, touched: { retExp: true }, real: items });
+  assert.deepEqual(fixTexts(typed('pro'), 'A4'), ['改回估算 ≈ 120,000']);
+  assert.deepEqual(fixTexts(typed('simple'), 'A4'), ['改回估算 ≈ 10,000']);
+});
+
+test('A8: a fractional youngest child blocks with floor and ceil buttons', () => {
+  const [q] = only(S0({ expense: 120000, real: real({}, { count: 2, age: 5.5, monthly: 1600 }) }), 'A8');
+  assert.equal(q.kind, 'block'); assert.deepEqual(q.rel, { sub: false, left: [{ label: '最小的孩子', value: 5.5 }], op: null, right: null });
+  assert.deepEqual(q.fixes, [{ text: '→ 5', aria: '最小的孩子改成 5', set: { 'kids.age': 5 } }, { text: '→ 6', aria: '最小的孩子改成 6', set: { 'kids.age': 6 } }]);
+});
+
+const fxOf = c => (c === 'USD' ? 1 : DATA.fx[c].value);
+const cn2us = v => v / fxOf(DATA.countries.CN.cur) * fxOf(DATA.countries.US.cur);
+
+test('A4 with different work and retirement currencies compares in the retirement currency', () => {
+  const items = real({ monthly: 4000, endYear: 2045 });
+  const S = setRetireCountry(S0({ expense: 120000, real: items }), 'US', DATA);
+  const itemsRet = Math.round(cn2us(4000));
+  const low = { ...S, retExp: Math.round(cn2us(4000) * 12 / 2), touched: { retExp: true } };
+  const [q] = only(low, 'A4');
+  assert.deepEqual(q.rel.left, [{ label: '月供', value: itemsRet }]);
+  assert.equal(q.rel.right.value, Math.round(low.retExp / 12));
+  assert.equal(only({ ...low, retExp: Math.round(cn2us(4000) * 12 * 2) }, 'A4').length, 0);
+});
+
+test('A9 with a different retirement currency compares the town spend in that currency', () => {
+  const S = m => setRetireCountry(S0({ expense: 120000, real: real({ monthly: 4000, endYear: 2045 }), town: { name: '大理', monthly: m } }), 'US', DATA);
+  assert.equal(only(S(Math.floor(cn2us(4000) / 2)), 'A9').length, 1);
+  assert.equal(only(S(Math.ceil(cn2us(4000) * 2)), 'A9').length, 0);
+});
+
