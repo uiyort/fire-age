@@ -327,6 +327,30 @@ h3 { font-family: var(--f-display); font-weight: 900; font-size: 16px; margin: 1
 .fund p b { color: var(--ink); }
 .fund-bar { height: 10px; background: var(--surface-2); border-radius: 5px; overflow: hidden; }
 .fund-bar i { display: block; height: 100%; background: var(--accent); border-radius: 5px; }
+.ledger-toggle { font: inherit; font-size: 13px; padding: 0; margin-left: 6px; border: 0; background: transparent; color: var(--accent); cursor: pointer; white-space: nowrap; }
+/* The ledger behind the fund line (spec §7.1): label | number, numbers right-aligned, tabular and unbroken; labels wrap. */
+.ledger { margin-top: 0; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 10px; font-size: 14px; min-width: 0; }
+.lg-sec + .lg-sec { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 8px; }
+.lg-row { position: relative; display: flex; align-items: baseline; justify-content: space-between; gap: 0 12px; padding: 2px 0; }
+.lg-l { min-width: 0; overflow-wrap: anywhere; }
+.lg-n { flex: none; margin-left: auto; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lg-op { display: inline-block; width: 1em; color: var(--ink-3); }
+.lg-age { display: inline-block; min-width: 3.8em; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.lg-year { display: inline-block; min-width: 3.2em; font-variant-numeric: tabular-nums; }
+.lg-row.head .lg-n { font-size: 13px; color: var(--ink-3); }
+.lg-row.sub { padding-left: 1.3em; font-size: 13px; color: var(--ink-2); }
+.lg-row.sum { margin-top: 2px; border-top: 1px solid var(--line); padding-top: 4px; }
+.lg-row.bad, .lg-row.bad button.link { color: var(--bad); font-weight: 700; }
+.lg-row.ended, .lg-row.wait, .ledger s { color: var(--ink-3); }
+.lg-row.pick { color: var(--good); font-weight: 700; }
+.ledger button.link { white-space: normal; text-align: left; }
+.lg-row.go button.link::after { content: ""; position: absolute; inset: 0; }
+.ledger .est { color: var(--s1); }
+.ledger .warn { color: var(--warn); }
+.ledger .dots { font-size: 11px; letter-spacing: 1px; }
+.lg-note { margin: 0 0 2px 1.3em; font-size: 12px; color: var(--ink-3); }
+.lg-more { text-align: right; font-size: 12px; }
+.lg-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-3); }
 .story-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .story-list li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; font-size: 14px; }
 .story-list b { font-family: var(--f-mono); font-weight: 500; color: var(--accent); white-space: nowrap; }
@@ -362,6 +386,8 @@ h3 { font-family: var(--f-display); font-weight: 900; font-size: 16px; margin: 1
 .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px 28px; margin-top: 12px; }
 .hero-grid .hero { margin-top: 0; }
 @media (min-width: 1100px) { .hero-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); } .type-block { border-left: 1px solid var(--line); padding-left: 24px; } }
+/* The ledger opens in place under the fund line, in the hero's column; the type keeps the other column. */
+@media (min-width: 1100px) { .hero-grid .ledger { grid-column: 1; } .hero-grid .type-block { grid-column: 2; grid-row: 1 / span 2; align-self: start; } }
 .type-block h2 { font-size: 13px; font-family: var(--f-body); font-weight: 500; color: var(--ink-2); margin: 0; }
 .type-block .type-head { margin-top: 4px; }
 .lab-title { margin-top: 10px; }

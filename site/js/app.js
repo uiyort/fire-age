@@ -1,7 +1,7 @@
 // Page wiring: reads inputs into state, recomputes, renders.
 import DATA from './data-latest.js';
 import { DEFAULT_SEED, bwdSolve, monteCarlo, walkPath } from './engine.js';
-import { bwdOdds, decilePaths, dualOdds, extendRow, needLine, oddsRuler, oddsSolve, oddsYears, successAt } from './odds.js';
+import { bwdOdds, decilePaths, dualOdds, extendRow, needLine, oddsAround, oddsRuler, oddsSolve, oddsYears, successAt } from './odds.js';
 import { hardestIndex, heroModel, holidayType, oddsText, lifeName, lifeNames, lifeRibbon, lifeStory, placeRanking, townPlan, cardPlace, withoutItemsGain } from './holiday.js';
 import { FIELD_LABEL, FIELD_ORDER, LIMITS, applyPensionEstimate, cleanReal, cleanSplit, commitField, defaultState, groupStates, loadState, problems, resetRetExp, saveState, safeStorage, setField, setPen, setReal, setRetireCountry, setSplit, setTown, setWorkCountry, splitOn, storyRows, toParams, unsplit } from './state.js';
 import { estimateFromForm } from './pension.js';
@@ -14,7 +14,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { assumptionLine, renderCard, summaryCardSpec, typeCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, leversHtml, lifeGainText, lifeTagText, fieldLineHtml, fieldLinesHtml, fixesHtml, groupStatusHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
+  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, ledgerHtml, leversHtml, lifeGainText, lifeTagText, fieldLineHtml, fieldLinesHtml, fixesHtml, groupStatusHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -41,6 +41,8 @@ const started = (() => {
 let S = loadState(DATA, storage);
 let goal = loadGoal(storage);
 let latest = null;
+// The ledger behind the fund line: closed until the person opens it, then drawn with every refresh.
+let ledgerOpen = false;
 let mcTimer = 0;
 let proTimer = 0;
 // True from a change of the numbers until the simulation for them has run.
@@ -541,7 +543,8 @@ function renderHero() {
   const { mode, p, t, bwd, retireT, target, ruler, dispCur: cur } = latest;
   const success = latest.success;
   latest.hero = heroModel({ mode, p, t, bwd, success, need: target[retireT ?? 0], ruler: mode === 'bwd' ? null : ruler });
-  $('hero').innerHTML = heroHtml(latest.hero, { p, dispCur: cur });
+  $('hero').innerHTML = heroHtml(latest.hero, { p, dispCur: cur, open: ledgerOpen });
+  renderLedger();
   placeTag();
   stickyNow = '';
   $('sticky-result').innerHTML = stickyHtml(latest.hero, { p, dispCur: cur, success, pro: S.view === 'pro' });
@@ -549,6 +552,32 @@ function renderHero() {
     ? (success === null ? '按计划没有放假年份，不计算成功率。' : `2,000 次模拟，成功率 ${pct(success, 0)}，按本工具假设。`)
     : (latest.hero.people === null ? '先到得了，再看撑不撑得住。' : `10 个平行的你，${latest.hero.people} 个的钱够花到 ${p.life} 岁。`);
   $('lead-risk').textContent = riskLead;
+}
+
+// The ledger, while open, from the numbers as they are: held, the rows stop at the first stop and nothing is worked
+// out; otherwise from the solved plan (the year chosen, working backward; the last year, out of reach).
+function ledgerNow() {
+  const year = new Date().getFullYear();
+  const view = S.view === 'pro' ? 'pro' : 'simple';
+  if (isHeld()) {
+    const { wCur, rCur } = toParams(S, DATA);
+    return ledgerHtml({ rows: storyRows(S, DATA, year, null), list: stopsNow(), odds: [], plan: null, state: 'held', view, mode: S.mode, p: null, dispCur: wCur, rCur });
+  }
+  const { p, t, bwd, target, odds, mc, mode, dispCur: cur } = latest;
+  const unreachable = mode !== 'bwd' && t === null;
+  const T = mode === 'bwd' ? bwd.n : unreachable ? p.life - p.age - 1 : t;
+  const plan = unreachable ? { p, t: T, need: null, unreachable: true } : { p, t: T, need: target[T] };
+  const state = unreachable ? 'unreachable' : mode !== 'bwd' && T === 0 ? 'now' : 'ok';
+  return ledgerHtml({ rows: storyRows(S, DATA, year, plan), list: [], odds: oddsAround(p, T), plan, state, view, mode, p, dispCur: cur, mc: mc ?? null, bwdOdds: odds });
+}
+function renderLedger() {
+  document.querySelectorAll('.ledger-toggle').forEach(button => {
+    button.setAttribute('aria-expanded', String(ledgerOpen));
+    button.lastElementChild.textContent = ledgerOpen ? '▾' : '▸';
+  });
+  const html = ledgerOpen && (latest || isHeld()) ? ledgerNow() : '';
+  $('ledger').innerHTML = html;
+  $('ledger').hidden = !html;
 }
 
 // After typing pauses, the simulation and the slow parts run one task at a time, so the page keeps answering
@@ -1006,7 +1035,7 @@ function holdResult(stops, marks = stops) {
     // Hidden while stopped; emptied too, so no age from the numbers before is left in the page.
     $('type-now').innerHTML = '';
     $('tiles').innerHTML = '';
-    $('hero').innerHTML = heldHeroHtml();
+    $('hero').innerHTML = heldHeroHtml(ledgerOpen);
     placeTag();
     const head = heldHeadHtml(S.view);
     $('headline').innerHTML = head;
@@ -1019,6 +1048,8 @@ function holdResult(stops, marks = stops) {
     $('sticky-result').innerHTML = sticky;
   }
   markProblems(marks);
+  // A stop still being typed is not drawn yet, in the ledger either: it follows once the field is left.
+  if (marks === stops) renderLedger();
 }
 
 // Puts the cursor in a field: the professional view first if only it has the field, then the numbers opened, every
@@ -1337,6 +1368,22 @@ function onClick(ev) {
   if (ev.target.closest?.('#nav-numbers')) {
     ev.preventDefault();
     goToNumbers();
+    return;
+  }
+  // The ledger opens and closes in place; the toggle keeps the focus. Opening finishes a pending simulation first.
+  const ledgerToggle = ev.target.closest?.('.ledger-toggle');
+  if (ledgerToggle) {
+    const focused = document.activeElement === ledgerToggle;
+    ledgerOpen = !ledgerOpen;
+    if (ledgerOpen && !isHeld()) flushSimulation();
+    renderLedger();
+    if (focused) document.querySelector('.ledger-toggle')?.focus();
+    return;
+  }
+  // A ledger row's label goes back to its field.
+  const ledgerField = ev.target.closest?.('#ledger [data-field]');
+  if (ledgerField) {
+    goToField(ledgerField.dataset.field);
     return;
   }
   if (ev.target.closest?.('.grp-plus')) {

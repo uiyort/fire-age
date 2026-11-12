@@ -1,6 +1,6 @@
 // Makes a result feel personal: Mondays left, a four-letter holiday type, the same money elsewhere, one drawn life.
 // Pure functions, no DOM. Every label and number comes from the model, with its rule published on the method page.
-import { assetsAt, buildParams, coastNeed, conv, fiNeed, lifePath, savingsRate } from './engine.js';
+import { assetsAt, buildParams, coastNeed, conv, fiNeed, firstDraw, lifePath, savingsRate } from './engine.js';
 import { needLine, oddsSolve, oddsYears } from './odds.js';
 
 const DAYS_PER_YEAR = 365.25;
@@ -306,7 +306,8 @@ export function heroModel({ mode, p, t, bwd, success, need = null, ruler = null 
     // Forward, the age is the 8-in-10 age by definition; working backward, the odds are those of the plan as it is.
     label: !reachable ? '' : backward ? oddsText(success) : '八成把握',
     fund: { have: p.assets, need: line, share: line > 0 ? Math.min(p.assets / line, 1) : 1 },
-    times: yearSpend > 0 && reachable ? Math.round(line / yearSpend) : null,
+    // The holiday line over what the first holiday year takes from savings (spec §9.2): one denominator with the implied rate.
+    times: reachable && firstDraw(p, workYears) > 0 ? Math.round(line / firstDraw(p, workYears)) : null,
     months,
     // Savings that alone cover every month to the end of the plan, before any return: the count stops meaning anything.
     covered: months !== null && months >= total * 12,

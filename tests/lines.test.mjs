@@ -16,7 +16,7 @@ test('chipText: blanks first, one names the item, several count', () => {
 });
 
 test('the stopped result: — 岁放假, 放假资金 —, and 财务独立 — 岁 in the professional headline', () => {
-  assert.equal(heldHeroHtml(), '<div class="hero-big"><span aria-label="暂无结果">—</span> 岁放假</div><div class="fund"><p>放假资金 —</p></div>');
+  assert.equal(heldHeroHtml(), '<div class="hero-big"><span aria-label="暂无结果">—</span> 岁放假</div><div class="fund"><p>放假资金 — <button type="button" class="ledger-toggle" aria-expanded="false" aria-controls="ledger">怎么算的 <span aria-hidden="true">▸</span></button></p></div>');
   assert.equal(heldHeadHtml('pro'), '<p class="say">财务独立 <span aria-label="暂无结果">—</span> 岁</p>');
   assert.equal(heldHeadHtml('simple'), '');
 });

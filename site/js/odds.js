@@ -73,6 +73,15 @@ export function oddsSolve(p, { target = ODDS, s0 = null } = {}) {
   });
 }
 
+// The odds of the years round a holiday year (the one before, it, the one after, within the plan), for the ledger's ③.
+export function oddsAround(p, t, s0 = null) {
+  const last = p.life - p.age - 1;
+  return [t - 1, t, t + 1].filter(T => T >= 0 && T <= last).map(T => {
+    const share = successAt(p, T, s0);
+    return { t: T, age: p.age + T, count: Math.round(share * DEFAULT_PATHS), share };
+  });
+}
+
 // Years until the odds are reached, between whole years by where the target falls between the two years' odds.
 export function oddsYears(p, { target = ODDS, s0 = null } = {}) {
   const t = oddsSolve(p, { target, s0 });

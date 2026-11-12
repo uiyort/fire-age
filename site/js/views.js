@@ -1,5 +1,5 @@
 // Turns model results into page text and tables. Strings only, no DOM access.
-import { coastNeed, conv, bwdSolve, savingsAt, savingsRate, buildParams } from './engine.js';
+import { coastNeed, conv, bwdSolve, firstDraw, savingsAt, savingsRate, buildParams } from './engine.js';
 import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn, oddsBand, oddsText, peopleOf } from './holiday.js';
 import { needLine, oddsSolve } from './odds.js';
 import { MIN_SHOWN, SCENARIOS, answerValues, scenarioOptions } from './scenario.js';
@@ -118,10 +118,10 @@ export function statusPill(success) {
 
 const tile = (k, v, n = '') => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="n">${n}</div></div>`;
 
-// The withdrawal rate the holiday line implies, next to the published one it no longer depends on.
-function swrCompare(p, line) {
-  const spend = conv(p.retExp, p.rCur, p.wCur, p.fx);
-  return line > 0 ? `本工具在你的假设下反推的提取率是 ${pct(spend / line, 1)}；Morningstar 30 年九成把握是 3.9%` : '';
+// The withdrawal rate the holiday line implies, next to the published one it no longer depends on. Its numerator is
+// what the first holiday year takes from savings, the denominator of "≈ 年支出 × N 倍" too (spec §9.2).
+function swrCompare(p, line, t) {
+  return line > 0 ? `本工具在你的假设下反推的提取率是 ${pct(firstDraw(p, t) / line, 1)}；Morningstar 30 年九成把握是 3.9%` : '';
 }
 
 export function tilesHtml({ mode, p, t, bwd, mc, dispCur, target = needLine(p) }) {
@@ -131,10 +131,10 @@ export function tilesHtml({ mode, p, t, bwd, mc, dispCur, target = needLine(p) }
   const parts = [];
   if (mode === 'bwd') {
     const line = target[bwd.n];
-    parts.push(tile(`${p.tAge} 岁的放假线`, D(line), `八成把握所需。${swrCompare(p, line)}`));
+    parts.push(tile(`${p.tAge} 岁的放假线`, D(line), `八成把握所需。${swrCompare(p, line, bwd.n)}`));
     parts.push(tile('当前计划在那时有（中位数）', D(bwd.An), bwd.An >= line ? '已经够了' : `还差 ${D(line - bwd.An)}`));
   } else if (t !== null) {
-    parts.push(tile('放假线（八成把握）', D(target[t]), `放假 ${p.life - p.age - t} 年。${swrCompare(p, target[t])}`));
+    parts.push(tile('放假线（八成把握）', D(target[t]), `放假 ${p.life - p.age - t} 年。${swrCompare(p, target[t], t)}`));
   } else {
     parts.push(tile('今天的放假线', D(target[0]), `每年花 ${money(p.retExp, p.rCur)}`));
   }
@@ -670,10 +670,144 @@ export function chipText(list) {
 }
 
 const NO_RESULT = '<span aria-label="暂无结果">—</span>';
-// The big age and the fund while the result is stopped.
-export const heldHeroHtml = () => `<div class="hero-big">${NO_RESULT} 岁放假</div><div class="fund"><p>放假资金 —</p></div>`;
+// The ledger's switch at the end of the fund line: ▸ closed, ▾ open (spec §7.1).
+export const ledgerToggleHtml = (open = false) => `<button type="button" class="ledger-toggle" aria-expanded="${open}" aria-controls="ledger">怎么算的 <span aria-hidden="true">${open ? '▾' : '▸'}</span></button>`;
+// The big age and the fund while the result is stopped; the ledger still opens.
+export const heldHeroHtml = (open = false) => `<div class="hero-big">${NO_RESULT} 岁放假</div><div class="fund"><p>放假资金 — ${ledgerToggleHtml(open)}</p></div>`;
 // The headline while the result is stopped; the simple view has only the big age.
 export const heldHeadHtml = view => (view === 'pro' ? `<p class="say">财务独立 ${NO_RESULT} 岁</p>` : '');
+
+// ---- The ledger behind the fund line (spec §7): ① saving, ② after the holiday, ③ the 2,000 years, every number from
+// storyRows (① ②) and the odds (③). Two columns, label | number. Rows with a field go back to it. While the result is
+// held the rows stop at the first blocked or blank one; what follows is a fixed line each, with no number.
+// state: 'ok' | 'held' | 'unreachable' | 'now'. The professional ledger is drawn by Task 9.
+const METHOD = { now: 'accumulate', after: 'need-line', odds: 'odds' };
+const methodLink = id => `<a href="method.html#${id}">计算方法 ›</a>`;
+// The spaces between the cells are for reading the text as text (a copy, a screen reader); the layout ignores them.
+const lgRow = (label, n = '', cls = '') => `<div class="lg-row${cls ? ` ${cls}` : ''}"><span class="lg-l">${label}</span> <span class="lg-n">${n}</span></div>`;
+const lgOp = op => `<span class="lg-op" aria-hidden="true">${op ?? ''}</span> `;
+const fieldLink = (field, text) => (field ? `<button type="button" class="link" data-field="${field}">${text}</button>` : text);
+const agesText = ages => {
+  const [a, b] = ages ?? [];
+  if (a === null || a === undefined) return '';
+  return `<span class="lg-age">${b === null || b === undefined ? `${a} 起` : a === b ? `${a}` : `${a}–${b}`}</span> `;
+};
+const GO = '<span aria-hidden="true">›</span>';
+const struckHtml = names => `<s aria-label="已结束，不计入">${names.join('、')}</s>`;
+const dotsHtml = count => {
+  const on = Math.floor(count * 10 / 2000);
+  return `<span class="dots" aria-hidden="true">${'●'.repeat(on)}${'○'.repeat(10 - on)}</span>`;
+};
+const chengText = share => (peopleOf(share) === 0 ? '不到 1 成' : `${peopleOf(share)} 成`);
+
+export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'ok', view = 'simple', mode = 'fwd', p = null, dispCur, rCur = null, mc = null, bwdOdds = null }) {
+  if (view === 'pro') return '';
+  const wCur = p ? p.wCur : dispCur;
+  const retCur = p ? p.rCur : rCur ?? dispCur;
+  const curOf = r => (r.cur === 'retire' ? retCur : wCur);
+  const signed = (v, c) => (v < 0 ? `−${wholeMoney(-v, c)}` : wholeMoney(v, c));
+  const held = state === 'held';
+
+  // A stopped or blank row: the very relation drawn under the field, or its label and 待填.
+  const stopRow = r => {
+    const sub = r.op === '└' || r.rel?.sub;
+    if (r.status === 'blank') {
+      const label = r.op === '└' ? `${OP('└')} 其中${r.label ?? ''}` : r.label ?? FIELD_LABEL.simple[r.field] ?? '';
+      return lgRow(`${sub ? '' : lgOp(r.op)}${fieldLink(r.field, label)}`, `待填 ${GO}`, `${sub ? 'sub ' : ''}bad go`);
+    }
+    // The relation stands alone: an operator before "每月支出 −500 < 0" would be read into it.
+    const text = r.rel ? liveHtml(r.rel) : r.label ?? FIELD_LABEL.simple[r.field] ?? '';
+    return lgRow(`${sub ? '' : lgOp()}${fieldLink(r.field, text)}`, `${X} ${GO}`, `${sub ? 'sub ' : ''}bad go`);
+  };
+  const rowHtml = r => {
+    if (r.status === 'block' || r.status === 'blank') return stopRow(r);
+    if (r.value === 0 && r.key !== 'pension') return '';
+    const c = curOf(r);
+    switch (r.key) {
+      case 'have': return lgRow(`${lgOp()}${fieldLink(r.field, r.label)}`, roughMoney(r.value, c));
+      case 'income':
+      case 'expense': return lgRow(`${lgOp(r.op)}${fieldLink(r.field, r.label)}`, `${wholeMoney(r.value, c)}/月`);
+      case 'split': return lgRow(fieldLink(r.field, `${OP('=')} ${r.parts.map(v => num(v ?? 0)).join(` ${OP('+')} `)}`), '', 'sub');
+      case 'mortgage':
+      case 'kids': {
+        if (r.status === 'ended') return lgRow(relText({ ...r.rel, value: r.value ?? r.rel.value }), '', 'sub ended');
+        const end = r.key === 'kids' ? `${r.end} 岁` : r.end;
+        return lgRow(fieldLink(r.field, `${OP('└')} 其中${r.label} ${num(r.value)} ${OP('→')} ${end}`), '', 'sub');
+      }
+      case 'save': {
+        const amount = signed(r.value, c);
+        return lgRow(`${lgOp('=')}<b>${r.label}</b>`, r.status === 'flag' ? `<span class="warn"><span aria-label="提示">!</span> ${amount}</span>` : `<b>${amount}</b>`, 'sum');
+      }
+      case 'growth': return lgRow(`${lgOp()}${r.label} ${TOOL_TAG}`);
+      case 'saveLate': return lgRow(`${lgOp()}${r.label.replace(/^→ /, `${OP('→')} `)}`, wholeMoney(r.value, c));
+      case 'retExp': {
+        const est = r.status === 'est' ? '<span class="est" aria-label="估算">≈</span> ' : '';
+        return lgRow(`${lgOp()}${agesText(r.ages)}${fieldLink(r.field, r.label)}${r.struck ? ` ${struckHtml(r.struck)}` : ''}`, r.value === null ? NONE : `${est}${wholeMoney(r.value, c)}`);
+      }
+      case 'self': return lgRow(`${lgOp()}${agesText(r.ages)}${fieldLink(r.field, r.label)}`, r.value === null ? NONE : `+${wholeMoney(r.value, c)}`);
+      case 'pension': return r.value === null
+        ? lgRow(`${lgOp()}${agesText(r.ages)}${fieldLink(r.field, r.label)}`, `${NONE} ${GO}`, 'go')
+        : lgRow(`${lgOp()}${agesText(r.ages)}${fieldLink(r.field, r.label)}`, signed(r.value, c));
+      default:
+        if (r.key.startsWith('after:')) {
+          const amount = r.value === null ? NONE : signed(r.value, c);
+          return lgRow(`${lgOp()}${agesText(r.ages)}${struckHtml(r.struck)}`, r.status === 'flag' && r.value !== null ? `<span class="warn"><span aria-label="提示">!</span> ${amount}</span>` : amount);
+        }
+        return '';
+    }
+  };
+  // The rows the simple ledger draws: not the professional ones, not the → rows folded into the first ② row (they are
+  // for the line under the field), not the └ rows under retirement spending (the field line's), not ⇒ and its N.
+  const shown = r => r.views !== 'pro' && !r.folded && !r.key.startsWith('ret:') && r.key !== 'need' && r.key !== 'times';
+  const head = (title, right = '') => lgRow(`<b>${title}</b>`, right, 'head');
+  const sec = (body, cls = '') => `<div class="lg-sec${cls ? ` ${cls}` : ''}">${body}</div>`;
+  const more = id => `<div class="lg-more">${methodLink(id)}</div>`;
+  const foot = id => `<div class="lg-foot"><span><span class="est">≈</span> 估算 · 按今天的钱</span> ${methodLink(id)}</div>`;
+  const none = (label, op) => lgRow(`${lgOp(op)}${label}`, NONE, 'wait');
+
+  if (held) {
+    let cut = rows.findIndex(r => r.status === 'block' || r.status === 'blank');
+    let drawn = cut < 0 ? [] : rows.slice(0, cut + 1);
+    // A stop on a field with no row of its own (the age, say) stands first, in its own words.
+    if (cut < 0) {
+      const q = list.find(x => x.kind === 'blank') ?? list.find(x => x.kind === 'block');
+      drawn = q ? [{ key: 'stop', section: 'now', status: q.kind, rel: q.rel, field: q.field, label: FIELD_LABEL.simple[q.field] ?? q.field, op: null }] : [];
+      cut = 0;
+    }
+    const at = drawn.length ? drawn[drawn.length - 1].section : 'now';
+    const draw = s => drawn.filter(r => r.section === s && shown(r)).map(rowHtml).join('');
+    const first = sec(head('① 攒钱') + draw('now') + (at === 'now' ? none('每月存下', '=') : ''));
+    const second = at === 'after' ? sec(head('② 放假以后', '每月花') + draw('after')) : '';
+    return first + second + sec(none('② 要有', '⇒') + none('③ 放假年龄', '⇒'), 'wait') + foot(METHOD[at]);
+  }
+
+  const { t } = plan;
+  const age = p.age, holiday = p.age + t;
+  const now = state === 'now';
+  const unreachable = state === 'unreachable';
+  const bwd = mode === 'bwd';
+  const draw = s => rows.filter(r => r.section === s && shown(r)).map(rowHtml).join('');
+  const first = now
+    ? sec(head('① 攒钱', '不用再攒'))
+    : sec(head('① 攒钱', `${age} ${OP('→')} ${holiday} 岁`) + draw('now') + more(METHOD.now));
+  const needRow = rows.find(r => r.key === 'need');
+  const times = rows.find(r => r.key === 'times')?.value;
+  const line = unreachable || !needRow || needRow.value === null ? '' : lgRow(`${lgOp('⇒')}<b>${needRow.label}</b>`, `<b>${roughMoney(needRow.value, wCur)}</b>`, 'sum')
+    + `<p class="lg-note">${times ? `≈ 年支出 × ${times} 倍 · ` : ''}八成年景够花到 ${p.life} 岁</p>`;
+  const second = sec(head(unreachable ? `② 如果 ${holiday} 岁放假` : '② 放假以后', '每月花') + draw('after') + line + more(METHOD.after));
+  // ③: the years round the holiday; one year when it is today, out of reach, or chosen (working backward).
+  const one = now || unreachable || bwd;
+  const years = one ? odds.filter(o => o.t === t) : odds;
+  const yearLabel = o => (now && o.t === 0 ? '今天' : bwd ? `${o.age} 岁（你定的）` : `${o.age} 岁`);
+  const pick = o => o.t === t && !unreachable && !bwd;
+  const oddsRows = years.map(o => lgRow(`${lgOp()}<span class="lg-year">${yearLabel(o)}</span> ${dotsHtml(o.count)}`, chengText(o.share), pick(o) ? 'pick' : '')).join('');
+  let after = '';
+  if (unreachable) after = lgRow(`${lgOp()}规划期内到不了八成`);
+  else if (bwd) after = bwdOdds ? lgRow(`${lgOp('⇒')}要八成：第一年每月存 ${wholeMoney(bwdOdds.s0 / 12, wCur)}`, '', 'sum') : '';
+  else if (!now) after = lgRow(`${lgOp('⇒')}<b>第一个到八成</b>`, `<b>${holiday} 岁</b>`, 'sum');
+  const third = sec(head('③ 2,000 种年景', `平均每年 ${pct(p.r, 1)} ${TOOL_TAG}`) + oddsRows + after);
+  return first + second + third + foot(METHOD.odds);
+}
 
 export function stickyHtml(h, { p, dispCur, success, pro, chip = '' }) {
   if (chip) return `<b class="sticky-age">${pro ? `财务独立 ${NO_RESULT} 岁` : `${NO_RESULT} 岁放假`}</b><button type="button" class="chip" data-chip>${chip}</button>`;
@@ -707,7 +841,7 @@ export function sensitivityHtml(p, params) {
   return `<thead><tr><th>参数</th><th class="num">当前值</th><th>变动</th><th class="num">对放假年龄</th></tr></thead><tbody>${rows}</tbody>`;
 }
 
-export function heroHtml(h, { p, dispCur }) {
+export function heroHtml(h, { p, dispCur, open = false }) {
   const D = v => money(toDisplay(v, p, dispCur), dispCur);
   const total = h.workYears + h.holidayYears;
   const share = v => (v / total * 100).toFixed(1);
@@ -738,12 +872,15 @@ export function heroHtml(h, { p, dispCur }) {
   else if (h.months === 0 && h.next) months = `<p class="hero-months">还没开始攒假：存下 ${D(h.next.gap)}，就攒够一整年的假。</p>`;
   else if (h.months !== null) months = `<p class="hero-months">你已经攒够了 ${span(h.months)}的假${next}。</p>`;
   const R = v => roughMoney(toDisplay(v, p, dispCur), dispCur);
-  const times = h.times ? `<span class="nowrap">，大约是 ${h.times} 年的花销</span>` : '';
+  // The fund line is the ledger closed; out of reach there is no line to measure against.
+  const fund = h.reachable
+    ? `<div class="fund-bar" role="img" aria-label="放假资金已攒到 ${fundPct}%"><i style="width:${fundPct}%"></i></div><p>放假资金：已有 ${R(h.fund.have)} / 需要 ${R(h.fund.need)}（<b>${fundPct}%</b>） ${ledgerToggleHtml(open)}</p>`
+    : `<p>放假资金：按现在的节奏到不了 ${ledgerToggleHtml(open)}</p>`;
   return `${big ? `<div class="hero-big">${big}</div>` : ''}${sure}${ruler}${months}
     <div class="lifebar" role="img" aria-label="人生进度：上班 ${h.workYears} 年，放假 ${h.holidayYears} 年">${work}${rest}</div>
     <div class="lifebar-ticks"><span>${h.startAge} 岁 · 今天</span>${mid}<span>${h.endAge} 岁</span></div>
     ${mondays}${people}
-    <div class="fund"><div class="fund-bar" role="img" aria-label="放假资金已攒到 ${fundPct}%"><i style="width:${fundPct}%"></i></div><p>放假资金：已有 ${R(h.fund.have)} / 需要 ${R(h.fund.need)}（<b>${fundPct}%</b>）${times}</p></div>`;
+    <div class="fund">${fund}</div>`;
 }
 
 function personSvg(on) {
