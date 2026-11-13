@@ -1,7 +1,7 @@
 // The views helpers that draw the stopped result and, in later tasks, the lines under the fields.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chipText, heldHeadHtml, heldHeroHtml, splitLineHtml, stickyHtml, relText, fieldLinesHtml, fieldLineHtml, fixesHtml, lifeTagText, pensionEstimateHtml, groupStatusHtml, proLinesHtml, sideSummary, sideHeadName, sideCardHtml } from '../site/js/views.js';
+import { chipText, heldHeadHtml, heldHeroHtml, splitLineHtml, stickyHtml, relText, fieldLinesHtml, fieldLineHtml, fixesHtml, lifeTagText, pensionEstimateHtml, groupStatusHtml, proLinesHtml, sideSummary, sideHeadName, sideCardHtml, derivedStops } from '../site/js/views.js';
 import DATA from '../site/js/data-latest.js';
 import { defaultState, estimateRetireSpend, groupStates, storyRows, problems, resetRetExp, toParams } from '../site/js/state.js';
 
@@ -233,9 +233,11 @@ test('proLinesHtml: the rate prints to 2 decimals from 0.1, else to 3 significan
   for (const o of [us.out, uk.out]) assert.ok(!/= 0\.00 |汇率 0\.00(?!\d)/.test(strip(o.region + o.retExp)));
 });
 
+// What the eye reads: the words said only to screen readers left out.
+const seen = h => strip(h.replace(/<span class="sr">[^<]*<\/span>/g, ''));
 test('sideSummary: the closed rows in the spec\'s words', () => {
   const S = defaultState(DATA); const p = toParams(S, DATA, 2026);
-  const at = (row, s = S) => strip(sideSummary(row, { S: s, p: toParams(s, DATA, 2026), rows: storyRows(s, DATA, 2026, null), data: DATA }));
+  const at = (row, s = S) => seen(sideSummary(row, { S: s, p: toParams(s, DATA, 2026), rows: storyRows(s, DATA, 2026, null), data: DATA }));
   assert.equal(at('now'), '30 岁 · ¥20万 · 到手 ¥1.2万/月 · 存下 ¥6,000/月');
   assert.equal(at('where'), '中国大陆 → 中国大陆');
   assert.equal(at('pension'), '—');
@@ -272,8 +274,30 @@ test('sideHeadName: the spending row names its total, with = while it is the sum
 test('groupStatusHtml in a sidebar header: the ＋ is no nested button, and no data month', () => {
   const st = o => ({ blank: 0, block: 0, example: false, empty: false, changed: null, ...o });
   assert.ok(!groupStatusHtml(st({ empty: true }), { version: '2026-11', mark: true }).includes('<button'));
-  assert.equal(strip(groupStatusHtml(st({ empty: true }), { version: '2026-11', mark: true })), '＋');
+  assert.equal(seen(groupStatusHtml(st({ empty: true }), { version: '2026-11', mark: true })), '＋');
   assert.equal(strip(groupStatusHtml(st({ changed: 1 }), { version: '2026-11', mark: true, month: false })), '已改 1');
+});
+
+test('the header marks are said in words: hidden text, not aria-label on a span inside the button', () => {
+  const st = o => ({ blank: 0, block: 0, example: false, empty: false, changed: null, ...o });
+  const plus = groupStatusHtml(st({ empty: true }), { version: '2026-11', mark: true });
+  assert.match(plus, /<span class="sr">可以不填<\/span>/); assert.ok(!plus.includes('aria-label'));
+  const x = groupStatusHtml(st({ block: 1 }), { version: '2026-11', mark: true });
+  assert.match(x, /<span class="sr">拦住 1 处<\/span>/); assert.ok(!x.includes('aria-label'));
+  const S = defaultState(DATA);
+  const sum = row => sideSummary(row, { S, p: toParams(S, DATA, 2026), rows: storyRows(S, DATA, 2026, null), data: DATA });
+  for (const [row, word] of [['retire', '估算'], ['pension', '没有数']]) {
+    assert.match(sum(row), new RegExp(`<span class="sr">${word}</span>`)); assert.ok(!sum(row).includes('aria-label'), row);
+  }
+});
+
+test('a stop on a field r or σ is worked out from leaves the derived figure unworked', () => {
+  const S = { ...defaultState(DATA), view: 'pro', eq: 150 };
+  const out = sideSummary('returns', { S, p: toParams(S, DATA, 2026), rows: storyRows(S, DATA, 2026, null), data: DATA });
+  assert.match(seen(out), /→ r —$/); assert.match(out, /<span class="sr">暂无结果<\/span>/);
+  assert.deepEqual(derivedStops(problems(S, DATA, 2026)), { r: true, sigma: true, bondReal: false });
+  assert.deepEqual(derivedStops(problems({ ...S, eq: 60, rho: 2 }, DATA, 2026)), { r: false, sigma: true, bondReal: false });
+  assert.deepEqual(derivedStops(problems({ ...S, eq: 60 }, DATA, 2026)), { r: false, sigma: false, bondReal: false });
 });
 
 test('groupStates by row: spending and the age to holiday at count their own stops', () => {

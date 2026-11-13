@@ -14,7 +14,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { assumptionLine, renderCard, summaryCardSpec, typeCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, ledgerHtml, leversHtml, proLedgerRowHtml, proLinesHtml, lifeGainText, lifeTagText, fieldLineHtml, fieldLinesHtml, fixesHtml, groupStatusHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, sideCardHtml, sideHeadName, sideSummary, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
+  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, ledgerHtml, leversHtml, proLedgerRowHtml, proLinesHtml, lifeGainText, lifeTagText, fieldLineHtml, fieldLinesHtml, fixesHtml, groupStatusHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, SIDE_NO_RESULT, derivedStops, sideCardHtml, sideHeadName, sideSummary, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -442,11 +442,14 @@ const setEstimate = html => {
   $('estimate').innerHTML = html;
 };
 function renderEstimate(p) {
+  // A figure worked out from a stopped field reads —, never a number from the refused value.
+  const off = derivedStops(problems(S, DATA));
+  const fig = (key, d) => (off[key] ? SIDE_NO_RESULT : pct(p[key], d));
   if (S.view !== 'simple') {
     setEstimate(`<div class="derived">
-      <div><span>组合实际年化收益</span><b>${pct(p.r, 2)}</b></div>
-      <div><span>组合年化波动</span><b>${pct(p.sigma, 1)}</b></div>
-      <div><span>债券实际收益</span><b>${pct(p.bondReal, 2)}</b></div>
+      <div><span>组合实际年化收益</span><b>${fig('r', 2)}</b></div>
+      <div><span>组合年化波动</span><b>${fig('sigma', 1)}</b></div>
+      <div><span>债券实际收益</span><b>${fig('bondReal', 2)}</b></div>
     </div><label class="chk"><input type="checkbox" id="p-autoswr"${S.autoSwr ? ' checked' : ''}> 提取率按退休年限自动调整</label>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}`);
     placeRetLines();
     renderLines();
@@ -458,7 +461,7 @@ function renderEstimate(p) {
     setEstimate(`<h3 class="grp-legend"><label for="s-retexp">退休后每月想花</label><span class="grp-status" data-grp="retire"></span></h3>
       <div class="grp-body" id="side-s-retire"><div class="f"><div class="lab"><span class="u">${p.rCur}</span>${EST_BACK}</div>
       <span class="f-box">${EST_PRE}<input type="number" inputmode="decimal" id="s-retexp" step="500" placeholder="0" value="${S.retExp === null ? '' : Math.round(S.retExp / 12)}"></span></div>
-      <p class="fine mix-note">组合按股票 ${p.eq}% / 债券 ${100 - p.eq}% 估算（常见的基准组合，不是建议），扣掉通胀后约 ${pct(p.r, 1)}/年。<a href="sources.html">数据来源</a>，专业模式可以改。</p>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}</div>`);
+      <p class="fine mix-note">组合按股票 ${p.eq}% / 债券 ${100 - p.eq}% 估算（常见的基准组合，不是建议），扣掉通胀后约 ${fig('r', 1)}/年。<a href="sources.html">数据来源</a>，专业模式可以改。</p>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}</div>`);
   }
   placeRetLines();
   renderLines();
@@ -897,8 +900,10 @@ function syncGroups() {
 // ✕, and a row opens again whenever a ✕ newly shows in it. Below 1024 px the headers are not shown and nothing folds.
 const sideWide = window.matchMedia('(min-width: 1024px)');
 const SIDE_ROWS = ['tage', 'now', 'spend', 'where', 'pension', 'retire', 'region', 'returns', 'risk', 'sim'];
-const openRows = new Set(returning ? [] : SIDE_ROWS);
-let xRows = new Set();
+// Kept per view: the two views have rows of the same name (现在, 退休后) that the person opens and closes apart.
+const openRows = { simple: new Set(returning ? [] : SIDE_ROWS), pro: new Set(returning ? [] : SIDE_ROWS) };
+const xRows = { simple: new Set(), pro: new Set() };
+const openNow = () => openRows[S.view === 'pro' ? 'pro' : 'simple'];
 
 // The rows of the view on screen, in page order, with the element holding each: its header goes right before its body.
 function rowBoxes() {
@@ -911,8 +916,8 @@ function rowBoxes() {
 }
 
 function openRow(row) {
-  if (!row || openRows.has(row)) return;
-  openRows.add(row);
+  if (!row || openNow().has(row)) return;
+  openNow().add(row);
   syncSide();
 }
 
@@ -922,8 +927,9 @@ function syncSide() {
   document.querySelectorAll('.grp-head').forEach(head => { if (!homes.has(head.parentElement)) head.remove(); });
   const states = groupStates(S, markedNow, DATA, { by: 'row' });
   const x = new Set(boxes.filter(([row]) => states[row] && states[row].blank + states[row].block > 0).map(([row]) => row));
-  for (const row of x) if (!xRows.has(row)) openRows.add(row);
-  xRows = x;
+  const view = S.view === 'pro' ? 'pro' : 'simple';
+  for (const row of x) if (!xRows[view].has(row)) openRows[view].add(row);
+  xRows[view] = x;
   const year = new Date().getFullYear();
   const at = { S, p: toParams(S, DATA, year), rows: storyRows(S, DATA, year, null), data: DATA };
   for (const [row, el] of boxes) {
@@ -938,7 +944,7 @@ function syncSide() {
       head.innerHTML = '<b></b><span class="grp-sum"></span><span class="grp-status"></span><span class="grp-arrow" aria-hidden="true"></span>';
       body.before(head);
     }
-    const open = openRows.has(row);
+    const open = openRows[view].has(row);
     head.setAttribute('aria-expanded', String(open));
     el.classList.toggle('row-closed', !open);
     const [name, sum, status, arrow] = head.children;
@@ -960,6 +966,12 @@ function placeRows() {
   const estimate = $('estimate');
   const at = wide && S.view === 'pro' ? $('side-p-returns') : $('inputs-box');
   if (at.lastElementChild !== estimate) at.append(estimate);
+  // The professional income growth: in the 现在 row at 1024 px and wider; below, after spending, its split and the fold,
+  // where the two-column form draws it, so the order of the page is the order of Tab.
+  const growth = $('p-growth').closest('.f');
+  const spend = $('pro-form').querySelector('.grp-sub[data-row="spend"]');
+  if (wide && growth.parentElement !== $('side-p-now')) $('side-p-now').append(growth);
+  if (!wide && spend.nextElementSibling !== growth) spend.after(growth);
 }
 
 // The whole column stays on screen, from where it starts down to 16 px above the bottom: below the header at the top of
@@ -1508,8 +1520,13 @@ function onClick(ev) {
   const head = ev.target.closest?.('.grp-head');
   if (head) {
     const row = head.dataset.row;
-    if (openRows.has(row)) openRows.delete(row);
-    else openRows.add(row);
+    // Its ＋ does what the legend's ＋ does: the row opened and the cursor in the pension field.
+    if (ev.target.closest('.grp-plus')) {
+      goToField('pension');
+      return;
+    }
+    if (openNow().has(row)) openNow().delete(row);
+    else openNow().add(row);
     syncSide();
     return;
   }
@@ -1738,6 +1755,7 @@ function init() {
   });
   sideWide.addEventListener('change', () => {
     placeRows();
+    renderLines();
     syncSide();
     fitSide();
   });

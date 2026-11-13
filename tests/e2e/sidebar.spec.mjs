@@ -102,3 +102,91 @@ test.describe('between 900 and 1023 px', () => {
     await expect(page.locator('#s-age')).toBeVisible();
   });
 });
+
+// Review fix round 1.
+const derived = page => page.locator('#estimate .derived b');
+test('a blocked 股票占比 leaves r and the derived returns unworked: — instead of a number', async ({ page }) => {
+  await page.goto('/'); await page.click('#to-pro');
+  await page.fill('#p-eq', '150'); await page.locator('#p-eq').press('Tab');
+  await expect(page.locator('.grp-head[data-row="returns"] .grp-sum')).toContainText('→ r —');
+  await expect(page.locator('.grp-head[data-row="returns"] .grp-sum')).not.toContainText('%）');
+  await expect(page.locator('.grp-head[data-row="returns"] .grp-sum')).not.toContainText(/r \d/);
+  for (const i of [0, 1]) {
+    await expect(derived(page).nth(i)).toContainText('—');
+    await expect(derived(page).nth(i)).not.toContainText('%');
+  }
+  await page.fill('#p-eq', '60'); await page.locator('#p-eq').press('Tab');
+  await expect(derived(page).first()).toContainText('%');
+  await expect(page.locator('.grp-head[data-row="returns"] .grp-sum')).toContainText(/→ r \d+\.\d%/);
+});
+
+test('rows open and close per view: the professional 退休后 is not the simple one, and a closed ✕ row stays closed', async ({ page }) => {
+  await page.goto('/'); await page.reload();
+  await page.click('#to-pro');
+  await page.locator('.grp-head[data-row="retire"]').click();
+  await expect(page.locator('.grp-head[data-row="retire"]')).toHaveAttribute('aria-expanded', 'true');
+  await page.click('#to-simple');
+  await expect(page.locator('.grp-head[data-row="retire"]')).toHaveAttribute('aria-expanded', 'false');
+  const now = page.locator('.grp-head[data-row="now"]');
+  await now.click();
+  await page.fill('#s-age', '120'); await page.locator('#s-age').press('Tab');
+  await expect(now.locator('.grp-x')).toHaveText('✕ 1');
+  await now.click();
+  await expect(now).toHaveAttribute('aria-expanded', 'false');
+  await page.click('#to-pro'); await page.click('#to-simple');
+  await expect(now).toHaveAttribute('aria-expanded', 'false');
+  await page.click('#to-pro');
+  await expect(page.locator('.grp-head[data-row="retire"]')).toHaveAttribute('aria-expanded', 'true');
+});
+
+test('the marks in a header are said in words', async ({ page }) => {
+  await page.goto('/'); await page.reload();
+  await expect(page.locator('.grp-head[data-row="pension"]')).toHaveAccessibleName(/可以不填/);
+  await expect(page.locator('.grp-head[data-row="retire"]')).toHaveAccessibleName(/估算/);
+  const box = await page.locator('.grp-head[data-row="retire"] .sr').boundingBox();
+  expect(box.width).toBeLessThanOrEqual(1);
+  await page.locator('.grp-head[data-row="now"]').click();
+  await page.fill('#s-age', '120'); await page.locator('#s-age').press('Tab');
+  await expect(page.locator('.grp-head[data-row="now"]')).toHaveAccessibleName(/拦住 1 处/);
+});
+
+test('the ＋ in the 养老金 header opens the row and puts the cursor in the pension field', async ({ page }) => {
+  await page.goto('/'); await page.reload();
+  await page.locator('.grp-head[data-row="pension"] .grp-plus').click();
+  await expect(page.locator('#s-pension')).toBeFocused();
+  await expect(page.locator('.grp-head[data-row="pension"]')).toHaveAttribute('aria-expanded', 'true');
+});
+
+test('the professional 现在 row at 1024 px and wider: Tab goes income → growth, its order on the page', async ({ page }) => {
+  await page.goto('/'); await page.click('#to-pro');
+  await expect(page.locator('#p-income')).toBeVisible();
+  await page.locator('#p-income').focus(); await page.keyboard.press('Tab');
+  await expect(page.locator('#p-growth')).toBeFocused();
+});
+
+test.describe('on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  test('the professional form keeps its order: income → spending, its split and the fold → growth', async ({ page }) => {
+    await page.goto('/'); await page.click('#to-pro');
+    await expect(page.locator('#p-income')).toBeVisible();
+    await page.locator('#p-income').focus(); await page.keyboard.press('Tab');
+    await expect(page.locator('#p-expense')).toBeFocused();
+    const y = async sel => (await page.locator(sel).boundingBox()).y;
+    expect(await y('#p-expense')).toBeCloseTo(await y('#p-income'), 0);
+    expect(await y('#p-growth')).toBeGreaterThan(await y('#life-fold > summary'));
+    const order = await page.evaluate(() => {
+      const [fold, growth] = [document.getElementById('life-fold'), document.getElementById('p-growth')];
+      return Boolean(fold.compareDocumentPosition(growth) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    expect(order).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+  });
+  test('a blocked 股票占比 leaves the derived returns unworked', async ({ page }) => {
+    await page.goto('/'); await page.click('#to-pro');
+    await page.fill('#p-eq', '150'); await page.locator('#p-eq').press('Tab');
+    for (const i of [0, 1]) {
+      await expect(derived(page).nth(i)).toContainText('—');
+      await expect(derived(page).nth(i)).not.toContainText('%');
+    }
+  });
+});

@@ -4,7 +4,7 @@ import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn, o
 import { needLine, oddsSolve, oddsYears } from './odds.js';
 import { MIN_SHOWN, SCENARIOS, answerValues, scenarioOptions } from './scenario.js';
 import { impactOf, lifeChoices, tryParam } from './levers.js';
-import { FIELD_LABEL, LIMITS, itemsYearly, num, splitOn } from './state.js';
+import { FIELD_LABEL, LIMITS, itemsYearly, num, problems, splitOn } from './state.js';
 
 const moneyFormats = {};
 export function money(v, cur) {
@@ -1080,6 +1080,9 @@ export { bwdSolve };
 
 // The state at the right of a form group's header: ✕ N for the stops shown in it, else 示例, ＋ for an empty optional
 // group, 默认 / 已改 N for the assumptions; the two assumption groups also say which data month they stand on.
+// Words read out instead of a mark. Inside a button an aria-label on a plain span is not read, so the header of a
+// sidebar row says them as visually hidden text.
+const SR = text => `<span class="sr">${text}</span>`;
 // mark: inside a sidebar row's header, which is itself a button, the ＋ is a mark, not a button of its own; there the
 // data month is in the 地区与币种 row's summary instead (spec §6.3), so month: false leaves it out.
 export function groupStatusHtml(st, { version, mark = false, month = true }) {
@@ -1087,16 +1090,29 @@ export function groupStatusHtml(st, { version, mark = false, month = true }) {
   const data = st.changed === null || !month ? '' : ` <span class="grp-data">${version} 数据</span>`;
   if (stops > 0) {
     const parts = [st.block ? `拦住 ${st.block} 处` : '', st.blank ? `待填 ${st.blank} 处` : ''].filter(Boolean).join('，');
+    if (mark) return `<span class="grp-x" aria-hidden="true">✕ ${stops}</span>${SR(parts)}${data}`;
     return `<span class="grp-x" aria-label="${parts}">✕ ${stops}</span>${data}`;
   }
   if (st.example) return '示例';
-  if (st.empty) return mark ? '<span class="grp-plus" aria-label="可以不填">＋</span>' : '<button type="button" class="grp-plus" aria-label="可以不填，点此填写">＋</button>';
+  if (st.empty) return mark ? `<span class="grp-plus" aria-hidden="true">＋</span>${SR('可以不填')}` : '<button type="button" class="grp-plus" aria-label="可以不填，点此填写">＋</button>';
   if (st.changed !== null) return `${st.changed === 0 ? '默认' : `已改 ${st.changed}`}${data}`;
   return '';
 }
 
 // ---- The sidebar at 1024 px and wider (spec §6.3): each row's name, its one-line summary while closed, and the
 // result card at the bottom.
+
+// The fields each derived figure is worked out from. A stop (blank or block) on any of them leaves the figure
+// unworked: it reads — rather than a number from a value the page has refused.
+const DERIVED_FROM = {
+  r: ['eq', 'eqReal', 'bondY', 'infl', 'drag'],
+  sigma: ['eq', 'sigEq', 'sigBd', 'rho'],
+  bondReal: ['bondY', 'infl'],
+};
+export function derivedStops(list) {
+  const stopped = keys => list.some(q => (q.kind === 'blank' || q.kind === 'block') && keys.includes(q.field));
+  return Object.fromEntries(Object.entries(DERIVED_FROM).map(([k, keys]) => [k, stopped(keys)]));
+}
 
 const SIDE_NAME = {
   simple: { tage: '想几岁放假', now: '现在', spend: '每月支出', where: '在哪里', pension: '养老金', retire: '退休后每月想花' },
@@ -1111,11 +1127,14 @@ export function sideHeadName(row, S) {
   return `${name} ${splitOn(S) ? '= ' : ''}${total}`;
 }
 
-const SIDE_EST = '<span class="est" aria-label="估算">≈</span> ';
-const SIDE_WARN = '<span class="warn" aria-label="提示">!</span>';
+const SIDE_EST = `<span class="est" aria-hidden="true">≈</span>${SR('估算')} `;
+const SIDE_WARN = `<span class="warn" aria-hidden="true">!</span>${SR('提示')}`;
+const SIDE_NONE = `<span aria-hidden="true">—</span>${SR('没有数')}`;
+// No number, said in words: in the sidebar headers and the professional derived returns.
+export const SIDE_NO_RESULT = `<span aria-hidden="true">—</span>${SR('暂无结果')}`;
 // An amount that may be negative: the sign as U+2212 in front of the currency, with an orange ! before it.
 const signedMoney = (v, fmt) => (v < 0 ? `${SIDE_WARN} −${fmt(-v)}` : fmt(v));
-const orNone = (v, fmt) => (isSet(v) ? fmt(v) : NONE);
+const orNone = (v, fmt) => (isSet(v) ? fmt(v) : SIDE_NONE);
 
 // The closed row's summary, from the numbers as typed and the rows under the fields (spec §6.3 tables).
 export function sideSummary(row, { S, p, rows, data }) {
@@ -1140,7 +1159,7 @@ export function sideSummary(row, { S, p, rows, data }) {
     return items.length ? `其中${items.map(r => `${label(r)} ${num(r.value)}${pro ? '/年' : ''}`).join(' · ')}` : '';
   }
   if (row === 'where') return `${data.countries[S.workC].name} → ${data.countries[S.retC].name}`;
-  if (row === 'pension') return S.pension > 0 ? `${wholeMoney(Math.round(S.pension / 12), rCur)}/月 · ${pAge} 岁起` : NONE;
+  if (row === 'pension') return S.pension > 0 ? `${wholeMoney(Math.round(S.pension / 12), rCur)}/月 · ${pAge} 岁起` : SIDE_NONE;
   if (row === 'retire') {
     const typed = retRow?.typed;
     if (pro) {
@@ -1155,7 +1174,10 @@ export function sideSummary(row, { S, p, rows, data }) {
     const rate = wCur === rCur ? '' : ` · 1 ${rCur} = ${rateText(p)} ${wCur}`;
     return `${S.workC} → ${S.retC}${rate} · <span class="grp-data">${data.version} 数据</span>`;
   }
-  if (row === 'returns') return `股 ${num(p.eq)}% · 实际 ${p.eqReal.toFixed(1)}% · 通胀 ${p.infl.toFixed(1)}% → r ${(p.r * 100).toFixed(1)}%`;
+  if (row === 'returns') {
+    const r = derivedStops(problems(S, data)).r ? SIDE_NO_RESULT : `${(p.r * 100).toFixed(1)}%`;
+    return `股 ${num(p.eq)}% · 实际 ${p.eqReal.toFixed(1)}% · 通胀 ${p.infl.toFixed(1)}% → r ${r}`;
+  }
   if (row === 'risk') return `σ ${num(p.sigEq)}/${num(p.sigBd)} · ρ ${num(p.rho)} · 一年跌 ≥ 15% 后少花 ${num(p.flexCut)}%`;
   if (row === 'sim') return `八成 · ${DEFAULT_PATHS.toLocaleString('en-US')} 次 · 种子 ${DEFAULT_SEED}`;
   return '';
