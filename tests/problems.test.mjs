@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
-import { defaultState, loadState, problems, setField, setSplit, unsplit, splitOn, cleanSplit, itemsYearly, setWorkCountry, setRetireCountry, num, groupStates } from '../site/js/state.js';
+import { defaultState, loadState, problems, setField, setReal, setSplit, unsplit, splitOn, cleanSplit, itemsYearly, setWorkCountry, setRetireCountry, num, groupStates } from '../site/js/state.js';
 
 const real = (m = {}, k = {}) => ({ mortgage: { monthly: null, endYear: null, ...m }, kids: { count: null, age: null, monthly: null, ...k } });
 const S0 = o => ({ ...defaultState(DATA), ...o });
@@ -460,4 +460,19 @@ test('final review: 示例 leaves 现在 once a mortgage or children are filled,
   assert.equal(groupStates(m, P(m), DATA).now.example, false);
   const k = S0({ real: real({}, { count: 1, age: 3, monthly: 1000 }) });
   assert.equal(groupStates(k, P(k), DATA).now.example, false);
+});
+
+test('final re-review: a negative spending stays one stop through the mortgage, children and country paths', () => {
+  const neg = setField(defaultState(DATA), 'expense', '-500', DATA);
+  const stops = S => P(S).filter(q => q.kind === 'block' || q.kind === 'blank').map(q => q.field);
+  for (const S of [
+    setReal(neg, 'mortgage', 'monthly', '3000', DATA),
+    setReal(neg, 'kids', 'count', '1', DATA),
+    setRetireCountry(neg, neg.workC, DATA),
+    setWorkCountry(neg, neg.retC, DATA),
+  ]) {
+    assert.equal(S.retExp >= 0, true);
+    assert.equal(stops(S).includes('retExp'), false);
+    assert.equal(!!S.touched?.retExp, false);
+  }
 });

@@ -54,7 +54,7 @@ export function cleanReal(raw) {
 // The automatic retirement spending holds the items at their own value, so with data it is estimated again.
 export function setReal(S, part, field, rawText, data = null) {
   const next = { ...S, real: cleanReal({ ...S.real, [part]: { ...S.real?.[part], [field]: rawText } }) };
-  if (data && !S.touched?.retExp) next.retExp = Math.round(estimateRetireSpend(next.expense ?? 0, next.workC, next.retC, data, itemsYearly(next)));
+  if (data && !S.touched?.retExp) next.retExp = Math.round(estimateRetireSpend(Math.max(next.expense ?? 0, 0), next.workC, next.retC, data, itemsYearly(next)));
   return next;
 }
 
@@ -463,7 +463,7 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
   if (S.touched?.retExp && isSet(S.retExp) && itemsY > 0 && toRet(itemsY) >= S.retExp) {
     a4 = true;
     const shown = v => (work === ret ? v : whole(toRet(v)));
-    const est = Math.round(estimateRetireSpend(S.expense ?? 0, S.workC, S.retC, data, itemsYearly(S, thisYear)));
+    const est = Math.round(estimateRetireSpend(Math.max(S.expense ?? 0, 0), S.workC, S.retC, data, itemsYearly(S, thisYear)));
     add({ id: 'A4', rule: 'A4', kind: 'block', field: 'retExp', at: 'retExp',
       rel: { sub: true, left: items(v => shown(pro ? v * 12 : v), pro ? '/年' : null), op: '≥', right: { label: label('retExp'), value: pro ? S.retExp : whole(S.retExp / 12) } },
       fixes: [{ text: `改回估算 ≈ ${num(pro ? est : whole(est / 12))}`, reset: 'retExp' }] });
@@ -751,7 +751,7 @@ export function setWorkCountry(S, code, data) {
   const sp = cleanSplit(S.split);
   moved.split = { rent: move(sp.rent), food: move(sp.food), other: move(sp.other), before: move(sp.before) };
   if (splitOn(moved)) moved.expense = splitTotal(moved.split);
-  if (!S.touched.retExp) moved.retExp = Math.round(estimateRetireSpend(moved.expense ?? 0, code, S.retC, data, itemsYearly(moved)));
+  if (!S.touched.retExp) moved.retExp = Math.round(estimateRetireSpend(Math.max(moved.expense ?? 0, 0), code, S.retC, data, itemsYearly(moved)));
   moved.lastValid = { ...S.lastValid, ...localAssumptions(country) };
   moved.touched = Object.fromEntries(Object.entries(S.touched).filter(([id]) => !ASSUMPTION_FIELDS.includes(id)));
   return moved;
@@ -764,7 +764,7 @@ export function setRetireCountry(S, code, data) {
   if (S.touched.retExp) {
     moved.notice = `退休地已改为${data.countries[code].name}，你手动填写的退休支出没有变，请按当地货币和花费调整。`;
   } else {
-    moved.retExp = Math.round(estimateRetireSpend(S.expense ?? 0, S.workC, code, data, itemsYearly(S)));
+    moved.retExp = Math.round(estimateRetireSpend(Math.max(S.expense ?? 0, 0), S.workC, code, data, itemsYearly(S)));
   }
   return moved;
 }

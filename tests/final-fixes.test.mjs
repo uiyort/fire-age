@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
 import { defaultState, storyRows, toParams } from '../site/js/state.js';
-import { sideSummary, mixShares } from '../site/js/views.js';
+import { sideSummary, mixShares, pct } from '../site/js/views.js';
 
 const real = (m = {}, k = {}) => ({ mortgage: { monthly: null, endYear: null, ...m }, kids: { count: null, age: null, monthly: null, ...k } });
 const summary = (S, row) => sideSummary(row, { S, p: toParams(S, DATA, 2026), rows: storyRows(S, DATA, 2026, null), data: DATA });
@@ -24,8 +24,13 @@ test('sidebar: a negative split part leaves no 存下 and no ≈ 0 for retiremen
   assert.match(text(summary(S, 'retire')), /—没有数/);
 });
 
-test('the mix note writes — for a stopped share and U+2212 for a negative one', () => {
+test('the mix note writes — for a stopped share', () => {
   assert.deepEqual(mixShares(60, false), { stock: '60', bond: '40' });
   assert.deepEqual(mixShares(150, true), { stock: '—', bond: '—' });
-  assert.deepEqual(mixShares(60, false), { stock: '60', bond: '40' });
+});
+
+test('pct writes a true minus and never −0.0%', () => {
+  assert.equal(pct(-0.056, 1), '−5.6%');
+  assert.equal(pct(-0.0004, 1), '0.0%');
+  assert.equal(pct(0.039, 1), '3.9%');
 });

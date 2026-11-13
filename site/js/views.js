@@ -23,7 +23,12 @@ export function roughMoney(v, cur) {
 
 const whole = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 0 });
 export const wholeMoney = (v, cur) => (cur === 'CNY' ? `¥${whole.format(v)}` : `${cur} ${whole.format(v)}`);
-export const pct = (v, d = 1) => (Number.isFinite(v) ? `${(v * 100).toFixed(d)}%` : '—');
+// A percentage with a true minus sign, and never −0.0%.
+export const pct = (v, d = 1) => {
+  if (!Number.isFinite(v)) return '—';
+  const t = (v * 100).toFixed(d);
+  return `${/^-0(.0+)?$/.test(t) ? t.slice(1) : t.replace('-', '−')}%`;
+};
 
 export const toDisplay = (v, p, cur) => conv(v, p.wCur, cur, p.fx);
 
@@ -1187,8 +1192,8 @@ export function sideSummary(row, { S, p, rows, data }) {
     return `${S.workC} → ${S.retC}${rate} · <span class="grp-data">${data.version} 数据</span>`;
   }
   if (row === 'returns') {
-    const r = derivedStops(problems(S, data)).r ? SIDE_NO_RESULT : `${(p.r * 100).toFixed(1)}%`;
-    return `股 ${num(p.eq)}% · 实际 ${p.eqReal.toFixed(1)}% · 通胀 ${p.infl.toFixed(1)}% → r ${r}`;
+    const r = derivedStops(problems(S, data)).r ? SIDE_NO_RESULT : pct(p.r, 1);
+    return `股 ${num(p.eq)}% · 实际 ${pct(p.eqReal / 100, 1)} · 通胀 ${pct(p.infl / 100, 1)} → r ${r}`;
   }
   if (row === 'risk') return `σ ${num(p.sigEq)}/${num(p.sigBd)} · ρ ${num(p.rho)} · 一年跌 ≥ 15% 后少花 ${num(p.flexCut)}%`;
   if (row === 'sim') return `八成 · ${DEFAULT_PATHS.toLocaleString('en-US')} 次 · 种子 ${DEFAULT_SEED}`;
