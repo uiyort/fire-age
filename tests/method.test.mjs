@@ -14,13 +14,13 @@ test('the method page writes the items into the formulas', () => {
   assert.ok(md.includes('itemDelta(t)')); assert.ok(md.includes('a fall of 15% or more'));
 });
 test('the method page lists every limit the page enforces, as this tool\'s setting', () => {
-  assert.ok(html.includes('id="limits"')); assert.ok(html.includes('这些上下限和常见范围都是本工具设定。'));
+  assert.ok(html.includes('id="limits"')); assert.ok(html.includes('常见范围（只提示，专业版）')); assert.ok(html.includes('10 年期国债收益率')); assert.ok(html.includes('这些上下限和常见范围都是本工具设定。'));
   for (const v of [...LIMITS.age, ...LIMITS.pAge, LIMITS.lifeMax, LIMITS.endYearBack, LIMITS.endYearAhead, `${LIMITS.low * 100}%`]) assert.ok(html.includes(String(v)), v);
   for (const [lo, hi] of Object.values(LIMITS.common)) assert.ok(html.includes(`${lo < 0 ? '−' + -lo : lo}–${hi}%`), `${lo}–${hi}`);
 });
 test('the odds section says why 八成 and why 2,000 runs', () => {
   const sec = html.split('id="odds"')[1].split('<h2')[0];
-  for (const t of ['1,600', '2,000', '本工具设定']) assert.ok(sec.includes(t), t);
+  for (const t of ['1,600', '2,000', '本工具设定', '随机种子固定', '介于']) assert.ok(sec.includes(t), t);
 });
 test('the bad-year card says 15% or more', () => {
   assert.ok(PARAMS.find(p => p.id === 'flexCut').what.includes('组合某年跌了 15% 或更多'));

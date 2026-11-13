@@ -728,7 +728,7 @@ function renderLives() {
     '<span><i class="sw r-work"></i>上班</span>',
     '<span><i class="sw r-holiday"></i>放假有钱花</span>',
     '<span><i class="sw r-broke"></i>钱花完</span>',
-    '<span><i class="sw r-bad"></i>当年大跌 15% 以上</span>',
+    '<span><i class="sw r-bad"></i>当年大跌 15% 或更多</span>',
     ...(selectedFifth ? [`<span><i class="sw line-compare"></i>原计划：${names[fifth.baseIndex]}</span>`] : []),
   ].join('');
   drawLivesChart($('lives-chart'), $('lives-tip'), { age: p.age, lives: series, money: v => money(v, cur) });
