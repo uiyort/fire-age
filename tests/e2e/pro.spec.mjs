@@ -21,6 +21,8 @@ test('sources page marks assumed values and states their basis', async ({ page }
 test('method page publishes the formulas and the disclaimer', async ({ page }) => {
   await page.goto('/method.html');
   for (const t of ['组合实际收益', '安全提取率', '蒙特卡洛', '20261026', '不构成投资建议']) await expect(page.locator('body')).toContainText(t);
+  await expect(page.locator('#limits')).toContainText('页面上的限制');
+  await expect(page.locator('main')).toContainText('项目变化(t)');
 });
 
 test('the main page shows the data version and links both pages', async ({ page }) => {
