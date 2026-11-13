@@ -166,7 +166,8 @@ export function setField(S, id, rawText, data, { commit = true } = {}) {
   if (ASSUMPTION_FIELDS.includes(id)) next.touched = { ...S.touched, [id]: true };
   if (id === 'retExp') return { ...next, touched: { ...S.touched, retExp: true }, notice: '' };
   if (id === 'expense' && !S.touched.retExp) {
-    const spent = value ?? 0;
+    // A negative spending (stopped by B2) estimates from 0, so the stop stays on spending alone, as the split does.
+    const spent = Math.max(value ?? 0, 0);
     next.retExp = data ? Math.round(estimateRetireSpend(spent, S.workC, S.retC, data, itemsYearly(next))) : spent;
   }
   return next;
@@ -237,7 +238,10 @@ export function groupStates(S, list, data, { by = 'group' } = {}) {
     if (g && out[g]) out[g][q.kind] += 1;
   }
   const start = defaultState(data);
-  out.now.example = ['age', 'assets', 'income', 'expense'].every(k => S[k] === start[k]) && !splitOn(S);
+  // 示例: the numbers are still the examples and nothing under spending (a mortgage, children) has been filled.
+  const { mortgage: mort, kids: kid } = cleanReal(S.real);
+  const filled = [mort.monthly, mort.endYear, kid.count, kid.age, kid.monthly].some(v => v !== null && v !== undefined);
+  out.now.example = ['age', 'assets', 'income', 'expense'].every(k => S[k] === start[k]) && !splitOn(S) && !filled;
   out.pension.empty = !(S.pension > 0);
   const local = localAssumptions(data.countries[S.workC] ?? data.countries.CN);
   const differs = (k, base) => (S[k] !== base[k] ? 1 : 0);

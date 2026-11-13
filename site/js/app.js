@@ -14,7 +14,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { assumptionLine, renderCard, summaryCardSpec, typeCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, ledgerHtml, leversHtml, proLedgerRowHtml, proLinesHtml, lifeGainText, lifeTagText, fieldLineHtml, fieldLinesHtml, fixesHtml, groupStatusHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, SIDE_NO_RESULT, derivedStops, sideCardHtml, sideHeadName, sideSummary, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
+  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, ledgerHtml, leversHtml, proLedgerRowHtml, proLinesHtml, lifeGainText, lifeTagText, fieldLineHtml, fieldLinesHtml, fixesHtml, groupStatusHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, SIDE_NO_RESULT, derivedStops, mixShares, sideCardHtml, sideHeadName, sideSummary, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -456,12 +456,13 @@ function renderEstimate(p) {
     syncGroups();
     return;
   }
+  const mix = mixShares(p.eq, problems(S, DATA).some(q => (q.kind === 'blank' || q.kind === 'block') && q.field === 'eq'));
   const typing = document.activeElement?.id === 's-retexp';
   if (!typing) {
     setEstimate(`<h3 class="grp-legend"><label for="s-retexp">退休后每月想花</label><span class="grp-status" data-grp="retire"></span></h3>
       <div class="grp-body" id="side-s-retire"><div class="f"><div class="lab"><span class="u">${p.rCur}</span>${EST_BACK}</div>
       <span class="f-box">${EST_PRE}<input type="number" inputmode="decimal" id="s-retexp" step="500" placeholder="0" value="${S.retExp === null ? '' : Math.round(S.retExp / 12)}"></span></div>
-      <p class="fine mix-note">组合按股票 ${p.eq}% / 债券 ${100 - p.eq}% 估算（常见的基准组合，不是建议），扣掉通胀后约 ${fig('r', 1)}/年。<a href="sources.html">数据来源</a>，专业模式可以改。</p>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}</div>`);
+      <p class="fine mix-note">组合按股票 ${mix.stock}% / 债券 ${mix.bond}% 估算（常见的基准组合，不是建议），扣掉通胀后约 ${fig('r', 1)}/年。<a href="sources.html">数据来源</a>，专业模式可以改。</p>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}</div>`);
   }
   placeRetLines();
   renderLines();

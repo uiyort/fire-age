@@ -190,3 +190,15 @@ test.describe('on a phone', () => {
     }
   });
 });
+
+test('a mortgage above spending: the 现在 summary reads — for 存下, as the ledger does', async ({ page }) => {
+  await page.goto('/'); await page.reload();
+  await page.locator('.grp-head[data-row="spend"]').click();
+  const fold = page.locator('#life-fold');
+  if (!(await fold.evaluate(el => el.open))) await fold.locator('summary').click();
+  await page.fill('#life-mortgage', '8000');
+  await page.fill('#life-mortgage-end', '2045');
+  await page.locator('#life-mortgage-end').press('Tab');
+  await expect(page.locator('.grp-head[data-row="now"]')).toContainText('存下 —');
+  await expect(page.locator('.grp-head[data-row="now"]')).not.toContainText('¥6,000/月');
+});

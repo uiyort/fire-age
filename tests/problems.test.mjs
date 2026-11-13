@@ -446,3 +446,18 @@ test('groupStates: example, plus, counts, and changed assumptions', () => {
   assert.equal(groupStates({ ...S, view: 'pro' }, [], DATA).risk.changed, 0);
   assert.equal(groupStates(S0({ mode: 'bwd', tAge: 25 }), problems(S0({ mode: 'bwd', tAge: 25 }), DATA, 2026), DATA).pension.block, 1);
 });
+
+test('final review: a negative spending stops once, on spending; the retirement estimate stays at 0 and follows on', () => {
+  const S = setField(defaultState(DATA), 'expense', '-500', DATA);
+  assert.ok(S.retExp >= 0); assert.ok(!S.touched.retExp);
+  const stops = P(S).filter(q => q.kind === 'block' || q.kind === 'blank');
+  assert.deepEqual(stops.map(q => q.field), ['expense']);
+});
+
+test('final review: 示例 leaves 现在 once a mortgage or children are filled, even a stopped one', () => {
+  assert.equal(groupStates(defaultState(DATA), [], DATA).now.example, true);
+  const m = S0({ real: real({ monthly: 8000, endYear: 2045 }) });
+  assert.equal(groupStates(m, P(m), DATA).now.example, false);
+  const k = S0({ real: real({}, { count: 1, age: 3, monthly: 1000 }) });
+  assert.equal(groupStates(k, P(k), DATA).now.example, false);
+});

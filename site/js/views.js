@@ -1114,6 +1114,9 @@ export function derivedStops(list) {
   return Object.fromEntries(Object.entries(DERIVED_FROM).map(([k, keys]) => [k, stopped(keys)]));
 }
 
+// The stock and bond shares of the mix note: — while the share is stopped, never a number from the refused value.
+export const mixShares = (eq, stopped) => (stopped ? { stock: '—', bond: '—' } : { stock: num(eq), bond: num(100 - eq) });
+
 const SIDE_NAME = {
   simple: { tage: '想几岁放假', now: '现在', spend: '每月支出', where: '在哪里', pension: '养老金', retire: '退休后每月想花' },
   pro: { region: '地区与币种', now: '现在', spend: '当前年支出', retire: '退休后', returns: '收益假设', risk: '风险假设', sim: '模拟' },
@@ -1142,15 +1145,24 @@ export function sideSummary(row, { S, p, rows, data }) {
   const wCur = p.wCur, rCur = p.rCur;
   // 万 figures to three digits; below ¥10,000 the whole amount, grouped.
   const W = v => wholeMoney(v, wCur), R = v => (Math.abs(v) < 10000 ? wholeMoney : roughMoney)(v, wCur);
-  const save = isSet(S.income) && isSet(S.expense) ? S.income - S.expense : null;
+  // The ledger's own rows, stopped where the ledger stops: a figure after a stopped row reads —, never a number from
+  // a value the page has refused.
+  const isStop = r => r.status === 'block' || r.status === 'blank';
+  const noRowStop = problems(S, data).some(q => (q.kind === 'blank' || q.kind === 'block') && ['age', 'growth'].includes(q.field));
+  const after = key => {
+    const at = rows.findIndex(r => r.key === key);
+    return at >= 0 && (noRowStop || rows.slice(0, at).some(isStop));
+  };
+  const save = after('save') ? null : rows.find(r => r.key === 'save')?.value ?? null;
   const pAge = S.pAge ?? S.lastValid?.pAge;
   const retRow = rows.find(r => r.key === 'retExp');
+  const retStopped = after('retExp');
   const est = S.touched?.retExp ? '' : SIDE_EST;
   if (row === 'tage') return `${orNone(S.tAge, num)} 岁`;
   if (row === 'now') {
     const age = `${orNone(S.age, num)} 岁 · ${orNone(S.assets, R)}`;
     if (pro) return `${age} · ${orNone(S.income, R)}/年 · 涨 ${num(p.growth)}%/年 · 存 ${orNone(save, v => signedMoney(v, R))}/年`;
-    return `${age} · 到手 ${orNone(S.income, v => R(v / 12))}/月 · 存下 ${orNone(save, v => signedMoney(Math.round(v / 12), W))}/月`;
+    return `${age} · 到手 ${orNone(S.income, v => R(v / 12))}/月 · 存下 ${orNone(save, v => signedMoney(v, W))}/月`;
   }
   if (row === 'spend') {
     // The items still in today's spending; one that has ended is no longer part of it.
@@ -1161,14 +1173,14 @@ export function sideSummary(row, { S, p, rows, data }) {
   if (row === 'where') return `${data.countries[S.workC].name} → ${data.countries[S.retC].name}`;
   if (row === 'pension') return S.pension > 0 ? `${wholeMoney(Math.round(S.pension / 12), rCur)}/月 · ${pAge} 岁起` : SIDE_NONE;
   if (row === 'retire') {
-    const typed = retRow?.typed;
+    const typed = retStopped ? null : retRow?.typed;
     if (pro) {
       const pension = S.pension > 0 ? ` · 养老金 ${pAge} 岁起` : '';
-      return `${est}${orNone(typed, v => wholeMoney(v, rCur))}/年 · 到 ${orNone(S.life, num)}${pension}`;
+      return `${retStopped ? '' : est}${orNone(typed, v => wholeMoney(v, rCur))}/年 · 到 ${orNone(S.life, num)}${pension}`;
     }
-    const after = rows.filter(r => r.key.startsWith('after:') && !r.folded)
+    const later = retStopped ? '' : rows.filter(r => r.key.startsWith('after:') && !r.folded)
       .map(r => ` → ${r.ages[0]} 岁起 ${orNone(r.value, v => wholeMoney(v, rCur))}`).join('');
-    return `${est}${orNone(typed, num)}${after}`;
+    return `${retStopped ? '' : est}${orNone(typed, num)}${later}`;
   }
   if (row === 'region') {
     const rate = wCur === rCur ? '' : ` · 1 ${rCur} = ${rateText(p)} ${wCur}`;
