@@ -65,3 +65,26 @@ test('the home page says what the tool is without running any script', () => {
   assert.ok(title.startsWith('放假年龄'));
   for (const word of ['财务自由', '提前退休', '计算器']) assert.ok(title.includes(word), word);
 });
+
+test('each public page shows the preview image when its link is shared', () => {
+  for (const file of Object.keys(PUBLIC)) {
+    const html = read(file);
+    assert.equal(meta(html, 'og:image'), `${origin}/og.png`, file);
+    assert.equal(meta(html, 'og:image:width'), '1200', file);
+    assert.equal(meta(html, 'og:image:height'), '630', file);
+    assert.equal(meta(html, 'twitter:card'), 'summary_large_image', file);
+  }
+  const png = readFileSync('site/og.png');
+  assert.equal(png.readUInt32BE(16), 1200);
+  assert.equal(png.readUInt32BE(20), 630);
+});
+
+test('the home page tells search engines it is a free web application', () => {
+  const block = attr(read('index.html'), /<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  const ld = JSON.parse(block);
+  assert.equal(ld['@type'], 'WebApplication');
+  assert.equal(ld.name, '放假年龄');
+  assert.equal(ld.url, `${origin}/`);
+  assert.equal(ld.offers.price, '0');
+  assert.equal(ld.isAccessibleForFree, true);
+});

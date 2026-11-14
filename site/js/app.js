@@ -10,6 +10,7 @@ import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody } from './
 import { PARAMS, PARAM_GROUPS } from './params.js';
 import { makeGoal, compareVisit, goalApplies, loadGoal, saveGoal, clearGoal } from './goals.js';
 import { initAnalytics, track } from './analytics.js';
+import { stateFromLink } from './link.js';
 import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { assumptionLine, renderCard, summaryCardSpec, typeCardSpec } from './card.js';
@@ -38,8 +39,30 @@ const started = (() => {
     return false;
   }
 })();
-let S = loadState(DATA, storage);
-let goal = loadGoal(storage);
+// Numbers carried by a link (link.js) open in place of the saved ones, which are not overwritten until the person
+// changes something; the saved goal waits too, since it was set for the saved numbers.
+const linked = stateFromLink(location.hash, DATA);
+let linkHeld = linked !== null;
+let S = linked ?? loadState(DATA, storage);
+let goal = linked ? null : loadGoal(storage);
+function persist() {
+  if (!linkHeld) saveState(S, storage);
+}
+// The first change makes the numbers the person's own: they are saved from then on and the fragment is dropped,
+// so a reload keeps what they did rather than reading the link again.
+function releaseLink() {
+  if (!linkHeld) return;
+  linkHeld = false;
+  $('link-note').hidden = true;
+  history.replaceState(null, '', location.pathname + location.search);
+  persist();
+}
+function showLinkNote() {
+  const note = $('link-note');
+  note.innerHTML = '这是链接里带的算例数字。改成你自己的，就按你的算。'
+    + (returning ? ' <button type="button" class="link" id="link-back">换回我上次的数字</button>' : '');
+  note.hidden = false;
+}
 let latest = null;
 // The ledger behind the fund line: closed until the person opens it, then drawn with every refresh.
 let ledgerOpen = false;
@@ -508,7 +531,7 @@ function renderFast() {
   $('lead-faster').textContent = fasterLead(levers, { reached });
   renderSideLinks();
   renderGoal(p);
-  saveState(S, storage);
+  persist();
 }
 
 // The parts that solve the plan many times over: other places, the lab cards and the professional tables.
@@ -1261,7 +1284,7 @@ function judgeLeft() {
 // being typed in waits, and the result stays as it was, not recomputed.
 function refresh({ commit = false } = {}) {
   // Saved at once, so a reload straight after typing keeps what was typed.
-  saveState(S, storage);
+  persist();
   const stops = stopsNow();
   const typing = commit ? null : fieldKeyOf(document.activeElement);
   const held = typing === null ? [] : stops.filter(q => !shown.has(q.id) && restsOn(q, typing));
@@ -1319,7 +1342,7 @@ function onInput(ev) {
     const key = PEN_INPUTS.find(row => row[1] === short)?.[0];
     if (!key) return;
     S = setPen(S, { [key]: el.value });
-    saveState(S, storage);
+    persist();
     renderLines();
     renderPen();
     return;
@@ -1329,7 +1352,7 @@ function onInput(ev) {
     if (!row) return;
     labValues = {};
     S = setReal(S, row[1], row[2], el.value, DATA);
-    saveState(S, storage);
+    persist();
     refresh();
     return;
   }
@@ -1364,7 +1387,7 @@ function onInput(ev) {
   }
   if (el.id === 'town-name' || el.id === 'town-monthly') {
     S = setTown(S, el.id === 'town-name' ? { name: el.value } : { monthly: el.value });
-    saveState(S, storage);
+    persist();
     renderLines();
     if (latest?.p && !isHeld()) renderTown();
     return;
@@ -1527,6 +1550,11 @@ function download(name, type, text) {
 }
 
 function onClick(ev) {
+  if (ev.target.id === 'link-back') {
+    history.replaceState(null, '', location.pathname + location.search);
+    location.reload();
+    return;
+  }
   // A sidebar row opens or closes on its own (C36).
   const head = ev.target.closest?.('.grp-head');
   if (head) {
@@ -1773,6 +1801,10 @@ function init() {
   window.addEventListener('scroll', fitSideSoon, { passive: true });
   window.addEventListener('resize', fitSideSoon);
   $('type-all').innerHTML = allTypesHtml();
+  if (linkHeld) showLinkNote();
+  // Captured first, so the handlers below already save the change.
+  document.addEventListener('input', releaseLink, true);
+  document.addEventListener('change', releaseLink, true);
   document.addEventListener('input', onInput);
   document.addEventListener('change', ev => {
     if (ev.target.closest?.('#share-options')) {
@@ -1795,7 +1827,7 @@ function init() {
     const f = ev.target.id === 's-retexp' ? { id: 'retExp' } : fieldFromElement(ev.target.id);
     if (f) {
       S = commitField(S, f.id);
-      saveState(S, storage);
+      persist();
     }
     // Leaving a field is when its rules are judged.
     if (key && (isHeld() || stopsNow().some(q => !shown.has(q.id)))) judgeLeft();

@@ -112,6 +112,7 @@ body.result-held .hero-grid { grid-template-columns: minmax(0, 1fr); }
 .estimate { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
 .estimate .fine { margin: 0; }
 .notice { font-size: 13px; color: var(--warn); margin: 0; }
+.link-note { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: var(--accent-soft); color: var(--ink); font-size: 14px; }
 .derived { display: grid; gap: 2px; background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--ink-2); grid-column: 1 / -1; }
 .derived div { display: flex; justify-content: space-between; gap: 8px; }
 .derived b { font-family: var(--f-mono); color: var(--ink); font-weight: 500; }

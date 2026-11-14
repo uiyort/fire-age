@@ -21,7 +21,8 @@ test('no page loads a script, stylesheet or font from another origin', () => {
 });
 
 test('pages use no inline script, which the content security policy would block', () => {
-  for (const f of pages) assert.ok(!/<script(?![^>]*\bsrc=)[^>]*>/i.test(readFileSync(f, 'utf8')), f);
+  // A JSON-LD block is data the browser never runs, so the policy does not apply to it.
+  for (const f of pages) assert.ok(!/<script(?![^>]*\bsrc=)(?![^>]*type="application\/ld\+json")[^>]*>/i.test(readFileSync(f, 'utf8')), f);
 });
 
 test('site copy passes the compliance lint', () => {
