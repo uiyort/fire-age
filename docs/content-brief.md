@@ -41,6 +41,14 @@ Open with what the number did to the persona ("这位算例里的 30 岁上班�
 
 **Bilibili comments.** Two or three sentences on the topic of one specific video, with one concrete number. Each comment must respond to that video, so the author adapts every draft after watching it. Never post the same text twice. Bulk or repeated comments risk an account ban.
 
+**Zhihu.** Answer a question people actually search for, such as 存多少钱可以提前退休. Teach first: the 4% rule rests on US data, odds matter more than one target number, and the levers in order. Give one worked example. The link goes at the end, with `?ch=zh`. Answers come from the author's personal account; there is no brand account on Zhihu.
+
+**V2EX, Jike and GitHub.** The one exception to "lead with the experience": in these maker communities a post opens by saying what was built and which gaps it fills (backward solving, saving in one place and retiring in another, reproducible results, AGPL). Invite people to find errors in the formulas.
+
+## Links that fill in the numbers
+
+A link can carry a worked example in its fragment, which never reaches the server: `https://fire-age.com/?ch=zh#age=30&assets=200000&income=12000&expense=6000`. The keys are `age`, `assets`, `income`, `expense` and `retexp` (monthly, as in the simple form, in the currency of the place each belongs to), `tage`, `mode` (`fwd` or `bwd`), `work` and `retire` (country codes from the data). `linkHash()` in `site/js/link.js` writes the fragment. The visitor sees a note that these are the link's numbers, and their own saved numbers are not touched until they change something. Use these links only where links are allowed, never on Xiaohongshu.
+
 ## Honesty about the numbers
 
 - Results rest on assumptions. Say so when a number is the headline.
