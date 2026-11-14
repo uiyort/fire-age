@@ -454,7 +454,10 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
   const plus = (field, base, cur = v => v) => {
     const names = [mortgageOn && label('mortgage.monthly'), kidsOn && '孩子'].filter(Boolean);
     const itemsNow = cur(itemsY);
-    const X = pro ? Math.round(base + itemsNow) : whole(base / 12) + whole(itemsNow / 12);
+    // The number on the button is what the field shows once the exit is applied: read from the value that is set.
+    const itemsMonthly = (mortgageOn ? m.monthly : 0) + (kidsOn ? k.count * k.monthly : 0);
+    const total = field === 'expense' && on ? (split.rent ?? 0) + (split.food ?? 0) + (split.other ?? 0) + itemsMonthly : null;
+    const X = total !== null ? (pro ? total * 12 : whole(total)) : pro ? Math.round(base + itemsNow) : whole(Math.round(base + itemsNow) / 12);
     const set = field === 'expense' && on
       ? { ...(mortgageOn ? { 'split.rent': (split.rent ?? 0) + m.monthly } : {}), ...(kidsOn ? { 'split.other': (split.other ?? 0) + k.count * k.monthly } : {}) }
       : { [field]: Math.round(base + itemsNow) };

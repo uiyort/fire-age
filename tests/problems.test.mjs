@@ -531,3 +531,14 @@ test('A6: a two-digit year offers 20xx only when it lands in range; the line nam
 test('relText writes a range as plain years', () => {
   assert.equal(relText(only(S0({ real: real({ monthly: 3000, endYear: 35 }) }), 'A6')[0].rel), '还到哪年 35 不在 1976–2066');
 });
+test('the button number equals what the field shows after the exit, with fractional amounts across currencies', () => {
+  for (const [monthly, retExp] of [[7501, 40001], [7503, 40007], [3333, 50011], [777, 100], [1234, 9999], [5555, 30001]]) {
+    let S = setRetireCountry(S0({ expense: 216001, real: real({ monthly, endYear: 2045 }) }), 'TH', DATA);
+    S = { ...S, retExp, touched: { retExp: true } };
+    const fix = only(S, 'A4')[0].fixes[0];
+    const next = setField(S, 'retExp', String(fix.set.retExp), DATA);
+    assert.equal(num(Math.round(next.retExp / 12)), fix.text.split('→ ')[1], `${monthly}/${retExp}`);
+  }
+  const a3 = only(S0({ expense: 84001, real: real({ monthly: 7501, endYear: 2045 }) }), 'A3')[0].fixes[0];
+  assert.equal(num(Math.round(setField(S0({}), 'expense', String(a3.set.expense), DATA).expense / 12)), a3.text.split('→ ')[1]);
+});

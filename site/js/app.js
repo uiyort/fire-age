@@ -1059,8 +1059,7 @@ function renderLines() {
   const lines = at => fieldLinesHtml({ rows, list, at, view, wCur, rCur, note: own[at] ?? '' });
   // Exits of the relations drawn in the lines block, whose solid field is the block's own field, end the block.
   const ownFixes = key => {
-    // A11 (a flag under 每月支出) carries its exits there too.
-    const html = list.filter(q => (isStop(q) && q.rel?.sub && q.field === key) || (q.rule === 'A11' && key === 'expense')).map(q => fixesHtml(q.fixes)).join('');
+    const html = list.filter(q => isStop(q) && q.rel?.sub && q.field === key).map(q => fixesHtml(q.fixes)).join('');
     return html ? `<div class="fixes">${html}</div>` : '';
   };
   // A rent or mortgage in the parts may end one day, so the simple view points at the fold for the end year, after the

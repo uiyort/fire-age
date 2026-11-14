@@ -656,7 +656,8 @@ export function fieldLinesHtml({ rows, list, at, view, wCur, rCur, note = '' }) 
     const b14 = list.find(q => q.rule === 'B14');
     const save = b14 ? `<p class="row warn">${WARN} ${liveHtml(b14.rel)}${b14.note ? ` · ${b14.note}` : ''}</p>` : '';
     const a11 = list.find(q => q.rule === 'A11');
-    const spare = a11 ? `<p class="row warn">${OP('└')} ${a11.note} ${WARN}</p>` : '';
+    // The exit sits right under its line, before the pro note and the saving line.
+    const spare = a11 ? `<p class="row warn">${OP('└')} ${a11.note} ${WARN}</p><div class="fixes">${fixesHtml(a11.fixes)}</div>` : '';
     return sum + items.join('') + spare + note + save;
   }
   const today = rows.find(r => r.key === 'expense')?.value;

@@ -67,7 +67,8 @@ test('zero spending stops with no value button', async ({ page }) => {
   await page.locator('#s-expense').press('Tab');
   await expect(page.locator('#sticky-result .chip')).toHaveText('拦住：每月支出 ›');
   await expect(page.locator('#rel-expense')).toHaveText('每月支出 0 ✕');
-  await expect(page.locator('#rel-expense + .field-after .fix')).toHaveCount(0);
+  await expect(page.locator('.field-after:has(#rel-expense)')).toBeVisible();
+  await expect(page.locator('.field-after:has(#rel-expense) .fix')).toHaveCount(0);
 });
 
 test('typed retirement spending of 0 waits like a blank', async ({ page }) => {
@@ -77,4 +78,11 @@ test('typed retirement spending of 0 waits like a blank', async ({ page }) => {
   await page.fill('#s-retexp', '6000');
   await page.locator('#s-retexp').press('Tab');
   await expect(page.locator('.chip')).toHaveCount(0);
+});
+
+test('A11 button sits right under its line, before the saving flag', async ({ page }) => {
+  await withSaved(page, { expense: 96000, income: 60000, real: { mortgage: { monthly: 7500, endYear: 2030 }, kids } });
+  await openForm(page);
+  await expect(page.locator('#lines-expense')).toContainText('! 每月存下');
+  await expect(page.locator('#lines-expense .row.warn:has-text("扣掉月供") + .fixes .fix')).toHaveText('每月支出 + 月供 → 15,500');
 });
