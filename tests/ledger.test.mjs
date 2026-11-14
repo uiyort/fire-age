@@ -6,7 +6,7 @@ import { defaultState, storyRows, problems, setRetireCountry, toParams } from '.
 import { firstDraw, fwdSolve } from '../site/js/engine.js';
 import { bwdOdds, oddsAround, oddsSolve, oddsYears, needLine, successAt } from '../site/js/odds.js';
 import { heroModel } from '../site/js/holiday.js';
-import { heroHtml, heldHeroHtml, ledgerHtml, proLedgerRowHtml, tilesHtml } from '../site/js/views.js';
+import { heroHtml, heldHeroHtml, ledgerHtml, proLedgerRowHtml, sideCardHtml, stickyHtml, tilesHtml } from '../site/js/views.js';
 
 const strip = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const S = { ...defaultState(DATA), income: 360000, expense: 180000, retExp: 180000,
@@ -256,4 +256,12 @@ test('ledgerHtml pro ②: a self-pay row with no amount sorts at its claim age, 
   const at = x => text.indexOf(x);
   assert.ok(at('50 起 月供') >= 0 && at('→ 63 自缴') >= 0);
   assert.ok(at('月供实际变轻') < at('50 起 月供') && at('50 起 月供') < at('→ 63 自缴') && at('→ 63 自缴') < at('63 起 养老金'), text);
+});
+
+test('the stopped result reads 放假年龄 — with its chip, never — 岁', () => {
+  const hero = strip(heldHeroHtml(false, '拦住：房贷 ›'));
+  assert.ok(hero.startsWith('放假年龄 — 拦住：房贷 ›'), hero);
+  assert.ok(strip(stickyHtml(null, { pro: true, chip: 'x' })).startsWith('财务独立年龄 —'));
+  assert.ok(strip(sideCardHtml(null, { view: 'simple', chip: 'x' })).startsWith('放假年龄 —'));
+  for (const h of [hero, strip(stickyHtml(null, { chip: 'x' })), strip(sideCardHtml(null, { view: 'pro', chip: 'x' }))]) assert.ok(!h.includes('— 岁'), h);
 });

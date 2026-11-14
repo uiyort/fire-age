@@ -19,7 +19,7 @@ test('A11 shows under 每月支出 and its button adds the mortgage', async ({ p
   const warn = page.locator('#lines-expense .row.warn');
   await expect(warn).toHaveText('└ 扣掉月供只剩 500/月 !');
   await expect(page.locator('.chip')).toHaveCount(0);
-  await expect(page.locator('#hero')).not.toContainText('— 岁放假');
+  await expect(page.locator('#hero')).not.toContainText('放假年龄 —');
   const fix = page.locator('#lines-expense').getByRole('button', { name: '每月支出加上月供改成 15,500' });
   await expect(fix).toHaveText('每月支出 + 月供 → 15,500');
   await fix.click();
@@ -34,7 +34,7 @@ test('A3 value exit', async ({ page }) => {
   await page.locator('#sticky-result .chip').click();
   await page.locator('button.fix', { hasText: '每月支出 + 月供 → 14,500' }).click();
   await expect(page.locator('.chip')).toHaveCount(0);
-  await expect(page.locator('#hero')).not.toContainText('— 岁放假');
+  await expect(page.locator('#hero')).not.toContainText('放假年龄 —');
 });
 
 test('A4 hides the label link while blocked', async ({ page }) => {

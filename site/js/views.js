@@ -683,9 +683,10 @@ const NO_RESULT = '<span aria-label="暂无结果">—</span>';
 // The ledger's switch at the end of the fund line: ▸ closed, ▾ open (spec §7.1).
 export const ledgerToggleHtml = (open = false) => `<button type="button" class="ledger-toggle" aria-expanded="${open}" aria-controls="ledger">怎么算的 <span aria-hidden="true">${open ? '▾' : '▸'}</span></button>`;
 // The big age and the fund while the result is stopped; the ledger still opens.
-export const heldHeroHtml = (open = false) => `<div class="hero-big">${NO_RESULT} 岁放假</div><div class="fund"><p>放假资金 — ${ledgerToggleHtml(open)}</p></div>`;
+const chipButton = chip => `<button type="button" class="chip" data-chip>${chip}</button>`;
+export const heldHeroHtml = (open = false, chip = '') => `<div class="hero-big">放假年龄 ${NO_RESULT}${chip ? ` ${chipButton(chip)}` : ''}</div><div class="fund"><p>放假资金 — ${ledgerToggleHtml(open)}</p></div>`;
 // The headline while the result is stopped; the simple view has only the big age.
-export const heldHeadHtml = view => (view === 'pro' ? `<p class="say">财务独立 ${NO_RESULT} 岁</p>` : '');
+export const heldHeadHtml = (view, chip = '') => (view === 'pro' ? `<p class="say">财务独立年龄 ${NO_RESULT}${chip ? ` ${chipButton(chip)}` : ''}</p>` : '');
 
 // ---- The ledger behind the fund line (spec §7): ① saving, ② after the holiday, ③ the 2,000 years, every number from
 // storyRows (① ②) and the odds (③). Two columns, label | number. Rows with a field go back to it. While the result is
@@ -980,7 +981,7 @@ export function proLinesHtml({ S, p, data, list = [], rows = [] }) {
 }
 
 export function stickyHtml(h, { p, dispCur, success, pro, chip = '' }) {
-  if (chip) return `<b class="sticky-age">${pro ? `财务独立 ${NO_RESULT} 岁` : `${NO_RESULT} 岁放假`}</b><button type="button" class="chip" data-chip>${chip}</button>`;
+  if (chip) return `<b class="sticky-age">${pro ? `财务独立年龄 ${NO_RESULT}` : `放假年龄 ${NO_RESULT}`}</b><button type="button" class="chip" data-chip>${chip}</button>`;
   if (pro) {
     const age = h.reachable ? `财务独立 ${h.holidayAge} 岁` : '规划期内未达到';
     const odds = success === null || success === undefined ? '' : `<span>成功率 ${pct(success, 0)}</span>`;
@@ -1209,7 +1210,7 @@ const HOW = '<button type="button" class="link" data-how>怎么算的 ›</butto
 // and the chip. The simple view says X 成, never a percentage.
 export function sideCardHtml(h, { view, mode, success, chip = '', p = null }) {
   const pro = view === 'pro';
-  if (chip) return `<p class="side-line"><b class="side-age">${NO_RESULT} 岁</b><button type="button" class="chip" data-chip>${chip}</button></p>`;
+  if (chip) return `<p class="side-line"><b class="side-age">${pro ? '财务独立年龄' : '放假年龄'} ${NO_RESULT}</b><button type="button" class="chip" data-chip>${chip}</button></p>`;
   const line = parts => `<p class="side-line">${parts.filter(Boolean).join(' · ')} · ${HOW}</p>`;
   const odds = success === null || success === undefined ? '' : pro ? pct(success, 1) : oddsText(success);
   if (!h.reachable) return line([`<b class="side-age">${pro ? '规划期内未达到' : '还在路上'}</b>`]);

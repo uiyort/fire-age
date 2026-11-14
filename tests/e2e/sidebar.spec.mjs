@@ -45,7 +45,7 @@ test('a stopped number opens its row and the card carries the chip', async ({ pa
   await page.locator('.grp-head[data-row="now"]').click();
   await page.fill('#s-age', '120'); await page.locator('#s-age').press('Tab');
   await page.locator('.grp-head[data-row="now"]').click();
-  await expect(page.locator('#side-card')).toContainText('— 岁');
+  await expect(page.locator('#side-card')).toContainText('放假年龄 —');
   await page.locator('#side-card .chip').click();
   await expect(page.locator('#s-age')).toBeFocused();
   await expect(page.locator('.grp-head[data-row="now"]')).toHaveAttribute('aria-expanded', 'true');

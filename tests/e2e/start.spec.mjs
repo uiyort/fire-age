@@ -92,8 +92,8 @@ test.describe('on a computer', () => {
     await expect(page.locator('#s-income')).toHaveAttribute('aria-invalid', 'true');
     await expect(page.locator('#sticky-result .chip')).toHaveText('待填：到手收入 ›');
     await expect(page.locator('body')).toHaveClass(/result-held/);
-    await expect(page.locator('#hero')).toContainText('— 岁放假');
-    await expect(page.locator('#sticky-result')).toContainText('— 岁放假');
+    await expect(page.locator('#hero')).toContainText('放假年龄 —');
+    await expect(page.locator('#sticky-result')).toContainText('放假年龄 —');
     await page.fill('#s-income', '30000');
     await expect(page.locator('body')).not.toHaveClass(/result-held/);
     await expect(page.locator('#s-income')).not.toHaveAttribute('aria-invalid', 'true');

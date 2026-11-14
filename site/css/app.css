@@ -94,7 +94,11 @@ input:disabled { opacity: .65; }
 body.result-held .sticky-age, body.result-held .hero-big { color: var(--ink-3); }
 body.result-held #type-section, body.result-held #type-all, body.result-held #tiles, body.result-held #views-banner,
 body.result-held #life-tag, body.result-held #zone-faster, body.result-held #places-fold, body.result-held #zone-risk,
-body.result-held #share-section, body.result-held #lab-fold, body.result-held #zone-learn .card.pro-only { display: none; }
+body.result-held #share-section, body.result-held #lab-fold, body.result-held #zone-learn { display: none; }
+#hero .chip, #headline .chip { display: none; }
+@media (min-width: 1024px) { #hero .chip, #headline .chip { display: inline-block; } }
+#start-chip { display: none; }
+body.intro.result-held #start-chip { display: block; flex: 1 0 100%; margin: 0 0 8px; }
 body.result-held .hero-grid { grid-template-columns: minmax(0, 1fr); }
 .help { font: inherit; font-size: 12px; width: 22px; height: 22px; flex: none; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--accent); cursor: pointer; line-height: 1; padding: 0; }
 .help[aria-expanded="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }

@@ -995,7 +995,7 @@ const fitSideSoon = () => { sideFrame ||= requestAnimationFrame(fitSide); };
 // to holiday sooner; while the result is stopped nothing is worked out, so there is no count.
 function renderSideLinks() {
   const n = isHeld() ? 0 : document.querySelectorAll('#levers .lever').length;
-  const links = [`<a href="#zone-faster" data-needs-result>怎么提前${n ? ` ${n}` : ''}</a>`, '<a href="#zone-risk" data-needs-result>撑得住吗</a>', '<a href="#zone-learn">参数</a>'];
+  const links = [`<a href="#zone-faster" data-needs-result>怎么提前${n ? ` ${n}` : ''}</a>`, '<a href="#zone-risk" data-needs-result>撑得住吗</a>', '<a href="#zone-learn" data-needs-result>参数</a>'];
   if (S.view !== 'pro') links.push('<a href="#share-section" data-needs-result>放假卡</a>');
   setHtml($('side-links'), links.join('<span class="side-dot" aria-hidden="true"> · </span>'));
 }
@@ -1176,14 +1176,17 @@ function applyFix(fix) {
 // focusout) never swaps an element under the pointer.
 let heldState = null;
 let stickyNow = '';
+let heldChip = null;
 function holdResult(stops, marks = stops) {
   cancelAnimationFrame(frame);
   clearTimeout(mcTimer);
   clearTimeout(proTimer);
   stale = true;
   const numbers = JSON.stringify({ ...S, lastValid: null });
-  if (heldState !== numbers || !isHeld()) {
+  const chip = chipText(stops);
+  if (heldState !== numbers || heldChip !== chip || !isHeld()) {
     heldState = numbers;
+    heldChip = chip;
     const p = toParams(S, DATA);
     syncChrome(p);
     syncInputs();
@@ -1194,20 +1197,21 @@ function holdResult(stops, marks = stops) {
     // Hidden while stopped; emptied too, so no age from the numbers before is left in the page.
     $('type-now').innerHTML = '';
     $('tiles').innerHTML = '';
-    $('hero').innerHTML = heldHeroHtml(ledgerOpen);
+    $('hero').innerHTML = heldHeroHtml(ledgerOpen, chip);
     $('ledger-row').innerHTML = proLedgerRowHtml({ held: true, open: ledgerOpen });
     placeTag();
-    const head = heldHeadHtml(S.view);
+    const head = heldHeadHtml(S.view, chip);
     $('headline').innerHTML = head;
     $('headline').hidden = !head;
     renderOpenCards(p);
   }
-  const sticky = stickyHtml(null, { pro: S.view === 'pro', chip: chipText(stops) });
+  $('start-chip').innerHTML = chip ? `<button type="button" class="chip" data-chip>${chip}</button>` : '';
+  const sticky = stickyHtml(null, { pro: S.view === 'pro', chip });
   if (sticky !== stickyNow) {
     stickyNow = sticky;
     $('sticky-result').innerHTML = sticky;
   }
-  renderSideCard(chipText(stops));
+  renderSideCard(chip);
   renderSideLinks();
   markProblems(marks);
   renderLedger();
@@ -1284,6 +1288,8 @@ function refresh({ commit = false } = {}) {
   cancelAnimationFrame(frame);
   frame = requestAnimationFrame(() => {
     heldState = null;
+    heldChip = null;
+    $('start-chip').innerHTML = '';
     document.body.classList.remove('result-held');
     renderFast();
     renderOpenCards(latest.p);

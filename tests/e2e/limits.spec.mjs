@@ -1,4 +1,4 @@
-// A broken rule or a blank stops the result: — 岁放假 and a red chip that jumps to the field. Nothing turns red while typing.
+// A broken rule or a blank stops the result: 放假年龄 — and a red chip that jumps to the field. Nothing turns red while typing.
 import { test, expect } from '@playwright/test';
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -39,9 +39,9 @@ test('a mortgage at or above monthly spending stops the result; the chip jumps t
   await page.locator('#life-fold summary').click();
   await page.fill('#life-mortgage', '7500'); await page.fill('#life-mortgage-end', '2045');
   await page.locator('#life-mortgage-end').press('Tab');
-  await expect(page.locator('#sticky-result')).toContainText('— 岁放假');
+  await expect(page.locator('#sticky-result')).toContainText('放假年龄 —');
   await expect(page.locator('#sticky-result .chip')).toHaveText('拦住：房贷 ›');
-  await expect(page.locator('#hero')).toContainText('— 岁放假');
+  await expect(page.locator('#hero')).toContainText('放假年龄 —');
   await expect(page.locator('.headline')).not.toContainText(/\d+ 岁放假/);
   for (const id of ['#type-section', '#zone-faster', '#zone-risk', '#places-fold', '#share-section', '#life-tag']) await expect(page.locator(id)).toBeHidden();
   await page.evaluate(() => { document.getElementById('inputs-box').open = false; document.getElementById('life-fold').open = false; });
@@ -70,7 +70,7 @@ test('a blank shows 待填 and — , never the old result', async ({ page }) => 
   await page.goto('/');
   await page.fill('#s-expense', ''); await page.locator('#s-expense').press('Tab');
   await expect(page.locator('#sticky-result .chip')).toHaveText('待填：每月支出 ›');
-  await expect(page.locator('#hero')).toContainText('— 岁放假');
+  await expect(page.locator('#hero')).toContainText('放假年龄 —');
   await expect(page.locator('body')).toHaveClass(/result-held/);
 });
 
@@ -107,7 +107,7 @@ test('a plan end saved above 110: the chip names 规划到 in the simple view an
   await expect(page.locator('#to-pro')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#p-life')).toBeFocused();
   await expect(page.locator('#p-life')).toHaveAttribute('aria-invalid', 'true');
-  await expect(page.locator('#sticky-result')).toContainText('财务独立 — 岁');
+  await expect(page.locator('#sticky-result')).toContainText('财务独立年龄 —');
 });
 
 test('a help card shows nothing worked out from blocked numbers, and its numbers come back once fixed', async ({ page }) => {
@@ -371,7 +371,7 @@ test('a fix that leaves another problem moves the chip on and leaves no stale ma
   await expect(page.locator('#life-kids')).not.toHaveAttribute('aria-describedby', /./);
   await expect(page.locator('#rel-kids\\.count')).toHaveCount(0);
   await expect(page.locator('#sticky-result .chip')).toHaveText('待填 2 处 ›');
-  await expect(page.locator('#hero')).toContainText('— 岁放假');
+  await expect(page.locator('#hero')).toContainText('放假年龄 —');
 });
 
 test('A5 不算房贷; an ended mortgage is struck through; a range line and its → button', async ({ page }) => {
