@@ -514,7 +514,7 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
       note: `扣掉${names}只剩 ${num(pro ? Math.round(left) : whole(left / 12))}${pro ? '/年' : '/月'}`, fixes: [plus('expense', S.expense)] });
   }
 
-  // ---- Ranges (B2-B10), the same in both views; only the labels and units follow the view.
+  // ---- Ranges (B2-B9; B10 is a pro-only flag), the same in both views; only the labels and units follow the view.
   const NEG = ['assets', 'income', 'expense', 'retExp', 'pension', 'selfPension', 'selfMedical', ...SPLIT_KEYS, 'mortgage.monthly', 'kids.monthly'];
   const YEARLY = ['income', 'expense', 'retExp', 'pension'];
   const valueOf = f => {
@@ -743,15 +743,20 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
   // their last year (the same year with them already ended is the difference, so the mortgage's real-terms drift over
   // the years before stays out of it), = the engine's spending from that age. An end past the plan never comes.
   if (plan) {
+    let above = rows.find(r => r.key === 'retExp')?.value ?? null;
     for (const age of ends.filter(a => a > holiday && a <= p.life)) {
       const gone = p.events.filter(e => e.endAge === age);
       if (!gone.length) continue;
       const y = age - 1 - p.age;
       const early = { ...p, events: p.events.map(e => (e.endAge === age ? { ...e, endAge: age - 1 } : e)) };
-      add(`draw:${age}`, 'after', null, yearly(spendAt(p, t, age - p.age)), {
+      const value = yearly(spendAt(p, t, age - p.age));
+      const less = yearly(spendAt(p, t, y) - spendAt(early, t, y));
+      // drift: the row above minus − is not = (the mortgage's real-terms drift over the years between), so the = is a ≈.
+      add(`draw:${age}`, 'after', null, value, {
         op: '−', cur: 'work', per, ages: [age, null], items: gone.map(e => ITEM_NAME[e.id]),
-        less: yearly(spendAt(p, t, y) - spendAt(early, t, y)), lessTyped: yearly(gone.reduce((total, e) => total + e.amount, 0)),
+        less, lessTyped: yearly(gone.reduce((total, e) => total + e.amount, 0)), drift: above !== null && above - less !== value,
       });
+      above = value;
     }
   }
   const own = v => (Number.isFinite(Number(v)) ? Math.max(Number(v), 0) : 0);

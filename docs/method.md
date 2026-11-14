@@ -68,7 +68,7 @@ Two entries in a fold titled "有房贷或孩子？到期后开销会降" ("mort
 
 ## Limits on the page
 
-All of these are this tool's settings. Beyond a limit the page stops the result; common ranges only warn.
+All of these are this tool's settings. Beyond a limit the page stops the result (except the warnings below); common ranges only warn.
 
 - Mortgage and children (monthly) below monthly spending (equal is stopped too); typed retirement monthly spending above mortgage and children (equal is stopped too); when the mortgage is entered as parts, the payment is at most rent and mortgage.
 - Mortgage end year from this year − 50 to this year + 40; number of children an integer, 0 or more; the youngest child 0 or more, counted until 22; amounts 0 or more; monthly spending above 0; typed retirement monthly spending of 0 counts as blank.

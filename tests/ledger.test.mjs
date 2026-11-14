@@ -8,7 +8,7 @@ import { bwdOdds, oddsAround, oddsSolve, oddsYears, needLine, successAt } from '
 import { heroModel } from '../site/js/holiday.js';
 import { heroHtml, heldHeroHtml, ledgerHtml, pct, proLedgerRowHtml, sideCardHtml, stickyHtml, tilesHtml } from '../site/js/views.js';
 
-const strip = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+const strip = h => h.replace(/<span class="sr">[^<]*<\/span>/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const S = { ...defaultState(DATA), income: 360000, expense: 180000, retExp: 180000,
   real: { mortgage: { monthly: 7500, endYear: 2045 }, kids: { count: null, age: null, monthly: null } } };
 const solve = s => { const p = toParams(s, DATA, 2026); const t = oddsSolve(p); return { p, t, need: needLine(p)[t] }; };
@@ -59,7 +59,7 @@ test('ledgerHtml simple: the three sections in the spec\'s words', () => {
   const less = Math.round((spendOf(p, t, 19) - spendOf(p, t, 19, 50)) / 12);
   assert.equal(less, Math.round(90000 * Math.pow(1 + p.infl / 100, -19) / 12));
   for (const s of ['① 攒钱', `30 → ${30 + t} 岁`, '已有 ¥20万', '到手 ¥30,000/月', '− 支出 ¥15,000/月', '└ 其中月供 7,500 → 2045', '= 每月存下 ¥15,000', '收入每年 +2% 本工具设定',
-    `→ ${29 + t} 岁每月存下`, '② 放假以后 每月花', `${30 + t}–49 退休后 ≈ ¥${fmt(spendOf(p, t, t) / 12)}`, `− 50 起 月供 ≈ ${fmt(less)} = ¥${fmt(spendOf(p, t, 20) / 12)}`, '63 起 养老金 — ›',
+    `→ ${29 + t} 岁每月存下`, '② 放假以后 每月花', `${30 + t}–49 退休后 ≈ ¥${fmt(spendOf(p, t, t) / 12)}`, `− 50 起 月供 ≈ ${fmt(less)} = ≈ ¥${fmt(spendOf(p, t, 20) / 12)}`, '63 起 养老金 — ›',
     `⇒ ${30 + t} 岁放假要有 ¥391万`, `≈ 年支出 ¥${(firstDraw(p, t) / 1e4).toPrecision(3)}万 × ${Math.round(plan.need / firstDraw(p, t))} 倍 · 八成年景够花到 95 岁`, '③ 2,000 种年景', '平均每年 2.9% 本工具设定',
     `⇒ 第一个到八成 ${30 + t} 岁`, '≈ 估算 · 按今天的钱', '计算方法 ›']) assert.ok(text.includes(s), s);
   assert.doesNotMatch(html, /<s[ >]/); assert.match(html, /href="method\.html#accumulate"/);
@@ -214,7 +214,7 @@ test('ledgerHtml pro: the spec example, each number the engine\'s', () => {
   const text = strip(html);
   const h = 30 + t;
   for (const x of ['① 攒钱', '可投资资产 ¥200,000', '¥360,000', '− 当前年支出', '¥180,000', `t = ${t - 1} 时 ¥${Math.round(90000 * Math.pow(1 + p.infl / 100, -(t - 1))).toLocaleString('en-US')}`,
-    `= 年储蓄 t0 → t${t - 1} 180,000 → 301,536`, '② 放假以后 年初取出', `${h}–49 退休后年支出 ≈ ¥180,000`, `月供实际变轻，${h} 岁实付 ¥163,066`, `− 50 起 月供 ≈ ${fmt(spendOf(p, t, 19) - spendOf(p, t, 19, 50))} = ¥${fmt(spendOf(p, t, 20))}`,
+    `= 年储蓄 t0 → t${t - 1} 180,000 → 301,536`, '② 放假以后 年初取出', `${h}–49 退休后年支出 ≈ ¥180,000`, `月供实际变轻，${h} 岁实付 ¥163,066`, `− 50 起 月供 ≈ ${fmt(spendOf(p, t, 19) - spendOf(p, t, 19, 50))} = ≈ ¥${fmt(spendOf(p, t, 20))}`,
     '→ 63 自缴（工作地中国大陆且填了养老金才计） —', '养老金（超出年支出不计） — ›', '少花（只砍生活费，月供、自缴照付） 0%',
     `⇒ 放假线（每条路径倒推，取 80 分位） ¥${Math.round(need).toLocaleString('en-US')}`, `≈ 年支出 ¥${fmt(firstDraw(p, t))} × ${Math.round(need / firstDraw(p, t))} 倍 · 反推提取率`,
     `r = 60% × 5% + 40% × (${p.bondY}% − ${p.infl}%) − ${p.drag}% ${(p.r * 100).toFixed(2)}%`, `σ（股 17% · 债 6% · ρ 0.2） ${(p.sigma * 100).toFixed(1)}%`,
@@ -330,7 +330,7 @@ test('ledger copy: − rows, the named denominator, the bridge line, the FX note
   const s = family(); const plan = solve(s);
   const mc = { bands: { [plan.t]: [0, 0, 5000000, 0, 0] } };
   const html = strip(ledgerHtml({ rows: storyRows(s, DATA, 2026, plan), odds: oddsAround(plan.p, plan.t), plan, p: plan.p, dispCur: 'CNY', mc }));
-  assert.match(html, /− 54 起 孩子 2,000 = ¥14,152/);
+  assert.match(html, /− 54 起 孩子 2,000 = ≈ ¥14,152/);
   assert.match(html, /≈ 年支出 ¥19\.8万 × 21 倍 · 八成年景够花到 95 岁/);
   assert.match(html, /⇒ 50 岁时一般攒到 本工具设定 ¥500万/);
   assert.doesNotMatch(html, /汇率变化/);
@@ -346,7 +346,7 @@ test('ledger copy: − rows, the named denominator, the bridge line, the FX note
   assert.doesNotMatch(strip(ledgerHtml({ rows: storyRows(s, DATA, 2026, un), odds: oddsAround(plan.p, un.t), plan: un, state: 'unreachable', p: plan.p, dispCur: 'CNY', mc })), /一般攒到/);
   const pro = strip(ledgerHtml({ rows: storyRows({ ...s, view: 'pro' }, DATA, 2026, plan), odds: oddsAround(plan.p, plan.t), plan, p: plan.p, view: 'pro', dispCur: 'CNY', mc }));
   assert.doesNotMatch(pro, /一般攒到/);
-  assert.match(pro, /− 54 起 孩子 24,000 = ¥169,825/); assert.match(pro, /− 55 起 月供 ≈ 67,825 = ¥102,000/);
+  assert.match(pro, /− 54 起 孩子 24,000 = ≈ ¥169,825/); assert.match(pro, /− 55 起 月供 ≈ 67,825 = ¥102,000/);
   assert.match(pro, new RegExp(`≈ 年支出 ¥${fmt(firstDraw(plan.p, plan.t))} × 21 倍 · 反推提取率`));
 });
 test('two currencies: ② in the work currency, the field lines in the retirement currency, the FX note in pro', () => {
@@ -371,4 +371,25 @@ test('held: no − rows', () => {
   const s = family();
   assert.equal(storyRows(s, DATA, 2026, null).filter(r => r.key.startsWith('draw:')).length, 0);
   assert.ok(storyRows(s, DATA, 2026, null).some(r => r.key.startsWith('after:')));
+});
+
+test('② rows whose subtraction does not add up are marked drift, exact ones are not', () => {
+  for (const view of ['simple', 'pro']) {
+    const s = { ...family(), view }; const plan = solve(s);
+    const rows = storyRows(s, DATA, 2026, plan);
+    const above = [rows.find(r => r.key === 'retExp'), ...rows.filter(r => r.key.startsWith('draw:'))];
+    const draws = above.slice(1);
+    assert.deepEqual(draws.map(r => r.drift), [above[0].value - draws[0].less !== draws[0].value, above[1].value - draws[1].less !== draws[1].value]);
+    assert.deepEqual(draws.map(r => r.drift), [true, false], view);
+  }
+  const s = family(); const plan = solve(s);
+  const { p, t } = plan;
+  const html = ledgerHtml({ rows: storyRows(s, DATA, 2026, plan), list: [], odds: oddsAround(p, t), plan, state: 'ok', view: 'simple', mode: 'fwd', p, dispCur: 'CNY' });
+  const text = strip(html);
+  assert.match(text, /− 54 起 孩子 2,000 = ≈ ¥14,152/);
+  assert.match(text, /− 55 起 月供 ≈ 5,652 = ¥8,500/);
+  // The operators are silent on the page, so the row says 减 and 剩 for a screen reader.
+  const row = html.slice(html.lastIndexOf('孩子 2,000') - 400, html.lastIndexOf('孩子 2,000') + 400);
+  assert.match(row, /<span class="sr">减<\/span>/);
+  assert.match(row, /<span class="sr">剩<\/span>/);
 });

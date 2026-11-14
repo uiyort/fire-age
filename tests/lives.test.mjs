@@ -455,3 +455,10 @@ test('the pension line says so plainly when pension plus self-pay makes the holi
   assert.ok(!/NaN|undefined|null/.test(later));
   assert.match(note({ withPension: null, withoutPension: 45, gain: null }), /不算养老金 45 岁/);
 });
+
+test('the sensitivity table writes a negative non-money value with U+2212', async () => {
+  const { sensitivityHtml } = await import('../site/js/views.js');
+  const html = sensitivityHtml({ ...person(), swr: -1, fxDrift: -0.5 }, [{ id: 'swr', name: '安全提取率' }, { id: 'fxDrift', name: '退休地货币升值' }]);
+  assert.match(html, /−1/); assert.match(html, /−0\.5/);
+  assert.ok(!/>-\d/.test(html), html);
+});

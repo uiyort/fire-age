@@ -774,7 +774,8 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
       default:
         if (r.key.startsWith('draw:')) {
           const approx = r.less !== r.lessTyped ? '<span class="est" aria-label="约">≈</span> ' : '';
-          return lgRow(`${lgOp(r.op)}${agesText(r.ages)}${r.items.join('、')} ${approx}${num(r.less)}`, r.value === null ? NONE : `${OP('=')} ${signed(r.value, c)}`);
+          const eq = r.drift ? '<span class="est" aria-label="约">≈</span> ' : '';
+          return lgRow(`${lgOp(r.op)}${SR('减')}${agesText(r.ages)}${r.items.join('、')} ${approx}${num(r.less)}`, r.value === null ? NONE : `${OP('=')}${SR('剩')} ${eq}${signed(r.value, c)}`);
         }
         return '';
     }
@@ -1013,7 +1014,7 @@ export function sensitivityHtml(p, params) {
     const v = p[id];
     if (['assets', 'income', 'expense'].includes(id)) return money(v, p.wCur);
     if (['retExp', 'pension'].includes(id)) return money(v, p.rCur);
-    return String(v);
+    return num(v);
   };
   const rows = params.map(param => {
     const impact = impactOf(p, param.id);

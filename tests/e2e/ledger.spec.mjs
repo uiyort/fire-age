@@ -167,12 +167,12 @@ test('the family numbers: ② subtracts each ending item from the engine\'s spen
   await expect(page.locator('#hero')).toContainText(/岁放假|现在就能放假/);
   await page.locator('.ledger-toggle').first().click();
   const ledger = page.locator('#ledger');
-  await expect(ledger).toContainText(/− \d+ 起 孩子 2,000 = ¥[\d,]+/);
-  await expect(ledger).toContainText(/− \d+ 起 月供 ≈ [\d,]+ = ¥[\d,]+/);
+  await expect(ledger).toContainText(/− 减?\s*\d+ 起 孩子 2,000 =\s*剩?\s*(≈\s*)?¥[\d,]+/);
+  await expect(ledger).toContainText(/− 减?\s*\d+ 起 月供 ≈ [\d,]+ =\s*剩?\s*(≈\s*)?¥[\d,]+/);
   await expect(ledger).toContainText(/≈ 年支出 ¥[\d.]+万 × \d+ 倍/);
   await expect(ledger).toContainText(/⇒ \d+ 岁时一般攒到 本工具设定 ¥[\d.]+万/);
   // The − rows carry no strike-through; the struck names stay in the lines under the field.
-  const items = ledger.locator('.lg-row', { hasText: /^\s*− \d+ 起/ });
+  const items = ledger.locator('.lg-row', { hasText: /^\s*− 减?\s*\d+ 起/ });
   await expect(items).toHaveCount(2);
   expect(await ledger.locator('.lg-row', { hasText: '起' }).locator('s').count()).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);

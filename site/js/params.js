@@ -41,7 +41,7 @@ export const PARAMS = [
     improve: '留意持有产品的总费率，善用当地合法的税收优惠账户。', noRangeReason: TOOL_ASSUMPTION },
   { id: 'fxDrift', name: '退休地货币升值', what: '如果在一国攒钱、去另一国退休，退休地货币每年相对升值多少。默认 0，表示汇率长期跟着物价走。',
     improve: '跨国退休要试试正值，看看退休地货币升值时计划还撑不撑得住。', noRangeReason: TOOL_ASSUMPTION },
-  { id: 'swr', name: '安全提取率', what: '退休第一年从资产里取多少比例，之后随通胀调整。提取率越低，需要的本金越多，也越安全。',
+  { id: 'swr', name: '安全提取率（对照）', what: '退休第一年从资产里取多少比例，之后随通胀调整。',
     improve: '放假越早，退休期越长，提取率要越低。开支能灵活调整的人可以承受更高一些的提取率。',
     range: { text: '30 年退休期、90% 成功率约 3.9%（Morningstar 2026）。更长的退休期由本工具下调，属于经验假设。', sourceUrl: MORNINGSTAR } },
   { id: 'sigEq', name: '股票波动率', what: '股票每年收益上下波动的幅度。它不改变预期收益，但影响运气差时计划能否撑住。',

@@ -1174,7 +1174,7 @@ function applyFix(fix) {
   fieldEl(key)?.focus();
 }
 
-// The stopped result: — 岁放假, the chip naming stops, frames for marks (the stops shown, by default all of them).
+// The stopped result: 放假年龄 —, the chip naming stops, frames for marks (the stops shown, by default all of them).
 // Nothing is worked out from the numbers. The form is drawn once per set of numbers, so a second call for the same numbers (a change, then a
 // focusout) never swaps an element under the pointer.
 let heldState = null;
