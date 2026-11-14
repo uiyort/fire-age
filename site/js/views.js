@@ -1,5 +1,5 @@
 // Turns model results into page text and tables. Strings only, no DOM access.
-import { DEFAULT_PATHS, DEFAULT_SEED, coastNeed, conv, bwdSolve, firstDraw, fwdSolve, savingsAt, savingsRate, buildParams } from './engine.js';
+import { DEFAULT_PATHS, DEFAULT_SEED, coastNeed, conv, bwdSolve, firstDraw, fwdSolve, savingsAt, savingsRate, buildParams, swrFor } from './engine.js';
 import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn, oddsBand, oddsText, peopleOf } from './holiday.js';
 import { needLine, oddsSolve, oddsYears } from './odds.js';
 import { MIN_SHOWN, SCENARIOS, answerValues, scenarioOptions } from './scenario.js';
@@ -713,7 +713,7 @@ const dotsHtml = count => {
 const chengText = share => (peopleOf(share) === 0 ? '不到 1 成' : `${peopleOf(share)} 成`);
 const isSet = v => v !== null && v !== undefined;
 // The professional ③ inputs: a stop in one of them stops the ledger at the r row (spec §7.4).
-const THIRD_FIELDS = ['eq', 'eqReal', 'bondY', 'infl', 'drag', 'sigEq', 'sigBd', 'rho', 'swr'];
+const THIRD_FIELDS = ['eq', 'eqReal', 'bondY', 'infl', 'drag', 'sigEq', 'sigBd', 'rho'];
 const PATHS_TEXT = DEFAULT_PATHS.toLocaleString('en-US');
 const PRO_THIRD = `③ ${PATHS_TEXT} 条路径 · 种子 ${DEFAULT_SEED}`;
 
@@ -909,7 +909,7 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
     const amount = pro ? wholeMoney : roughMoney;
     const note = [times ? `≈ 年支出 ${amount(firstYear, wCur)} × ${times} 倍` : null];
     // The implied rate: the same first year over the line.
-    if (pro) note.push(`反推提取率 ${pct(firstYear / needRow.value, 1)}`, '对照 3.9%');
+    if (pro) note.push(`反推提取率 ${pct(firstYear / needRow.value, 1)}（八成）`, `对照 ${pct(swrFor(p, p.life - p.age - t), 1)}`);
     else note.push(`八成年景够花到 ${p.life} 岁`);
     line = lgRow(`${lgOp('⇒')}<b>${needRow.label}</b>`, `<b>${amount(needRow.value, wCur)}</b>`, 'sum')
       + `<p class="lg-note">${note.filter(Boolean).join(' · ')}</p>`;
@@ -986,6 +986,9 @@ export function proLinesHtml({ S, p, data, list = [], rows = [] }) {
   }
   const b12 = list.find(q => q.rule === 'B12');
   out.pension = `<p class="row">养老金上限 = 年支出</p>${b12 ? `<p class="row warn">${WARN} ${liveHtml(b12.rel)} · ${b12.note}</p>` : ''}`;
+  // The published rate is a comparison only: its source always, and B10 when the typed value is out of range.
+  const b10 = list.find(q => q.rule === 'B10');
+  out.swr = `<p class="row">3.9% = Morningstar · 30 年 · 九成</p>${b10 ? `<p class="row warn">${WARN} ${liveHtml(b10.rel)}</p>` : ''}`;
   for (const q of list) if (q.rule === 'B11') out[q.field] = `<p class="row warn">${WARN} ${q.note}</p>`;
   return out;
 }

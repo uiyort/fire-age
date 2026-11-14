@@ -75,16 +75,18 @@ export function fiNeed(p, t, E = p.retExp, r = p.r) {
   // pension cap (which only limits what the pension saves), and the total cannot go below zero.
   const ev = eventPv(p, t, r);
   const Ew = spendW(p, t, E), Pw = pensW(p, t);
-  if (Pw <= 0) return Math.max(Ew / swrFor(p, H) + ev, 0);
-  if (p.pAge <= a) return Math.max(Math.max(Ew - Pw, 0) / swrFor(p, H) + ev, 0);
+  // A typed withdrawal rate of 0 or below can never fund anything: the need is infinite, never a negative sum.
+  const over = (x, h) => { const s = swrFor(p, h); return x <= 0 ? 0 : s > 0 ? x / s : Infinity; };
+  if (Pw <= 0) return Math.max(over(Ew, H) + ev, 0);
+  if (p.pAge <= a) return Math.max(over(Math.max(Ew - Pw, 0), H) + ev, 0);
   const b = Math.min(p.pAge - a, H);
   // Social insurance paid by hand until the pension starts is work-currency money in today's terms; it sits
   // outside the cap, which only limits what the pension itself can save.
   let pv = 0, paid = 0;
   for (let k = 0; k < b; k++) { const d = Math.pow(1 + r, k); pv += Ew / d; paid += (p.selfPay ?? 0) / d; }
-  if (b < H) pv += Math.max(Ew - Pw, 0) / swrFor(p, H - b) / Math.pow(1 + r, b);
+  if (b < H) pv += over(Math.max(Ew - Pw, 0), H - b) / Math.pow(1 + r, b);
   // A pension can only help: never ask for more than the same plan with no pension.
-  return Math.max(Math.min(pv, Ew / swrFor(p, H)) + paid + ev, 0);
+  return Math.max(Math.min(pv, over(Ew, H)) + paid + ev, 0);
 }
 
 export const savingsAt = (p, t, s0 = null) =>

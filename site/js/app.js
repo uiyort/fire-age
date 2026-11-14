@@ -199,7 +199,7 @@ const PRO_FIELDS = [
     { id: 'infl', label: '长期通胀', unit: '%', step: 0.1 },
     { id: 'drag', label: '税费拖累', unit: '%', step: 0.05 },
     { id: 'fxDrift', label: '退休币升值', unit: '%', step: 0.1 },
-    { id: 'swr', label: '安全提取率', unit: '%', step: 0.1 },
+    { id: 'swr', label: '安全提取率（对照）', unit: '%', step: 0.1 },
   ] },
   { legend: '风险假设', grp: 'risk', fields: [
     { id: 'sigEq', label: '股票波动率', unit: '小数', step: 0.01 },
@@ -1057,7 +1057,7 @@ function renderLines() {
   const rows = storyRows(S, DATA, year, null).map(r => (r.key === 'split' ? { ...r, before: sp.before } : r));
   const wCur = DATA.countries[S.workC].cur, rCur = DATA.countries[S.retC].cur;
   // The professional view's own lines: the rate, the nominal mortgage, the estimate across countries, the pension cap
-  // and the orange flags (B11, B12), each under its field.
+  // and the orange flags (B10, B11, B12), each under its field.
   const own = view === 'pro' ? proLinesHtml({ S, p: toParams(S, DATA, year), data: DATA, list, rows }) : {};
   const lines = at => fieldLinesHtml({ rows, list, at, view, wCur, rCur, note: own[at] ?? '' });
   // Exits of the relations drawn in the lines block, whose solid field is the block's own field, end the block.
@@ -1087,12 +1087,12 @@ function renderLines() {
   if (view === 'pro') {
     addAfter($('p-disp'), own.region && own.region.replace('</p>', ` <span class="grp-data">${DATA.version} 数据</span></p>`));
     addAfter(fieldEl('pension'), own.pension);
-    for (const key of Object.keys(LIMITS.common)) addAfter(fieldEl(key), own[key]);
+    for (const key of [...Object.keys(LIMITS.common), 'swr']) addAfter(fieldEl(key), own[key]);
   }
   // Orange frames: a changed assumption outside the common range (B11), a pension above the year's spending (B12).
   document.querySelectorAll('.f.warn').forEach(el => el.classList.remove('warn'));
   for (const q of list) {
-    const el = view === 'pro' && (q.rule === 'B11' || q.rule === 'B12') ? fieldEl(q.field) : null;
+    const el = view === 'pro' && (q.rule === 'B10' || q.rule === 'B11' || q.rule === 'B12') ? fieldEl(q.field) : null;
     if (el) wrapOf(el).classList.add('warn');
   }
   // A box already in place with the same content stays, so a redraw never swaps a button under the pointer.

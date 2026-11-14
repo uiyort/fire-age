@@ -276,9 +276,14 @@ test('B6–B10: claim age, shares, correlation, volatilities, withdrawal rate', 
   assert.deepEqual(only(S0({ sigEq: 17 }), 'B9')[0].fixes, [{ text: '→ 0.17', aria: '股票波动率改成 0.17', set: { sigEq: 0.17 } }]);
   assert.deepEqual(fixTexts(S0({ sigBd: -0.2 }), 'B9'), ['→ 0.2']);
   assert.equal(only(S0({ sigEq: 1 }), 'B9').length + only(S0({ sigEq: 0 }), 'B9').length, 0);
-  assert.deepEqual(rel(S0({ autoSwr: false, swr: 0 }), 'B10'), { sub: false, left: [{ label: '安全提取率', value: 0 }], op: '≤', right: { label: null, value: 0 } });
-  assert.deepEqual(fixTexts(S0({ autoSwr: false, swr: 0 }), 'B10'), ['→ 3.9']);
-  assert.deepEqual(fixTexts(S0({ autoSwr: false, swr: 12 }), 'B10'), ['→ 10']);
+  assert.deepEqual(rel(S0({ autoSwr: false, swr: 0, view: 'pro' }), 'B10'), { sub: false, left: [{ label: '安全提取率', value: 0 }], op: '≤', right: { label: null, value: 0 } });
+  // The typed rate is a comparison only (spec item 11): a flag, never a chip, never held.
+  for (const swr of [0, 12, -1]) {
+    const q = only(S0({ autoSwr: false, swr, view: 'pro' }), 'B10')[0];
+    assert.equal(q.kind, 'flag'); assert.deepEqual(q.fixes, []);
+    assert.deepEqual(P(S0({ autoSwr: false, swr, view: 'pro' })).filter(x => x.kind === 'block'), []);
+  }
+  assert.deepEqual(P(S0({ autoSwr: false, swr: 0 })).filter(q => q.kind === 'block'), []);
   assert.equal(only(S0({ autoSwr: false, swr: 10 }), 'B10').length + only(S0({ autoSwr: true, swr: 0 }), 'B10').length, 0);
 });
 

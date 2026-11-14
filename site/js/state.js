@@ -567,12 +567,6 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
   range('B7', 'flexCut', 0, 100, () => 0, () => 100);
   range('B8', 'rho', -1, 1, () => -1, () => 1);
   for (const f of ['sigEq', 'sigBd']) range('B9', f, 0, 1, v => Math.abs(v), v => Math.round(v / 100 * 1e6) / 1e6);
-  // B10: a typed withdrawal rate above 0 and up to 10.
-  if (!S.autoSwr && isSet(S.swr) && (S.swr <= 0 || S.swr > LIMITS.swrMax)) {
-    const low = S.swr <= 0;
-    one('B10', 'swr', S.swr, low ? '≤' : '>', { label: null, value: low ? 0 : LIMITS.swrMax }, low ? 3.9 : LIMITS.swrMax);
-  }
-
   // ---- Judgement flags, professional view only (the simple view has only A10 and B14).
   if (pro) {
     // B11: a changed assumption outside the common range. A default, or a value that follows the monthly data, never flags.
@@ -581,6 +575,12 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
       const def = f in follow ? follow[f] : own[f];
       if (!isSet(S[f]) || S[f] === def || (S[f] >= lo && S[f] <= hi)) continue;
       add({ rule: 'B11', kind: 'flag', field: f, note: `常见 ${num(lo)} 到 ${num(hi)}` });
+    }
+    // B10: a typed withdrawal rate at or below 0, or above 10. It is a comparison only (it never changes the
+    // result), so it warns and never stops anything.
+    if (!S.autoSwr && isSet(S.swr) && (S.swr <= 0 || S.swr > LIMITS.swrMax)) {
+      const low = S.swr <= 0;
+      add({ rule: 'B10', kind: 'flag', field: 'swr', rel: { sub: false, left: [{ label: label('swr'), value: S.swr }], op: low ? '≤' : '>', right: { label: null, value: low ? 0 : LIMITS.swrMax } }, fixes: [] });
     }
     // B12: a pension above the year's spending: the rest is not counted.
     if (isSet(S.pension) && isSet(S.retExp) && S.pension > S.retExp) {

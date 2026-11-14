@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
 import { defaultState, storyRows, problems, setField, setReal, setRetireCountry, toParams } from '../site/js/state.js';
-import { firstDraw, fwdSolve, planFlows } from '../site/js/engine.js';
+import { firstDraw, fwdSolve, planFlows, swrFor } from '../site/js/engine.js';
 import { bwdOdds, oddsAround, oddsSolve, oddsYears, needLine, successAt } from '../site/js/odds.js';
 import { heroModel } from '../site/js/holiday.js';
 import { heroHtml, heldHeroHtml, ledgerHtml, pct, proLedgerRowHtml, sideCardHtml, stickyHtml, tilesHtml } from '../site/js/views.js';
@@ -184,9 +184,16 @@ test('ledgerHtml pro: every consideration the model uses, in years', () => {
   const text = strip(ledgerHtml({ rows: storyRows(s, DATA, 2026, plan), list: [], odds: oddsAround(p, t), plan, state: 'ok', view: 'pro', mode: 'fwd', p, dispCur: 'CNY', mc }));
   for (const x of [`t = 0…${t - 1}`, '税后年收入 · 实际增长 +2%/年 本工具设定', '当前年支出 · 按今天的钱不变 本工具设定', '└ 其中月供 90,000/年 → 2045',
     `月供实际 × (1 + ${p.infl}%)^−t`, '年末存入 · 资产不低于 0 本工具设定', '年初取出', '一年跌 ≥ 15% 次年少花（只砍生活费，月供、自缴照付）',
-    '退休币升值（只算到放假那年） — 同币种', '放假线（每条路径倒推，取 80 分位）', `反推提取率 ${(firstDraw(p, t) / need * 100).toFixed(1)}% · 对照 3.9%`,
+    '退休币升值（只算到放假那年） — 同币种', '放假线（每条路径倒推，取 80 分位）', `反推提取率 ${(firstDraw(p, t) / need * 100).toFixed(1)}%（八成） · 对照 ${(swrFor(p, p.life - p.age - t) * 100).toFixed(1)}%`,
     '③ 2,000 条路径 · 种子 20261026 本工具设定', `r = 60% × 5% + 40% × (`, ' / 2,000 ', '⇒ 第一个到 80%', '插值', '中位资产 ¥4,294,780', '按固定收益算（约五成）',
     '本工具设定 · 按今天的钱 · 实际收益', '计算方法 ›']) assert.ok(text.includes(x), x);
+});
+
+test('ledgerHtml pro: the withdrawal-rate comparison follows the typed field and names the page 八成', () => {
+  const s = { ...S, view: 'pro', autoSwr: false, swr: 5 };
+  const plan = solve(s); const { p, t } = plan;
+  const text = strip(ledgerHtml({ rows: storyRows(s, DATA, 2026, plan), list: [], odds: oddsAround(p, t), plan, state: 'ok', view: 'pro', mode: 'fwd', p, dispCur: 'CNY' }));
+  assert.ok(text.includes('对照 5.0%') && text.includes('（八成）'));
 });
 
 test('ledgerHtml pro: a return floored at −50% says so on the r row', () => {

@@ -132,3 +132,8 @@ test('events: the need drops in the pension-capped case too', () => {
   const q = e => base({ retExp: 72000, pension: 24000, expense: 72000, income: 144000, events: e });
   assert.ok(fiNeed(q([mortgage({ amount: 36000 })]), 10) < fiNeed(q([]), 10));
 });
+
+test('a typed withdrawal rate of 0 or below needs infinite assets, so the fixed-return solve finds nothing', () => {
+  const p = swr => base({ autoSwr: false, swr });
+  for (const swr of [0, -1]) { assert.equal(fiNeed(p(swr), 0), Infinity); assert.equal(fwdSolve(p(swr)), null); }
+});

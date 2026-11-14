@@ -43,3 +43,26 @@ test('exports download from the pro view', async ({ page }) => {
   await page.click('#export-json');
   expect((await json).suggestedFilename()).toMatch(/\.json$/);
 });
+
+test('the typed safe withdrawal rate is a comparison only: 0 and 12 warn, never stop the result or change the age', async ({ page }) => {
+  await page.goto('/'); await page.click('#to-pro');
+  const field = page.locator('#p-swr').locator('xpath=ancestor::div[contains(@class,"f")][1]');
+  await expect(page.locator('#pro-form')).toContainText('3.9% = Morningstar · 30 年 · 九成');
+  await expect(page.locator('#pro-form')).toContainText('安全提取率（对照）');
+  const headline = page.locator('#headline');
+  await expect(headline).not.toContainText('—');
+  const before = await headline.innerText();
+  await page.uncheck('#p-autoswr');
+  for (const [value, line] of [['0', '! 安全提取率 0 ≤ 0'], ['12', '! 安全提取率 12 > 10']]) {
+    await page.fill('#p-swr', value); await page.locator('#p-swr').press('Tab');
+    await expect(page.locator('#pro-form')).toContainText(line);
+    await expect(field).toHaveClass(/warn/);
+    await expect(page.locator('.chip')).toHaveCount(0);
+    await expect(headline).not.toContainText('—');
+    expect(await headline.innerText()).toBe(before);
+  }
+  await page.fill('#p-swr', '0'); await page.locator('#p-swr').press('Tab');
+  await page.locator('#ledger-row .ledger-toggle').click();
+  await expect(page.locator('#ledger')).toContainText(/按固定收益算（约五成）\s*—/);
+  await expect(page.locator('#ledger')).toContainText('对照 0.0%');
+});
