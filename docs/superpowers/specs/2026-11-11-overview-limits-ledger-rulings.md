@@ -1,0 +1,41 @@
+# Rulings: overview, limits and ledger (2026-11-11 plan)
+
+Decisions the controller made while executing docs/superpowers/plans/2026-11-11-overview-limits-ledger.md, copied from its execution ledger before the ledger was deleted. Each line says what was decided and what it costs if wrong. The 2026-11-14 review-fix batch keeps its rulings in its own plan (Rulings section).
+
+- Ruling: "New explanatory sentences: 0" binds the calculator page; the ≤3 method-page sentences on 八成/2,000 (Task 11) are on the method page, which exists to explain — cost if wrong: three sentences to cut.
+- Ruling: the ledger ③ header "2,000 种年景" in the simple view does not break "simple says only X 成, never a count of runs": it is existing page copy (index.html:241) and no per-age counts are shown in simple — cost if wrong: one header word.
+- Ruling: pro view A4 `改回估算 ≈ N` is yearly (spec §4.1 says pro counts by year; brief said monthly) — spec is the authority — cost if wrong: one line.
+- Ruling: a non-integer youngest-child age blocks as A8 with floor/ceil buttons — spec silent; silently dropping a typed value is what the owner asked to end — cost if wrong: one rule to relax.
+- Ruling: B4/B5 wait while age is out of range (B3) — one root problem at a time, as A2 hides A3 — cost if wrong: a second chip entry appears later.
+- Ruling: a negative split part stays (B2 blocks it) instead of switching the split off — no silent drop — cost if wrong: one condition.
+- Ruling: B2 on mortgage/kids/split parts uses monthly units in both views — those inputs are monthly in both views (月供，每月) — cost if wrong: unit label.
+- Ruling: A5 half-filled item row carries status `blank` so the ledger can stop there; Task 6 must not draw a line under the field for it (spec: A5 adds no line) — carry to Task 6 — cost if wrong: one extra line.
+- Ruling: blocks on fields with no ① ② row (age, life, eq) only empty `need`/`times`; ① ② rows show typed values, which are not computed from the blocked field — cost if wrong: a row shown that should read —.
+- Task 3: review Needs fixes — 1 Important (plan-mandated: retReal omits fx drift; brief formula). Ruling: fix it — spec says rows report the numbers the engine uses; the brief's formula is wrong for cross-currency — cost if wrong: none.
+- Ruling: minors 1 (retExp row value when an item ends before the holiday), 4 (mortgageReal after it ended; self when holiday ≥ pAge) and 5 (conv shadowing) go into fix round 1 with the Important — all are "ledger number differs from engine" or a trap — cost: a slightly larger fix round.
+- Ruling: chip names follow spec §10.1 CHIP_NAME (`到手收入`), not the brief's `每月到手收入` — spec wins — cost if wrong: one word.
+- Ruling: the typing hold treats all cells of one group (mortgage / children / split) as one field — otherwise a cell turns red mid-entry — cost if wrong: marks appear one field later.
+- Ruling: spec §3 wins over the brief's raw-HTML test: `=`/`+` in the sum line are aria-hidden with a readable label — goes into Task 5's fix round — cost if wrong: a test string.
+- Ruling: pro split parts carry a `/月` unit (mockup shows it; parts are monthly beside a yearly total) — fix round — cost if wrong: two characters.
+- Ruling: applying a lab/views value to expense while the split is on leaves the split first (like 只填总数) and then sets the value — the person chose that number — fix round — cost if wrong: the split is lost on apply.
+- Ruling: the split stays on while any part is non-blank and non-zero (a negative part keeps the lock; B2 blocks it) — keeps total and parts in step — cost if wrong: one condition in splitOn.
+- Ruling: while split, B2 for a negative amount skips 每月支出 itself (the part is blocked instead) and the retirement estimate reads a negative split total as 0 — one root problem, no fix button overwriting the locked total — cost if wrong: one extra stop shown.
+- Ruling: storyRows └ item rows keep their typed amount after a stop (otherwise `└ 其中孩子 —` under the field); the ledger (Task 8) blanks rows after the cut itself — carry to Task 8 — cost if wrong: ledger shows an amount after the cut.
+- Ruling: B11/B12/B13 lines are Task 9's (plan Task 9 tests them), not Task 6's.
+- Ruling: pro 现在 shows 示例 too (spec §6.1 lists it; brief said simple-only) — spec wins — cost if wrong: one word in pro.
+- Ruling: #ledger sits inside .hero-grid right after #hero (opens in place on phone); Task 9 places the pro ledger itself — cost if wrong: DOM position.
+- Ruling: one 计算方法 link per section (spec §9.1); item and pension rows already jump to their fields, so no extra #items/#pension links on the page — fewer words — cost if wrong: two links.
+- Ruling: site/studio/ (internal, exempt) keeps its own denominator — cost if wrong: an internal tool shows a different N.
+- Ruling: in ②, a row whose start age is at or before the holiday age is shown starting at the holiday age (the model charges it from then), keeping ② in age order — cost if wrong: an age label.
+- Ruling: pro A10 `< 现在 … × 25%` stays yearly in pro (the compared amount is yearly there) — cost if wrong: unit.
+- Ruling: the collapsed #ledger-row sits beside the tiles, so it must use the display currency like them; the open ledger body keeps the model's own currencies (work/retirement, each amount with its sign) because it traces the calculation — carry into review/fix — cost if wrong: one currency label.
+- Ruling: pro backward ③ copy `⇒ 要 80%：第一年储蓄 ¥X` (spec silent) — cost if wrong: copy.
+- Ruling: pro held cut line reads `⇒ 放假线 —` (pro calls that row 放假线) — cost if wrong: copy.
+- Ruling: fitSide() sizes the sidebar to fit under the header (spec "整栏固定" and mockups; the brief's calc(100vh − 32px) left the chip off-screen) — cost if wrong: one function.
+- Ruling: while held, the 怎么提前 link shows no count (nothing is worked out from blocked numbers) — cost if wrong: one number.
+- Ruling: pro derived-returns box sits in the 收益假设 row at ≥ 1024 px — cost if wrong: placement.
+- Task 11: implementer DONE 4db4f1c (492 unit, 186 e2e, lint ok). Ruling: '一年跌 15% 以上' and '下跌超过 15%' elsewhere on the method page also become '15% 或更多' — same code fact — cost if wrong: none.
+- Task 11: review Needs fixes — Important (line endings of tests/method.test.mjs). Ruling: the finding is factually wrong — `git ls-files --eol` shows i/lf w/lf for tests/method.test.mjs — no action — cost if wrong: none.
+- Ruling: Minor 3 (aria-label on role-less spans) deferred to a follow-up — accessibility polish, no visual effect, touches many e2e selectors — cost if wrong: screen readers miss a status word.
+- Final fix round: c23ad91 (497 unit, 187 e2e, lint 0). Ruling: mixShares blanks only on a stop on eq — cost if wrong: note shows shares while returns blank. Ruling: sidebar blanks figures when any earlier row is block/blank (incl. while typing) — cost if wrong: 存下 may flicker to — while typing. Ruling: 示例 ignores retirement-country change (country lives in 在哪里, not 现在) — cost if wrong: none.
+- Ruling: sidebar keeps a figure when a stop sits on a field with no ledger row (规划到 200, eq 150 in simple) while the ledger shows — — not computed from the refused value, constraint holds — cost if wrong: two places disagree for one stop.
