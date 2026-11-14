@@ -683,7 +683,7 @@ const NO_RESULT = '<span aria-label="暂无结果">—</span>';
 // The ledger's switch at the end of the fund line: ▸ closed, ▾ open (spec §7.1).
 export const ledgerToggleHtml = (open = false) => `<button type="button" class="ledger-toggle" aria-expanded="${open}" aria-controls="ledger">怎么算的 <span aria-hidden="true">${open ? '▾' : '▸'}</span></button>`;
 // The big age and the fund while the result is stopped; the ledger still opens.
-const chipButton = chip => `<button type="button" class="chip" data-chip>${chip}</button>`;
+export const chipButton = chip => `<button type="button" class="chip" data-chip>${chip}</button>`;
 export const heldHeroHtml = (open = false, chip = '') => `<div class="hero-big">放假年龄 ${NO_RESULT}${chip ? ` ${chipButton(chip)}` : ''}</div><div class="fund"><p>放假资金 — ${ledgerToggleHtml(open)}</p></div>`;
 // The headline while the result is stopped; the simple view has only the big age.
 export const heldHeadHtml = (view, chip = '') => (view === 'pro' ? `<p class="say">财务独立年龄 ${NO_RESULT}${chip ? ` ${chipButton(chip)}` : ''}</p>` : '');

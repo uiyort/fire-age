@@ -47,6 +47,10 @@ test.describe('at 390', () => {
     await expect(page.locator('#start-chip')).toContainText('待填：每月支出 ›');
     await expect(page.locator('body')).toHaveClass(/intro/);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+    // A tap right after an edit of another field must still reach the chip (it is not rebuilt under the finger).
+    await page.fill('#s-age', '31');
+    await page.locator('#start-chip .chip').tap();
+    await expect(page.locator('#s-expense')).toBeFocused();
     await page.fill('#s-expense', '6000');
     await page.locator('#s-expense').blur();
     await expect(page.locator('#start-chip')).toBeHidden();

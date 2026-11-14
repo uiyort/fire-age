@@ -14,7 +14,7 @@ import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { assumptionLine, renderCard, summaryCardSpec, typeCardSpec } from './card.js';
 import {
-  allTypesHtml, cardBody, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, ledgerHtml, leversHtml, proLedgerRowHtml, proLinesHtml, lifeGainText, lifeTagText, fieldLineHtml, fieldLinesHtml, fixesHtml, groupStatusHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, SIDE_NO_RESULT, derivedStops, mixShares, sideCardHtml, sideHeadName, sideSummary, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
+  allTypesHtml, cardBody, chipButton, chipText, fasterLead, fifthOddsHtml, placesTitle, fifthBrief, fifthCompareHtml, fifthSentence, goalFor, goalHtml, headlineText, heatHtml, heldHeadHtml, heldHeroHtml, heroHtml, labChangesHtml, ledgerHtml, leversHtml, proLedgerRowHtml, proLinesHtml, lifeGainText, lifeTagText, fieldLineHtml, fieldLinesHtml, fixesHtml, groupStatusHtml, pensionEstimateHtml, livesHtml, livesSummary, money, pct, pctTableHtml, placesHtml, scenarioHtml, sensitivityHtml, SIDE_NO_RESULT, derivedStops, mixShares, sideCardHtml, sideHeadName, sideSummary, solvesHtml, stickyHtml, storyHtml, wholeMoney, tilesHtml, toDisplay, townHtml, trackStyle, tryHtml, trySentence, tryValueText, typeHtml, variantsHtml, viewsBannerHtml,
 } from './views.js';
 
 const $ = id => document.getElementById(id);
@@ -1205,7 +1205,7 @@ function holdResult(stops, marks = stops) {
     $('headline').hidden = !head;
     renderOpenCards(p);
   }
-  $('start-chip').innerHTML = chip ? `<button type="button" class="chip" data-chip>${chip}</button>` : '';
+  setHtml($('start-chip'), chip ? chipButton(chip) : '');
   const sticky = stickyHtml(null, { pro: S.view === 'pro', chip });
   if (sticky !== stickyNow) {
     stickyNow = sticky;
@@ -1289,7 +1289,7 @@ function refresh({ commit = false } = {}) {
   frame = requestAnimationFrame(() => {
     heldState = null;
     heldChip = null;
-    $('start-chip').innerHTML = '';
+    setHtml($('start-chip'), '');
     document.body.classList.remove('result-held');
     renderFast();
     renderOpenCards(latest.p);
