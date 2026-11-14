@@ -2,16 +2,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
-import { defaultState, storyRows, problems, setRetireCountry, toParams } from '../site/js/state.js';
-import { firstDraw, fwdSolve } from '../site/js/engine.js';
+import { defaultState, storyRows, problems, setField, setReal, setRetireCountry, toParams } from '../site/js/state.js';
+import { firstDraw, fwdSolve, planFlows } from '../site/js/engine.js';
 import { bwdOdds, oddsAround, oddsSolve, oddsYears, needLine, successAt } from '../site/js/odds.js';
 import { heroModel } from '../site/js/holiday.js';
-import { heroHtml, heldHeroHtml, ledgerHtml, proLedgerRowHtml, sideCardHtml, stickyHtml, tilesHtml } from '../site/js/views.js';
+import { heroHtml, heldHeroHtml, ledgerHtml, pct, proLedgerRowHtml, sideCardHtml, stickyHtml, tilesHtml } from '../site/js/views.js';
 
 const strip = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const S = { ...defaultState(DATA), income: 360000, expense: 180000, retExp: 180000,
   real: { mortgage: { monthly: 7500, endYear: 2045 }, kids: { count: null, age: null, monthly: null } } };
 const solve = s => { const p = toParams(s, DATA, 2026); const t = oddsSolve(p); return { p, t, need: needLine(p)[t] }; };
+// The engine's spending at plan year y, before pension and self-pay; ended: the items ending at that age already gone.
+const spendOf = (p, t, y, endedAt = null) => planFlows({ ...p, pension: 0, selfPay: 0,
+  events: p.events.map(e => (e.endAge === endedAt ? { ...e, endAge: endedAt - 1 } : e)) }, t, null).full[y];
+const fmt = v => Math.round(v).toLocaleString('en-US');
 
 test('oddsAround: three years round the holiday, from the same simulation', () => {
   const { p, t } = solve(S);
@@ -50,11 +54,17 @@ test('ledgerHtml simple: the three sections in the spec\'s words', () => {
   const plan = solve(S); const { p, t } = plan;
   const html = ledgerHtml({ rows: storyRows(S, DATA, 2026, plan), list: [], odds: oddsAround(p, t), plan, state: 'ok', view: 'simple', mode: 'fwd', p, dispCur: 'CNY' });
   const text = strip(html);
+  // ② starts from what the engine spends the first holiday year; the mortgage's row subtracts what the engine counted
+  // for it in its last year (lighter in real terms, so ≈), and = is the engine's spending from 50.
+  const less = Math.round((spendOf(p, t, 19) - spendOf(p, t, 19, 50)) / 12);
+  assert.equal(less, Math.round(90000 * Math.pow(1 + p.infl / 100, -19) / 12));
   for (const s of ['① 攒钱', `30 → ${30 + t} 岁`, '已有 ¥20万', '到手 ¥30,000/月', '− 支出 ¥15,000/月', '└ 其中月供 7,500 → 2045', '= 每月存下 ¥15,000', '收入每年 +2% 本工具设定',
-    `→ ${29 + t} 岁每月存下`, '② 放假以后 每月花', `${30 + t}–49 退休后 ≈ ¥15,000`, '50 起 月供 ¥7,500', '63 起 养老金 — ›',
-    `⇒ ${30 + t} 岁放假要有 ¥391万`, `≈ 年支出 × ${Math.round(plan.need / firstDraw(p, t))} 倍 · 八成年景够花到 95 岁`, '③ 2,000 种年景', '平均每年 2.9% 本工具设定',
+    `→ ${29 + t} 岁每月存下`, '② 放假以后 每月花', `${30 + t}–49 退休后 ≈ ¥${fmt(spendOf(p, t, t) / 12)}`, `− 50 起 月供 ≈ ${fmt(less)} = ¥${fmt(spendOf(p, t, 20) / 12)}`, '63 起 养老金 — ›',
+    `⇒ ${30 + t} 岁放假要有 ¥391万`, `≈ 年支出 ¥${(firstDraw(p, t) / 1e4).toPrecision(3)}万 × ${Math.round(plan.need / firstDraw(p, t))} 倍 · 八成年景够花到 95 岁`, '③ 2,000 种年景', '平均每年 2.9% 本工具设定',
     `⇒ 第一个到八成 ${30 + t} 岁`, '≈ 估算 · 按今天的钱', '计算方法 ›']) assert.ok(text.includes(s), s);
-  assert.match(html, /<s[^>]*>月供<\/s>/); assert.match(html, /href="method\.html#accumulate"/);
+  assert.doesNotMatch(html, /<s[ >]/); assert.match(html, /href="method\.html#accumulate"/);
+  // ① ends with the simulation's median at the holiday, — until the simulation is in.
+  assert.ok(text.includes(`→ ${29 + t} 岁每月存下`) && text.indexOf(`⇒ ${30 + t} 岁时一般攒到 本工具设定 —`) < text.indexOf('② 放假以后'), text);
   assert.match(html, /href="method\.html#need-line"/); assert.match(html, /href="method\.html#odds"/);
   assert.ok(!text.includes(' / 2,000') && !text.includes('成功率') && !text.includes('%（'));   // the simple view says only X 成
   // One line per year round the holiday, ten dots each, the holiday year marked.
@@ -197,9 +207,9 @@ test('ledgerHtml pro: the spec example, each number the engine\'s', () => {
   const text = strip(html);
   const h = 30 + t;
   for (const x of ['① 攒钱', '可投资资产 ¥200,000', '¥360,000', '− 当前年支出', '¥180,000', `t = ${t - 1} 时 ¥${Math.round(90000 * Math.pow(1 + p.infl / 100, -(t - 1))).toLocaleString('en-US')}`,
-    `= 年储蓄 t0 → t${t - 1} 180,000 → 301,536`, '② 放假以后 年初取出', `${h}–49 退休后年支出 ≈ ¥180,000`, `月供实际变轻，${h} 岁实付 ¥163,066`, '50 起 月供 ¥90,000',
+    `= 年储蓄 t0 → t${t - 1} 180,000 → 301,536`, '② 放假以后 年初取出', `${h}–49 退休后年支出 ≈ ¥180,000`, `月供实际变轻，${h} 岁实付 ¥163,066`, `− 50 起 月供 ≈ ${fmt(spendOf(p, t, 19) - spendOf(p, t, 19, 50))} = ¥${fmt(spendOf(p, t, 20))}`,
     '→ 63 自缴（工作地中国大陆且填了养老金才计） —', '养老金（超出年支出不计） — ›', '少花（只砍生活费，月供、自缴照付） 0%',
-    `⇒ 放假线（每条路径倒推，取 80 分位） ¥${Math.round(need).toLocaleString('en-US')}`, `≈ 年支出 × ${Math.round(need / firstDraw(p, t))} 倍`,
+    `⇒ 放假线（每条路径倒推，取 80 分位） ¥${Math.round(need).toLocaleString('en-US')}`, `≈ 年支出 ¥${fmt(firstDraw(p, t))} × ${Math.round(need / firstDraw(p, t))} 倍 · 反推提取率`,
     `r = 60% × 5% + 40% × (${p.bondY}% − ${p.infl}%) − ${p.drag}% ${(p.r * 100).toFixed(2)}%`, `σ（股 17% · 债 6% · ρ 0.2） ${(p.sigma * 100).toFixed(1)}%`,
     `⇒ 第一个到 80% ${h} 岁`, `按固定收益算（约五成） ${p.age + fwdSolve(p)} 岁`, `${h} 岁中位资产 —`]) assert.ok(text.includes(x), x);
   for (const o of oddsAround(p, t)) assert.ok(text.includes(`${o.age} 岁 ${o.count.toLocaleString('en-US')} / 2,000 ${(o.share * 100).toFixed(1)}%`), `${o.age}`);
@@ -264,4 +274,94 @@ test('the stopped result reads 放假年龄 — with its chip, never — 岁', (
   assert.ok(strip(stickyHtml(null, { pro: true, chip: 'x' })).startsWith('财务独立年龄 —'));
   assert.ok(strip(sideCardHtml(null, { view: 'simple', chip: 'x' })).startsWith('放假年龄 —'));
   for (const h of [hero, strip(stickyHtml(null, { chip: 'x' })), strip(sideCardHtml(null, { view: 'pro', chip: 'x' }))]) assert.ok(!h.includes('— 岁'), h);
+});
+
+// ---- Review fixes batch (2026-11-14), item 9 and the item-10 note: the ledger adds up.
+const family = () => {
+  let s = { ...defaultState(DATA), age: 35, assets: 500000, income: 360000, touched: {} };
+  s = setField(s, 'expense', '216000', DATA);
+  for (const [g, k, v] of [['mortgage', 'monthly', '7500'], ['mortgage', 'endYear', '2045'], ['kids', 'count', '1'], ['kids', 'age', '3'], ['kids', 'monthly', '2000']]) s = setReal(s, g, k, v, DATA);
+  return s;
+};
+test('simple ②: the first row is what the engine spends the first year, × N rebuilds the line', () => {
+  const s = family(); const plan = solve(s); const { p, t } = plan;
+  const rows = storyRows(s, DATA, 2026, plan);
+  const first = rows.find(r => r.key === 'retExp'), times = rows.find(r => r.key === 'times');
+  assert.equal(first.value, Math.round(firstDraw({ ...p, pension: 0, selfPay: 0 }, t) / 12));
+  assert.equal(times.draw, firstDraw(p, t)); assert.equal(times.value, Math.round(plan.need / firstDraw(p, t)));
+  assert.deepEqual(rows.filter(r => r.key.startsWith('draw:')).map(r => [r.ages[0], r.items, r.less, r.op]), [[54, ['孩子'], 2000, '−'], [55, ['月供'], 5652, '−']]);
+  // The engine relation: − is what the engine counted for the items in their last year; = is the engine's spending
+  // from then; with the row above the year before, the row above minus − is exactly =.
+  const draws = rows.filter(r => r.key.startsWith('draw:'));
+  for (const r of draws) {
+    const age = r.ages[0];
+    assert.equal(r.less, Math.round((spendOf(p, t, age - 1 - p.age) - spendOf(p, t, age - 1 - p.age, age)) / 12));
+    assert.equal(r.value, Math.round(spendOf(p, t, age - p.age) / 12));
+    assert.equal(r.cur, 'work');
+  }
+  assert.deepEqual(draws.map(r => r.lessTyped), [2000, 7500]);
+  assert.equal(draws[0].value - draws[1].less, draws[1].value);
+  assert.equal(draws[1].less, Math.round(90000 * Math.pow(1 + p.infl / 100, -(55 - 1 - p.age)) / 12));
+  if (DATA.version === '2026-11') {
+    assert.equal(p.age + t, 50); assert.equal(first.value, 16499); assert.equal(times.value, 21); assert.equal(Math.round(plan.need), 4149879);
+    assert.deepEqual(rows.filter(r => r.key.startsWith('draw:')).map(r => r.value), [14152, 8500]);
+    const pro = storyRows({ ...s, view: 'pro' }, DATA, 2026, plan);
+    assert.deepEqual(pro.filter(r => r.key.startsWith('draw:')).map(r => r.value), [169825, 102000]);
+  }
+});
+test('simple ②: the example numbers', () => {
+  const s = defaultState(DATA); const plan = solve(s);
+  const rows = storyRows(s, DATA, 2026, plan);
+  assert.equal(rows.find(r => r.key === 'retExp').value, 6000);
+  if (DATA.version === '2026-11') {
+    assert.equal(plan.p.age + plan.t, 50); assert.equal(rows.find(r => r.key === 'times').value, 35);
+    assert.equal(rows.find(r => r.key === 'saveLate').value, 11482);
+    assert.equal(pct(plan.p.r, 2), '2.87%'); assert.equal(pct(plan.p.sigma, 1), '10.9%');
+  }
+});
+test('ledger copy: − rows, the named denominator, the bridge line, the FX note', () => {
+  const s = family(); const plan = solve(s);
+  const mc = { bands: { [plan.t]: [0, 0, 5000000, 0, 0] } };
+  const html = strip(ledgerHtml({ rows: storyRows(s, DATA, 2026, plan), odds: oddsAround(plan.p, plan.t), plan, p: plan.p, dispCur: 'CNY', mc }));
+  assert.match(html, /− 54 起 孩子 2,000 = ¥14,152/);
+  assert.match(html, /≈ 年支出 ¥19\.8万 × 21 倍 · 八成年景够花到 95 岁/);
+  assert.match(html, /⇒ 50 岁时一般攒到 本工具设定 ¥500万/);
+  assert.doesNotMatch(html, /汇率变化/);
+  // Beyond the brief: the mortgage's counted amount is lighter than the typed 7,500, so ≈; no strike-through in the ledger.
+  assert.match(html, /− 55 起 月供 ≈ 5,652 = ¥8,500/);
+  assert.ok(html.indexOf('⇒ 50 岁时一般攒到') < html.indexOf('② 放假以后'));
+  const raw = ledgerHtml({ rows: storyRows(s, DATA, 2026, plan), odds: oddsAround(plan.p, plan.t), plan, p: plan.p, dispCur: 'CNY', mc });
+  assert.doesNotMatch(raw, /<s[ >]/);
+  // Out of reach, today, and the professional view: no bridge line.
+  const now = { ...plan, t: 0 };
+  assert.doesNotMatch(strip(ledgerHtml({ rows: storyRows(s, DATA, 2026, now), odds: oddsAround(plan.p, 0), plan: now, state: 'now', p: plan.p, dispCur: 'CNY', mc: { bands: { 0: [0, 0, 1, 0, 0] } } })), /一般攒到/);
+  const un = { p: plan.p, t: plan.p.life - plan.p.age - 1, need: null, unreachable: true };
+  assert.doesNotMatch(strip(ledgerHtml({ rows: storyRows(s, DATA, 2026, un), odds: oddsAround(plan.p, un.t), plan: un, state: 'unreachable', p: plan.p, dispCur: 'CNY', mc })), /一般攒到/);
+  const pro = strip(ledgerHtml({ rows: storyRows({ ...s, view: 'pro' }, DATA, 2026, plan), odds: oddsAround(plan.p, plan.t), plan, p: plan.p, view: 'pro', dispCur: 'CNY', mc }));
+  assert.doesNotMatch(pro, /一般攒到/);
+  assert.match(pro, /− 54 起 孩子 24,000 = ¥169,825/); assert.match(pro, /− 55 起 月供 ≈ 67,825 = ¥102,000/);
+  assert.match(pro, new RegExp(`≈ 年支出 ¥${fmt(firstDraw(plan.p, plan.t))} × 21 倍 · 反推提取率`));
+});
+test('two currencies: ② in the work currency, the field lines in the retirement currency, the FX note in pro', () => {
+  const s = setRetireCountry(family(), 'TH', DATA); const plan = solve(s); const { p, t } = plan;
+  assert.notEqual(p.wCur, p.rCur);
+  const rows = storyRows(s, DATA, 2026, plan);
+  const times = rows.find(r => r.key === 'times');
+  assert.equal(rows.find(r => r.key === 'retExp').cur, 'work');
+  assert.ok(rows.some(r => r.key.startsWith('draw:')));
+  for (const r of rows.filter(x => x.key.startsWith('draw:'))) assert.equal(r.cur, 'work');
+  assert.equal(times.value, Math.round(plan.need / times.draw));
+  assert.equal(rows.find(r => r.key === 'retExp').value, Math.round(spendOf(p, t, t) / 12));
+  const after = rows.filter(r => r.key.startsWith('after:'));
+  assert.ok(after.length > 0); for (const r of after) assert.equal(r.cur, 'retire');
+  const pro = storyRows({ ...s, view: 'pro' }, DATA, 2026, plan);
+  const text = strip(ledgerHtml({ rows: pro, odds: oddsAround(p, t), plan, p, view: 'pro', dispCur: 'CNY' }));
+  assert.ok(text.includes('放假后汇率变化、养老金币种暂未区分'), text);
+  assert.ok(text.indexOf('退休币升值') < text.indexOf('放假后汇率变化'));
+  assert.doesNotMatch(strip(ledgerHtml({ rows, odds: oddsAround(p, t), plan, p, dispCur: 'CNY' })), /汇率变化/);
+});
+test('held: no − rows', () => {
+  const s = family();
+  assert.equal(storyRows(s, DATA, 2026, null).filter(r => r.key.startsWith('draw:')).length, 0);
+  assert.ok(storyRows(s, DATA, 2026, null).some(r => r.key.startsWith('after:')));
 });

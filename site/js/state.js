@@ -1,5 +1,5 @@
 // Input state for the calculator: what the person typed, before it becomes model parameters.
-import { buildParams, firstDraw, longRunInflation, savingsAt } from './engine.js';
+import { buildParams, firstDraw, longRunInflation, planFlows, savingsAt } from './engine.js';
 
 const STORAGE_KEY = 'fire-age-v1';
 const MONEY_FIELDS = ['assets', 'income', 'expense', 'retExp', 'pension', 'selfPension', 'selfMedical'];
@@ -620,6 +620,8 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
 // while it is blocked or blank. A row that is blocked carries the very relation problems() draws under the field.
 const TOOL = '本工具设定';
 const ITEM_NAME = { mortgage: '月供', kids: '孩子' };
+// The engine's spending at plan year y (work currency, today's money) for a holiday in year t, before pension and self-pay.
+const spendAt = (p, t, y) => planFlows({ ...p, pension: 0, selfPay: 0 }, t, null).full[y];
 export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = null) {
   const view = S.view === 'pro' ? 'pro' : 'simple';
   const pro = view === 'pro';
@@ -710,13 +712,16 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
   const leftAfter = gone => (isSet(S.retExp) ? S.retExp - toRet(gone.reduce((total, e) => total + e.amount, 0)) : null);
   const goneAtHoliday = holiday === null ? [] : events.filter(e => e.endAge <= holiday);
   const retStop = stop(['retExp']) ?? (a4 ? { status: 'block', stop: a4.id, rel: a4.rel } : !S.touched?.retExp ? { status: 'est' } : null);
-  add('retExp', 'after', pro ? '退休后年支出' : '退休后', yearly(leftAfter(goneAtHoliday)), {
-    cur: 'retire', per, field: 'retExp', ages: [holiday, nextEnd === undefined ? null : nextEnd - 1], typed: yearly(S.retExp),
+  // With a plan, the simple view's first row is what the engine spends the first holiday year (the professional
+  // retReal); the professional row stays the typed amount less the items gone, its real value on the next row.
+  const engineFirst = !pro && plan !== null;
+  add('retExp', 'after', pro ? '退休后年支出' : '退休后', engineFirst ? whole(spendAt(p, t, t) / 12) : yearly(leftAfter(goneAtHoliday)), {
+    cur: engineFirst ? 'work' : 'retire', per, field: 'retExp', ages: [holiday, nextEnd === undefined ? null : nextEnd - 1], typed: yearly(S.retExp),
     ...(goneAtHoliday.length ? { struck: goneAtHoliday.map(e => ITEM_NAME[e.id]) } : {}), ...retStop,
   });
   // The holiday year's spending as the engine counts it (drift, the mortgage at its real value), before pension and self-pay.
   if (pro && plan && mOn && mEvent.endAge > holiday) {
-    add('retReal', 'after', `月供实际变轻，${holiday} 岁实付`, whole(firstDraw({ ...p, pension: 0, selfPay: 0 }, t)),
+    add('retReal', 'after', `月供实际变轻，${holiday} 岁实付`, whole(spendAt(p, t, t)),
       { cur: 'work', per, views: 'pro' });
   }
   const retItem = { op: '└', cur: 'retire', per, under: 'retExp' };
@@ -733,6 +738,21 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
       op: '→', cur: 'retire', per, under: 'retExp', ages: [age, null], struck: events.filter(e => e.endAge === age).map(e => ITEM_NAME[e.id]),
       ...(holiday !== null && age <= holiday ? { folded: true } : {}), ...(low ? { status: 'flag' } : {}),
     });
+  }
+  // The ledger's ② rows after the first, with a plan: − what the engine counted for the items ending at that age in
+  // their last year (the same year with them already ended is the difference, so the mortgage's real-terms drift over
+  // the years before stays out of it), = the engine's spending from that age. An end past the plan never comes.
+  if (plan) {
+    for (const age of ends.filter(a => a > holiday && a <= p.life)) {
+      const gone = p.events.filter(e => e.endAge === age);
+      if (!gone.length) continue;
+      const y = age - 1 - p.age;
+      const early = { ...p, events: p.events.map(e => (e.endAge === age ? { ...e, endAge: age - 1 } : e)) };
+      add(`draw:${age}`, 'after', null, yearly(spendAt(p, t, age - p.age)), {
+        op: '−', cur: 'work', per, ages: [age, null], items: gone.map(e => ITEM_NAME[e.id]),
+        less: yearly(spendAt(p, t, y) - spendAt(early, t, y)), lessTyped: yearly(gone.reduce((total, e) => total + e.amount, 0)),
+      });
+    }
   }
   const own = v => (Number.isFinite(Number(v)) ? Math.max(Number(v), 0) : 0);
   const selfPay = plan ? p.selfPay ?? 0 : S.workC === 'CN' && (S.pension ?? 0) > 0 ? (own(S.selfPension) + own(S.selfMedical)) * 12 : 0;
@@ -755,7 +775,7 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
   const need = plan && !plan.unreachable && isSet(plan.need) ? plan.need : null;
   add('need', 'after', pro ? '放假线（每条路径倒推，取 80 分位）' : holiday === null ? '放假要有' : `${holiday} 岁放假要有`, need, { op: '⇒', cur: 'work' });
   const draw = need === null ? 0 : firstDraw(p, t);
-  add('times', 'after', null, draw > 0 ? Math.round(need / draw) : null);
+  add('times', 'after', null, draw > 0 ? Math.round(need / draw) : null, { draw: need === null ? null : draw });
 
   // The cut: the first blocked or blank row keeps its value, every row after it waits. The items (└ under spending and
   // under retirement spending) only repeat an amount the person typed, so they stay.

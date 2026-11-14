@@ -34,7 +34,10 @@ test('storyRows: section ① follows the engine', () => {
 test('storyRows: section ② ages, amounts, the line and the multiple', () => {
   const plan = solved(S); const { p, t, need } = plan;
   const rows = storyRows(S, DATA, 2026, plan);
-  assert.deepEqual([row(rows, 'retExp').ages, row(rows, 'retExp').value, row(rows, 'retExp').status], [[30 + t, 49], 15000, 'est']);
+  // With a plan the simple first row is what the engine spends the first holiday year (the mortgage at its real value).
+  assert.deepEqual([row(rows, 'retExp').ages, row(rows, 'retExp').value, row(rows, 'retExp').status, row(rows, 'retExp').cur],
+    [[30 + t, 49], Math.round(planFlows({ ...p, pension: 0, selfPay: 0 }, t, null).full[t] / 12), 'est', 'work']);
+  assert.equal(storyRows(S, DATA, 2026, null).find(r => r.key === 'retExp').value, 15000);
   const after = row(rows, 'after:50');
   assert.deepEqual([after.ages, after.struck, after.value, after.under], [[50, null], ['月供'], 7500, 'retExp']);
   assert.deepEqual([row(rows, 'pension').value, row(rows, 'pension').field], [null, 'pension']);

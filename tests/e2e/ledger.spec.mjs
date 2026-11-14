@@ -155,3 +155,25 @@ test('the professional fund line follows the display currency, like the tiles', 
   await expect(page.locator('#ledger-row')).not.toContainText('¥');
   await expect(page.locator('#tiles')).toContainText('US$');
 });
+
+// ---- Review fixes batch (2026-11-14), item 9: the ledger adds up.
+test('the family numbers: ② subtracts each ending item from the engine\'s spending, × N names its denominator, ① ends with the median', async ({ page }) => {
+  await page.goto('/');
+  for (const [id, v] of [['#s-age', '35'], ['#s-assets', '500000'], ['#s-income', '30000'], ['#s-expense', '18000']]) await page.fill(id, v);
+  await page.locator('#life-fold summary').click();
+  for (const [id, v] of [['#life-mortgage', '7500'], ['#life-mortgage-end', '2045'], ['#life-kids', '1'], ['#life-kid-age', '3'], ['#life-kid-monthly', '2000']]) await page.fill(id, v);
+  await page.locator('#life-kid-monthly').press('Tab');
+  await expect(page.locator('#hero')).not.toContainText('—');
+  await expect(page.locator('#hero')).toContainText(/岁放假|现在就能放假/);
+  await page.locator('.ledger-toggle').first().click();
+  const ledger = page.locator('#ledger');
+  await expect(ledger).toContainText(/− \d+ 起 孩子 2,000 = ¥[\d,]+/);
+  await expect(ledger).toContainText(/− \d+ 起 月供 ≈ [\d,]+ = ¥[\d,]+/);
+  await expect(ledger).toContainText(/≈ 年支出 ¥[\d.]+万 × \d+ 倍/);
+  await expect(ledger).toContainText(/⇒ \d+ 岁时一般攒到 本工具设定 ¥[\d.]+万/);
+  // The − rows carry no strike-through; the struck names stay in the lines under the field.
+  const items = ledger.locator('.lg-row', { hasText: /^\s*− \d+ 起/ });
+  await expect(items).toHaveCount(2);
+  expect(await ledger.locator('.lg-row', { hasText: '起' }).locator('s').count()).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});

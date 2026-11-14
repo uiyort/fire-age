@@ -769,10 +769,12 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
       case 'pension': return r.value === null
         ? lgRow(`${lgOp()}${agesText(r.ages)}${fieldLink(r.field, r.label)}`, `${NONE} ${GO}`, 'go')
         : lgRow(`${lgOp()}${agesText(r.ages)}${fieldLink(r.field, r.label)}`, signed(r.value, c));
+      // − the items ending at that age, as the engine counted them in their last year (≈ when that is not the typed
+      // amount: the mortgage, lighter in real terms); = the engine's spending from then.
       default:
-        if (r.key.startsWith('after:')) {
-          const amount = r.value === null ? NONE : signed(r.value, c);
-          return lgRow(`${lgOp()}${agesText(r.ages)}${struckHtml(r.struck)}`, r.status === 'flag' && r.value !== null ? flagged(amount) : amount);
+        if (r.key.startsWith('draw:')) {
+          const approx = r.less !== r.lessTyped ? '<span class="est" aria-label="约">≈</span> ' : '';
+          return lgRow(`${lgOp(r.op)}${agesText(r.ages)}${r.items.join('、')} ${approx}${num(r.less)}`, r.value === null ? NONE : `${OP('=')} ${signed(r.value, c)}`);
         }
         return '';
     }
@@ -823,7 +825,9 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
         return lgRow(label, r.status === 'flag' ? flagged(signed(r.value, c)) : signed(r.value, c), 'lnk');
       }
       case 'flexCut': return lgRow(`${lgOp()}${fieldLink(r.field, r.label)}`, r.value === null ? NONE : `${num(r.value)}%`, 'lnk');
-      case 'fxDrift': return lgRow(`${lgOp()}${fieldLink(r.field, r.label)}`, r.value === null ? `${NONE} 同币种` : `${num(r.value)}%`, 'lnk');
+      // Across currencies, what the model leaves out after the holiday.
+      case 'fxDrift': return lgRow(`${lgOp()}${fieldLink(r.field, r.label)}`, r.value === null ? `${NONE} 同币种` : `${num(r.value)}%`, 'lnk')
+        + (wCur !== retCur ? '<p class="lg-note">放假后汇率变化、养老金币种暂未区分</p>' : '');
       case 'cross': return lgRow(`${lgOp()}<span class="est" aria-label="估算">≈</span>${r.label.replace(/^≈/, '')}`);
       default: return simpleRow(r);
     }
@@ -832,9 +836,9 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
     if (r.status === 'block' || r.status === 'blank') return stopRow(r);
     return pro ? proRow(r) : simpleRow(r);
   };
-  // The rows the ledger draws: not the other view's, not the → rows folded into the first ② row (they are for the
-  // line under the field), not the └ rows under retirement spending (the field line's), not ⇒ and its N.
-  const shown = r => r.views !== (pro ? 'simple' : 'pro') && !r.folded && !r.key.startsWith('ret:') && r.key !== 'need' && r.key !== 'times';
+  // The rows the ledger draws: not the other view's, not the → rows (they are for the line under the field; the −
+  // rows stand for them here), not the └ rows under retirement spending (the field line's), not ⇒ and its N.
+  const shown = r => r.views !== (pro ? 'simple' : 'pro') && !r.key.startsWith('after:') && !r.key.startsWith('ret:') && r.key !== 'need' && r.key !== 'times';
   const head = (title, right = '') => lgRow(`<b>${title}</b>`, right, 'head');
   const sec = (body, cls = '') => `<div class="lg-sec${cls ? ` ${cls}` : ''}">${body}</div>`;
   const more = id => `<div class="lg-more">${methodLink(id)}</div>`;
@@ -889,20 +893,26 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
     .map((r, i) => [r, i]).sort(([a, i], [b, j]) => (s === 'after' ? startOf(a) - startOf(b) : 0) || i - j).map(([r]) => r)
     .map(rowHtml).join('');
   const span = pro ? `t = 0…${t - 1}` : `${age} ${OP('→')} ${holiday} 岁`;
+  // The simple ① ends with what the simulation's median life holds at the holiday (the professional 中位资产), once
+  // the simulation of these numbers is in; not when the holiday is today or out of reach.
+  const bridge = pro || now || unreachable ? ''
+    : lgRow(`${lgOp('⇒')}${holiday} 岁时一般攒到 ${TOOL_TAG}`, mc?.bands?.[t] ? roughMoney(mc.bands[t][2], wCur) : NONE);
   const first = now
     ? sec(head('① 攒钱', '不用再攒'))
-    : sec(head('① 攒钱', span) + draw('now') + more(METHOD.now));
+    : sec(head('① 攒钱', span) + draw('now') + bridge + more(METHOD.now));
   const needRow = rows.find(r => r.key === 'need');
-  const times = rows.find(r => r.key === 'times')?.value;
+  // N 倍 and its denominator: what the first holiday year takes from savings (spec §9.2), named.
+  const { value: times, draw: firstYear } = rows.find(r => r.key === 'times') ?? {};
   const noLine = unreachable || !needRow || needRow.value === null;
   let line = '';
-  if (!noLine && pro) {
-    // The implied rate: what the first holiday year takes from savings, over the line (spec §9.2), the N 倍's denominator.
-    line = lgRow(`${lgOp('⇒')}<b>${needRow.label}</b>`, `<b>${wholeMoney(needRow.value, wCur)}</b>`, 'sum')
-      + `<p class="lg-note">${times ? `≈ 年支出 × ${times} 倍 · ` : ''}反推提取率 ${pct(firstDraw(p, t) / needRow.value, 1)} · 对照 3.9%</p>`;
-  } else if (!noLine) {
-    line = lgRow(`${lgOp('⇒')}<b>${needRow.label}</b>`, `<b>${roughMoney(needRow.value, wCur)}</b>`, 'sum')
-      + `<p class="lg-note">${times ? `≈ 年支出 × ${times} 倍 · ` : ''}八成年景够花到 ${p.life} 岁</p>`;
+  if (!noLine) {
+    const amount = pro ? wholeMoney : roughMoney;
+    const note = [times ? `≈ 年支出 ${amount(firstYear, wCur)} × ${times} 倍` : null];
+    // The implied rate: the same first year over the line.
+    if (pro) note.push(`反推提取率 ${pct(firstYear / needRow.value, 1)}`, '对照 3.9%');
+    else note.push(`八成年景够花到 ${p.life} 岁`);
+    line = lgRow(`${lgOp('⇒')}<b>${needRow.label}</b>`, `<b>${amount(needRow.value, wCur)}</b>`, 'sum')
+      + `<p class="lg-note">${note.filter(Boolean).join(' · ')}</p>`;
   }
   const second = sec(head(unreachable ? `② 如果 ${holiday} 岁放假` : '② 放假以后', afterRight) + draw('after') + line + more(METHOD.after));
   // ③: the years round the holiday; one year when it is today, out of reach, or chosen (working backward).
