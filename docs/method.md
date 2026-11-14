@@ -63,7 +63,7 @@ Two entries in a fold titled "有房贷或孩子？到期后开销会降" ("mort
 - **Children's spending is real**, and counted to age 22 (this tool's setting). Several children are modelled at the youngest child's age, which is conservative.
 - **End year:** "still paying through year X" counts payments through that year, so spending drops at the start of the following year (mortgage end age = rounded age + end year − this year + 1).
 - The two together must be below monthly spending, and below retirement monthly spending when the person typed it; otherwise the page stops the result (no age is worked out until it is fixed). The tag under the big age reads "已算：房贷到 YYYY、孩子到 22 岁 ›" and lists only the items actually used, without an amount.
-- **Under retirement spending:** the amount left once the items end is on the `→ N 岁起 ¥X` rows (today's money, one row per end age, at most two). If the person typed retirement monthly spending themselves (not the page's own estimate, which already includes the items) and the amount left is under a quarter of current monthly spending, that row carries an orange `!`. "比不算早 N 年" (the gain from counting the expiry) appears only inside the fold.
+- **Under retirement spending:** the amount left once the items end is on the `→ N 岁起 ¥X` rows (today's money, one row per end age, at most two). If the person typed retirement monthly spending themselves (not the page's own estimate, which already includes the items) and the amount left is under a quarter of current monthly spending, that row carries an orange `!`. Under monthly spending, the same flag shows when what is left after the mortgage and children is under a quarter of monthly spending (A11, a warning with an optional fix button). "比不算早 N 年" (the gain from counting the expiry) appears only inside the fold.
 - **Retiring elsewhere:** the items do not follow local prices. In the automatic retirement spending estimate and the place ranking only the rest is scaled by the price ratio; the items are converted at FX, so the amount removed when one ends is the amount the spending holds.
 
 ## Limits on the page
@@ -71,16 +71,17 @@ Two entries in a fold titled "有房贷或孩子？到期后开销会降" ("mort
 All of these are this tool's settings. Beyond a limit the page stops the result; common ranges only warn.
 
 - Mortgage and children (monthly) below monthly spending (equal is stopped too); typed retirement monthly spending above mortgage and children (equal is stopped too); when the mortgage is entered as parts, the payment is at most rent and mortgage.
-- Mortgage end year from this year − 50 to this year + 40; number of children an integer, 0 or more; the youngest child 0 or more, counted until 22; amounts 0 or more.
+- Mortgage end year from this year − 50 to this year + 40; number of children an integer, 0 or more; the youngest child 0 or more, counted until 22; amounts 0 or more; monthly spending above 0; typed retirement monthly spending of 0 counts as blank.
 - Age 16–85; holiday age asked for above the age and below planning-to; planning-to at least age + 2 and at most 110; pension claim age 45–75.
-- Stock share and the bad-year cut 0–100; stock-bond correlation −1 to 1; volatility 0–1; safe withdrawal rate above 0 and at most 10%.
-- "Left very little": 25% of current monthly spending (a warning only).
+- Stock share and the bad-year cut 0–100; stock-bond correlation −1 to 1; volatility 0–1.
+- "Left very little": 25% of current monthly spending (a warning only); also a warning under monthly spending when less than 25% of it is left after the mortgage and children.
+- Safe withdrawal rate (a comparison only, never stops the result): above 0 and at most 10% is the common range, and outside it only warns.
 - Common ranges (warning only, pro view): income real growth −2–5%, equity real return −2–10%, 10-year bond 0–8%, long-run inflation 0–6%, drag 0–2%, retirement-currency drift −3–3%.
 - A portfolio return below −50% counts as −50%; pension above yearly spending is not counted; contribution years are at least years already paid.
 
 ## Not modelled
 
-Detailed tax law (approximated by `drag`), owner-occupied housing, one-off expenses, bequests, excess medical inflation, city-level living costs, and dynamic withdrawal strategies other than the bad-year cut.
+Detailed tax law (approximated by `drag`), owner-occupied housing, one-off expenses, bequests, excess medical inflation, city-level living costs, and dynamic withdrawal strategies other than the bad-year cut. Exchange-rate changes after the holiday and the pension's own currency are not yet separated.
 
 ## Reproducing a result
 

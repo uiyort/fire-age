@@ -18,6 +18,13 @@ test('the method page lists every limit the page enforces, as this tool\'s setti
   for (const v of [...LIMITS.age, ...LIMITS.pAge, LIMITS.lifeMax, LIMITS.endYearBack, LIMITS.endYearAhead, `${LIMITS.low * 100}%`]) assert.ok(html.includes(String(v)), v);
   for (const [lo, hi] of Object.values(LIMITS.common)) assert.ok(html.includes(`${lo < 0 ? '−' + -lo : lo}–${hi}%`), `${lo}–${hi}`);
 });
+test('the method page lists the zero spending rule, the under-25% row, the warn-only withdrawal rate and the FX limit', () => {
+  for (const t of ['每月支出大于 0', '退休后每月想花填 0 算没填', '放假后汇率变化、养老金币种暂未区分']) assert.ok(html.includes(t), t);
+  const row = n => html.split('<tr>').find(r => r.includes(`<td>${n}</td>`));
+  assert.match(row('安全提取率（对照）'), /<td>安全提取率（对照）<\/td><td><\/td><td>大于 0，不超过 10%<\/td>/);
+  assert.match(row('扣掉月供和孩子后每月支出剩下的'), /<td>少于 25% 时提示<\/td><td><\/td>/);
+  assert.ok(md.includes('not yet separated'));
+});
 test('the odds section says why 八成 and why 2,000 runs', () => {
   const sec = html.split('id="odds"')[1].split('<h2')[0];
   for (const t of ['1,600', '2,000', '本工具设定', '随机种子固定', '介于']) assert.ok(sec.includes(t), t);
