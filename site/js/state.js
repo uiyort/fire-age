@@ -743,7 +743,8 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
   // their last year (the same year with them already ended is the difference, so the mortgage's real-terms drift over
   // the years before stays out of it), = the engine's spending from that age. An end past the plan never comes.
   if (plan) {
-    let above = rows.find(r => r.key === 'retExp')?.value ?? null;
+    // What the engine spends the first holiday year, in the view's units (pro: the retReal row when there is one).
+    let above = rows.find(r => r.key === 'retReal')?.value ?? yearly(spendAt(p, t, t));
     for (const age of ends.filter(a => a > holiday && a <= p.life)) {
       const gone = p.events.filter(e => e.endAge === age);
       if (!gone.length) continue;
@@ -754,7 +755,7 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
       // drift: the row above minus − is not = (the mortgage's real-terms drift over the years between), so the = is a ≈.
       add(`draw:${age}`, 'after', null, value, {
         op: '−', cur: 'work', per, ages: [age, null], items: gone.map(e => ITEM_NAME[e.id]),
-        less, lessTyped: yearly(gone.reduce((total, e) => total + e.amount, 0)), drift: above !== null && above - less !== value,
+        less, lessTyped: yearly(gone.reduce((total, e) => total + e.amount, 0)), drift: Math.abs(above - less - value) > 1,
       });
       above = value;
     }

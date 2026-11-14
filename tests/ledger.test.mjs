@@ -393,3 +393,21 @@ test('② rows whose subtraction does not add up are marked drift, exact ones ar
   assert.match(row, /<span class="sr">减<\/span>/);
   assert.match(row, /<span class="sr">剩<\/span>/);
 });
+
+test('drift follows the engine value the row follows, in the work currency, within one unit of rounding', () => {
+  const cases = [['same', family()], ['CN-TH', setRetireCountry(family(), 'TH', DATA)]];
+  for (const [name, base] of cases) for (const view of ['simple', 'pro']) {
+    const s = { ...base, view }; const plan = solve(s); const { p, t } = plan;
+    const rows = storyRows(s, DATA, 2026, plan);
+    const per = v => Math.round(view === 'pro' ? v : v / 12);
+    let above = per(spendOf(p, t, t));
+    const draws = rows.filter(r => r.key.startsWith('draw:'));
+    assert.equal(draws.length, 2);
+    draws.forEach((r, i) => {
+      assert.equal(r.drift, Math.abs(above - r.less - r.value) > 1, `${name} ${view} ${r.key}`);
+      if (i === 1) assert.equal(r.drift, false, `${name} ${view} 55 is exact`);
+      above = r.value;
+    });
+    if (name === 'same') assert.equal(draws[0].drift, true);
+  }
+});
