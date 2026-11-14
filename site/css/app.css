@@ -572,7 +572,7 @@ input.has-pre { padding-left: 28px; }
   .inputs fieldset, .inputs form > .grp-sub, #inputs-box > .estimate { padding: 0 16px 12px; border-top: 1px solid var(--line); margin: 0; }
   .inputs fieldset .grp-sub { margin: 0 -16px; padding: 0 16px 12px; border-top: 1px solid var(--line); }
   .grp-sub { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; grid-column: 1 / -1; grid-auto-flow: row dense; min-width: 0; }
-  .inputs form > :first-child, .inputs form > .grp-sub[hidden] + fieldset { border-top: 0; }
+  .inputs form > :first-child, .inputs form > fieldset[hidden] + fieldset { border-top: 0; }
   .inputs fieldset:has(> .grp-sub:last-child) { padding-bottom: 0; }
   .inputs fieldset.row-closed, .inputs form > .grp-sub.row-closed, .inputs fieldset .grp-sub.row-closed, #inputs-box > .estimate.row-closed { padding-bottom: 0; }
   .inputs fieldset.row-closed > .grp-sub { margin-top: -10px; }

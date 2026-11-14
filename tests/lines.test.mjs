@@ -306,7 +306,7 @@ test('groupStates by row: spending and the age to holiday at count their own sto
   const list = problems(S, DATA, 2026);
   const form = groupStates(S, list, DATA);
   const rows = groupStates(S, list, DATA, { by: 'row' });
-  assert.equal(form.now.blank, 1); assert.equal(form.pension.block, 1);
+  assert.equal(form.now.blank, 1); assert.equal(form.tage.block, 1); assert.equal(form.pension.block, 0);
   assert.equal(rows.spend.blank, 1); assert.equal(rows.now.blank, 0);
   assert.equal(rows.tage.block, 1); assert.equal(rows.pension.block, 0);
   assert.equal(rows.sim.changed, null);

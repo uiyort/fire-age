@@ -148,6 +148,9 @@ function markPlayed(id) {
 // Each group is a form group (its legend counts the problems) and a sidebar row; subs are rows of their own inside the
 // group (spec §6.3): spending with its split and the fold, and the age to holiday at, which the sidebar lists first.
 const SIMPLE_FIELDS = [
+  { legend: '想几岁放假', grp: 'tage', bwdOnly: true, fields: [
+    { id: 'tAge', elementId: 's-tage', label: '想几岁放假', unit: '岁', bwdOnly: true, full: true },
+  ] },
   { legend: '现在', grp: 'now', fields: [
     { id: 'age', label: '年龄', unit: '岁' },
     { id: 'assets', label: '已有存款和投资', unit: 'work', step: 10000 },
@@ -163,9 +166,7 @@ const SIMPLE_FIELDS = [
     { id: 'pension', label: '预计每月养老金', unit: 'retire', monthly: true, step: 500, full: true },
     { id: 'selfPension', label: '放假后每月自缴养老保险', unit: 'work', step: 100, min: 0, full: true, cnPension: true },
     { id: 'selfMedical', label: '放假后每月自缴医保', unit: 'work', step: 100, min: 0, full: true, cnPension: true, note: '各地不同，缴满当地规定的年限后可以停，这里一直算到领取养老金那年。' },
-  ], subs: [{ row: 'tage', bwdOnly: true, fields: [
-    { id: 'tAge', elementId: 's-tage', label: '想几岁放假', unit: '岁', bwdOnly: true, full: true },
-  ] }] },
+  ] },
 ];
 
 const PRO_FIELDS = [
@@ -341,7 +342,7 @@ function buildForm(el, prefix, groups) {
   const body = (row, html) => `<div class="grp-body" id="side-${prefix}-${row}">${html}</div>`;
   const fields = list => list.map(f => fieldHtml(prefix, f)).join('');
   const sub = s => `<div class="grp-sub" data-row="${s.row}"${s.bwdOnly ? ' data-bwd-only' : ''}>${body(s.row, fields(s.fields))}</div>`;
-  el.innerHTML = groups.map(g => `<fieldset data-row="${g.grp}"><legend>${g.legend}<span class="grp-status" data-grp="${g.grp}"></span></legend>${body(g.grp, fields(g.fields) + (g.html ?? ''))}${(g.subs ?? []).map(sub).join('')}</fieldset>`).join('');
+  el.innerHTML = groups.map(g => `<fieldset data-row="${g.grp}"${g.bwdOnly ? ' data-bwd-only' : ''}><legend>${g.legend}<span class="grp-status" data-grp="${g.grp}"></span></legend>${body(g.grp, fields(g.fields) + (g.html ?? ''))}${(g.subs ?? []).map(sub).join('')}</fieldset>`).join('');
 }
 
 function fillCountrySelects() {
@@ -860,6 +861,8 @@ function markProblems(list) {
   document.querySelectorAll('[aria-invalid="true"]').forEach(el => el.removeAttribute('aria-invalid'));
   document.querySelectorAll('[data-cmp]').forEach(el => { el.removeAttribute('aria-description'); el.removeAttribute('data-cmp'); });
   document.querySelectorAll('.f.bad, label.bad, .f.cmp, label.cmp').forEach(el => el.classList.remove('bad', 'cmp'));
+  // A box waiting to be filled shows no 0 (its placeholder is kept in data-ph and comes back with the mark).
+  document.querySelectorAll('[data-ph]').forEach(el => { el.placeholder = el.dataset.ph; el.removeAttribute('data-ph'); });
   const solid = new Set();
   for (const q of list) {
     for (const key of [q.field, ...q.more]) {
@@ -868,6 +871,10 @@ function markProblems(list) {
       solid.add(el);
       el.setAttribute('aria-invalid', 'true');
       wrap(el).classList.add('bad');
+      if (q.kind === 'blank' && el.placeholder && !el.hasAttribute('data-ph')) {
+        el.dataset.ph = el.placeholder;
+        el.placeholder = '';
+      }
     }
   }
   for (const q of list) {
@@ -956,14 +963,10 @@ function syncSide() {
   }
 }
 
-// At 1024 px and wider the age to holiday at is the first row, and the professional view's derived returns sit in the
-// 收益假设 row; below, both stay where the two-column form has them. Moved only when the view or the width changes.
+// At 1024 px and wider the professional view's derived returns sit in the 收益假设 row; below, they stay where the
+// two-column form has them. Moved only when the view or the width changes.
 function placeRows() {
   const wide = sideWide.matches;
-  const tage = $('simple-form').querySelector('.grp-sub[data-row="tage"]');
-  const home = wide ? $('simple-form') : $('simple-form').querySelector('fieldset[data-row="pension"]');
-  if (wide && home.firstElementChild !== tage) home.prepend(tage);
-  if (!wide && home.lastElementChild !== tage) home.append(tage);
   const estimate = $('estimate');
   const at = wide && S.view === 'pro' ? $('side-p-returns') : $('inputs-box');
   if (at.lastElementChild !== estimate) at.append(estimate);

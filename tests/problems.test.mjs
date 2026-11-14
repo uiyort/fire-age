@@ -445,7 +445,15 @@ test('groupStates: example, plus, counts, and changed assumptions', () => {
   const pro = S0({ view: 'pro', eq: 70, autoSwr: false });
   assert.equal(groupStates(pro, [], DATA).returns.changed, 2);
   assert.equal(groupStates({ ...S, view: 'pro' }, [], DATA).risk.changed, 0);
-  assert.equal(groupStates(S0({ mode: 'bwd', tAge: 25 }), problems(S0({ mode: 'bwd', tAge: 25 }), DATA, 2026), DATA).pension.block, 1);
+  const back = S0({ mode: 'bwd', tAge: 25 });
+  const st3 = groupStates(back, P(back), DATA);
+  assert.deepEqual([st3.tage.block, st3.pension.block], [1, 0]);
+});
+
+test('formGroupOf: the age to holiday at is its own group in the simple view, in the retirement group in pro', async () => {
+  const { formGroupOf } = await import('../site/js/state.js');
+  assert.equal(formGroupOf('tage', 'simple'), 'tage');
+  assert.equal(formGroupOf('retire', 'pro'), 'retire');
 });
 
 test('final review: a negative spending stops once, on spending; the retirement estimate stays at 0 and follows on', () => {
