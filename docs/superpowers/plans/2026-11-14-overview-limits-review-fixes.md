@@ -213,10 +213,10 @@ Add `relText` to the views.js import of this file. Update any existing A3/A6/A4/
 - Produces (rows from `storyRows`, units by view: simple monthly, pro yearly, `whole`-rounded):
   - Engine spending without pension and self-pay at plan year `y`: `spendAt(p, t, y) = planFlows({ ...p, pension: 0, selfPay: 0 }, t, null).full[y]` (module-local in state.js; `retReal` already equals `spendAt(p, t, t)`).
   - Simple `retExp` row, with a plan: `value = spendAt(p, t, t) / 12`, `cur: 'work'`. Without a plan: unchanged (today's money, retirement currency). Pro `retExp` and `retReal` rows unchanged.
-  - `draw:<age>` for each end age in `ends` with `age > holiday` (plan only): `{ key, section: 'after', op: '−', ages: [age, null], items: ['孩子'] | ['月供'] | both, less: typed amount of those items (simple monthly, pro yearly, work currency), value: spendAt(p, t, age − p.age) in view units, cur: 'work', views: 'both' }`. Held: no `draw:*` rows.
+  - `draw:<age>` for each end age in `ends` with `age > holiday` (plan only): `{ key, section: 'after', op: '−', ages: [age, null], items: ['孩子'] | ['月供'] | both, less: what the engine counted for those items in their last year (age − 1), i.e. `spendAt(p, t, age − 1 − p.age) − spendAt(p, t, age − p.age)` (simple monthly, pro yearly, work currency, `whole`-rounded), `lessTyped`: the typed amount; the cell shows `≈` before `less` when it differs from `lessTyped` (the mortgage, lighter in real terms), value: spendAt(p, t, age − p.age) in view units, cur: 'work', views: 'both' }`. Held: no `draw:*` rows.
   - `times` row: `{ value: N, draw: firstDraw(p, t) }` (yearly, work currency, the denominator).
 - Ledger copy (normalised textContent):
-  - ② item row: op cell `−`, then `54 起 孩子 2,000`, number cell `= ¥14,152`. No strike-through in the ledger (struck stays in the field lines).
+  - ② item row: op cell `−`, then `54 起 孩子 2,000` (or `55 起 月供 ≈ 5,652` when the counted amount differs from the typed one), number cell `= ¥14,152`. Each row's own step is exact: previous year's engine spending − `less` = `value`. No strike-through in the ledger (struck stays in the field lines).
   - ⇒ note: simple `≈ 年支出 ${roughMoney(draw)} × ${N} 倍 · 八成年景够花到 ${life} 岁`; pro `≈ 年支出 ${wholeMoney(draw)} × ${N} 倍 · 反推提取率 …` (the rest is Task 5's).
   - Simple ① last row (state `ok` or backward, not `now`/`unreachable`/held): op `⇒`, label `${holiday} 岁时一般攒到 ${TOOL_TAG}`, number `roughMoney(mc.bands[t][2])`, or `—` until `mc` is ready.
   - Pro ②, only when `p.wCur !== p.rCur`, after the 退休币升值 row: `放假后汇率变化、养老金币种暂未区分`.
@@ -236,7 +236,7 @@ test('simple ②: the first row is what the engine spends the first year, × N r
   const first = rows.find(r => r.key === 'retExp'), times = rows.find(r => r.key === 'times');
   assert.equal(first.value, Math.round(firstDraw({ ...p, pension: 0, selfPay: 0 }, t) / 12));
   assert.equal(times.draw, firstDraw(p, t)); assert.equal(times.value, Math.round(plan.need / firstDraw(p, t)));
-  assert.deepEqual(rows.filter(r => r.key.startsWith('draw:')).map(r => [r.ages[0], r.items, r.less, r.op]), [[54, ['孩子'], 2000, '−'], [55, ['月供'], 7500, '−']]);
+  assert.deepEqual(rows.filter(r => r.key.startsWith('draw:')).map(r => [r.ages[0], r.items, r.less, r.op]), [[54, ['孩子'], 2000, '−'], [55, ['月供'], 5652, '−']]);
   if (DATA.version === '2026-11') {
     assert.equal(p.age + t, 50); assert.equal(first.value, 16499); assert.equal(times.value, 21); assert.equal(Math.round(plan.need), 4149879);
     assert.deepEqual(rows.filter(r => r.key.startsWith('draw:')).map(r => r.value), [14152, 8500]);
@@ -334,7 +334,7 @@ Plus: Review Focus 2 — `setRetireCountry(family(), 'TH', DATA)`, simple rows: 
 4. A6 line `还到哪年 35 不在 1976–2066 ✕` (two characters 不在 plus the range), for both too low and too high. Cost: a word-free alternative later is a `relText` change.
 5. First visit: the chip appears in the sticky start row above 算出 and the intro stays; the intro is not ended by a stopped 算出. Cost: if the owner prefers leaving the intro, `stopAtProblem` there calls `endIntro()` instead.
 6. The main-column chip shows only at ≥ 1024 px (below, the top bar already holds it), so one chip is in view at a time. Cost: none at 900–1023 if the sticky bar is visible there (it is).
-7. Ledger ② rows: `=` is the engine's spending that year (both views), `−` is the item's amount as typed. Because the mortgage keeps getting lighter between rows, the steps are not exact subtraction (family: 14,152 − 7,500 ≠ 8,500, the gap is the mortgage's real-value drift that pro shows). Cost if wrong: switch `less` to the engine's own drop in that year, one line in `storyRows`.
+7. Ledger ② rows (controller override, 2026-11-14): `=` is the engine's spending that year; `−` is what the engine counted for the ending item in its last year, with `≈` when that differs from the typed amount (family: `55 起 月供 ≈ 5,652 = ¥8,500`, and 14,152 − 5,652 = 8,500 exactly). The only gap left between displayed rows is the mortgage's yearly real-terms drift, which the `≈` marks. Reason: the panel required the ledger's arithmetic to add up (E2 item 9, E1 visible arithmetic); a typed 7,500 beside 14,152 → 8,500 reads as an error. Implementer: verify 5,652 from the engine (90,000 / 1.015^19 / 12) and children's counted amount equals the typed 2,000 in the 2026-11 data; if not, assert the engine relation and report the numbers.
 8. With a plan, simple ② amounts are in the work currency (the 放假线's), while the `→ N 岁起` field lines keep the retirement currency and today's money. Cost: a cross-country simple user sees ¥ in ② and ฿ under the field; item 10 next batch revisits currencies.
 9. The bridge line `⇒ 50 岁时一般攒到` is simple-only (pro already has `50 岁中位资产`) and absent for 现在就能放 / 到不了. Cost: one more row in pro if asked.
 10. `× N` names its denominator as `年支出 ¥X` with X = `firstDraw` (spending + self-pay − pension that year), `roughMoney` in simple, `wholeMoney` in pro.
