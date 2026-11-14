@@ -178,7 +178,10 @@ export function setField(S, id, rawText, data, { commit = true } = {}) {
 const REQUIRED_FIELDS = ['age', 'assets', 'income', 'expense', 'retExp'];
 export function missingFields(S) {
   const ids = S.mode === 'bwd' ? [...REQUIRED_FIELDS, 'tAge'] : REQUIRED_FIELDS;
-  return ids.filter(id => S[id] === null || S[id] === undefined);
+  const missing = ids.filter(id => S[id] === null || S[id] === undefined);
+  // Typed retirement spending of 0 waits like a blank; the estimate being 0 (spending 0) is the spending's own stop.
+  if (S.retExp === 0 && S.touched?.retExp) missing.push('retExp');
+  return missing;
 }
 
 // ---- The relations between the numbers: one list that the chip, the frames, the group counts, the lines under the
@@ -382,9 +385,12 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
     const y = m.endYear, back = thisYear - LIMITS.endYearBack, ahead = thisYear + LIMITS.endYearAhead;
     const left = [{ label: label('mortgage.endYear'), value: y, year: true }];
     const rel = !Number.isInteger(y) ? { sub: false, left, op: null, right: null }
-      : y < back ? { sub: false, left, op: '<', right: { label: null, value: back } }
-        : y > ahead ? { sub: false, left, op: '>', right: { label: null, value: ahead } } : null;
-    if (rel) add({ rule: 'A6', kind: 'block', field: 'mortgage.endYear', at: 'expense', rel });
+      : y < back || y > ahead ? { sub: false, left, op: '不在', right: { label: null, range: [back, ahead] } } : null;
+    // A two-digit year is offered as 20xx when that lands in range.
+    const full = 2000 + y;
+    const yearFix = Number.isInteger(y) && y >= 0 && y <= 99 && full >= back && full <= ahead
+      ? [{ text: `→ ${full}`, aria: `${label('mortgage.endYear')}改成 ${full}`, set: { 'mortgage.endYear': full } }] : [];
+    if (rel) add({ rule: 'A6', kind: 'block', field: 'mortgage.endYear', at: 'expense', rel, fixes: yearFix });
     else if (y < thisYear && m.monthly > 0) {
       add({ id: 'end:mortgage', rule: 'A6', kind: 'ended', field: 'mortgage.endYear', at: 'expense',
         rel: { sub: true, ended: true, label: label('mortgage.monthly'), value: m.monthly, fact: `${y} 已还完` } });
@@ -442,8 +448,23 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
       ] });
   }
 
+  // The exit that adds the items to a spending: its text and aria name them; the amount is in the view's units. With
+  // the split on, the mortgage goes into 房租和房贷 and the children into 其他 (monthly state values); otherwise the
+  // spending field itself takes the sum. cur converts the items to the currency of the spending (retirement: toRet).
+  const plus = (field, base, cur = v => v) => {
+    const names = [mortgageOn && label('mortgage.monthly'), kidsOn && '孩子'].filter(Boolean);
+    const itemsNow = cur(itemsY);
+    const X = pro ? Math.round(base + itemsNow) : whole(base / 12) + whole(itemsNow / 12);
+    const set = field === 'expense' && on
+      ? { ...(mortgageOn ? { 'split.rent': (split.rent ?? 0) + m.monthly } : {}), ...(kidsOn ? { 'split.other': (split.other ?? 0) + k.count * k.monthly } : {}) }
+      : { [field]: Math.round(base + itemsNow) };
+    return { text: `${label(field)} + ${names.join(' + ')} → ${num(X)}`, aria: `${label(field)}加上${names.join('和')}改成 ${num(X)}`, set };
+  };
+
   // A3: the items stay below the spending; equal blocks.
+  let a3 = false;
   if (!a2 && isSet(S.expense) && itemsY > 0 && itemsY >= S.expense) {
+    a3 = true;
     const spendField = on ? 'split.other' : 'expense';
     const sides = [spendField, ...(mortgageOn ? ['mortgage.monthly'] : []), ...(kidsOn ? ['kids.monthly'] : [])];
     const pick = [...(on ? SPLIT_KEYS : ['expense']), ...(mortgageOn ? ['mortgage.monthly'] : []), ...(kidsOn ? ['kids.count', 'kids.monthly'] : [])];
@@ -452,7 +473,7 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
     add({ id: 'A3', rule: 'A3', kind: 'block', field, compare: sides.filter(f => side(f) !== side(field)), at: 'expense',
       rel: { sub: true, left: items(v => (pro ? v * 12 : v), pro ? '/年' : null), op: '≥', right: { label: label('expense'), value: pro ? S.expense : whole(S.expense / 12) } },
       fixes: [
-        { text: `改${label('expense')}`, focus: spendField },
+        plus('expense', S.expense),
         ...(mortgageOn ? [{ text: `改${label('mortgage.monthly')}`, focus: 'mortgage.monthly' }] : []),
         ...(kidsOn ? [{ text: '改孩子', focus: 'kids.monthly' }] : []),
       ] });
@@ -466,7 +487,7 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
     const est = Math.round(estimateRetireSpend(Math.max(S.expense ?? 0, 0), S.workC, S.retC, data, itemsYearly(S, thisYear)));
     add({ id: 'A4', rule: 'A4', kind: 'block', field: 'retExp', at: 'retExp',
       rel: { sub: true, left: items(v => shown(pro ? v * 12 : v), pro ? '/年' : null), op: '≥', right: { label: label('retExp'), value: pro ? S.retExp : whole(S.retExp / 12) } },
-      fixes: [{ text: `改回估算 ≈ ${num(pro ? est : whole(est / 12))}`, reset: 'retExp' }] });
+      fixes: [plus('retExp', S.retExp, toRet), { text: `改回估算 ≈ ${num(pro ? est : whole(est / 12))}`, reset: 'retExp' }] });
   }
 
   // A9: a town's spend holds the items too; below them only that line stops. Equal is fine.
@@ -479,6 +500,15 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
   if (!a4 && S.touched?.retExp && isSet(S.retExp) && isSet(S.expense) && itemsY > 0) {
     const afterMonthly = Math.round((S.retExp - toRet(itemsY)) / 12);
     if (convert(afterMonthly, ret, work, data) < S.expense / 12 * LIMITS.low) add({ id: 'A10', rule: 'A10', kind: 'flag', field: 'retExp', at: 'retExp' });
+  }
+
+  // A11: spending that the items leave under a quarter of; an optional exit, so a flag under 每月支出 and the result is
+  // still worked out. Typed retirement spending does not matter here.
+  if (!a2 && !a3 && isSet(S.expense) && S.expense > 0 && itemsY > 0 && S.expense - itemsY < S.expense * LIMITS.low) {
+    const names = [mortgageOn && label('mortgage.monthly'), kidsOn && '孩子'].filter(Boolean).join('和');
+    const left = S.expense - itemsY;
+    add({ id: 'A11', rule: 'A11', kind: 'flag', field: 'expense', at: 'expense',
+      note: `扣掉${names}只剩 ${num(pro ? Math.round(left) : whole(left / 12))}${pro ? '/年' : '/月'}`, fixes: [plus('expense', S.expense)] });
   }
 
   // ---- Ranges (B2-B10), the same in both views; only the labels and units follow the view.
@@ -499,6 +529,10 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
     add({ rule: 'B2', kind: 'block', field: f, at: f.includes('.') ? 'expense' : f,
       rel: { sub: false, left: [{ label: label(f), value: shown(v) }], op: '<', right: { label: null, value: 0 } },
       fixes: [{ text: `→ ${num(shown(fixTo))}`, aria: `${label(f)}改成 ${num(shown(fixTo))}`, set: { [f]: fixTo } }] });
+  }
+  // Spending of exactly 0 has nothing to build on; there is no value to offer.
+  if (S.expense === 0 && !on) {
+    add({ rule: 'B2', kind: 'block', field: 'expense', at: 'expense', rel: { sub: false, left: [{ label: label('expense'), value: 0 }], op: null, right: null }, fixes: [] });
   }
   // The age rules wait while the age itself is blocked (B3), so one wrong age is one problem.
   const A = S.age, ageOk = isSet(A) && A >= LIMITS.age[0] && A <= LIMITS.age[1], life = S.life, tAge = S.tAge, bwd = S.mode === 'bwd';

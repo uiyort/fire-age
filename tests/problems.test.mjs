@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
 import { defaultState, loadState, problems, setField, setReal, setSplit, unsplit, splitOn, cleanSplit, itemsYearly, setWorkCountry, setRetireCountry, num, groupStates } from '../site/js/state.js';
+import { relText } from '../site/js/views.js';
 
 const real = (m = {}, k = {}) => ({ mortgage: { monthly: null, endYear: null, ...m }, kids: { count: null, age: null, monthly: null, ...k } });
 const S0 = o => ({ ...defaultState(DATA), ...o });
@@ -22,7 +23,7 @@ test('A3: the mortgage at or above monthly spending blocks; one yuan below does 
   assert.equal(q.kind, 'block'); assert.equal(q.field, 'mortgage.monthly'); assert.deepEqual(q.compare, ['expense']);
   assert.equal(q.chip, '房贷'); assert.equal(q.at, 'expense'); assert.equal(q.row, 'spend');
   assert.deepEqual(q.rel, { sub: true, left: [{ label: '月供', value: 7500 }], op: '≥', right: { label: '每月支出', value: 7000 } });
-  assert.deepEqual(q.fixes, [{ text: '改每月支出', focus: 'expense' }, { text: '改月供', focus: 'mortgage.monthly' }]);
+  assert.deepEqual(q.fixes.slice(1), [{ text: '改月供', focus: 'mortgage.monthly' }]);
   assert.equal(only(S0({ expense: 90000, real: real(M) }), 'A3').length, 1);
   assert.equal(only(S0({ expense: 90012, real: real(M) }), 'A3').length, 0);
 });
@@ -31,7 +32,7 @@ test('A3: mortgage and children together; the last committed field takes the sol
   const S = S0({ expense: 96000, real: real(M, { count: 1, age: 5, monthly: 1700 }) });
   const [q] = only(S, 'A3');
   assert.deepEqual(q.rel.left, [{ label: '月供', value: 7500 }, { label: '孩子', value: 1700 }]);
-  assert.deepEqual(q.fixes.map(f => f.text), ['改每月支出', '改月供', '改孩子']);
+  assert.deepEqual(q.fixes.map(f => f.text), ['每月支出 + 月供 + 孩子 → 17,200', '改月供', '改孩子']);
   const [byExpense] = only(S, 'A3', { last: 'expense' });
   assert.equal(byExpense.field, 'expense'); assert.equal(byExpense.chip, '每月支出');
   assert.deepEqual(byExpense.compare, ['mortgage.monthly', 'kids.monthly']);
@@ -42,10 +43,10 @@ test('A3: mortgage and children together; the last committed field takes the sol
 test('A3: with the split on, the dashed frame and 改每月支出 go to 其他; pro speaks in years', () => {
   const S = setSplit(S0({ real: real(M) }), 'rent', '7500', DATA);   // rent part = mortgage (A2 allows equal), total 7,500 (A3 blocks equal)
   const [q] = only(S, 'A3');
-  assert.deepEqual(q.compare, ['split.other']); assert.deepEqual(q.fixes[0], { text: '改每月支出', focus: 'split.other' });
+  assert.deepEqual(q.compare, ['split.other']); assert.deepEqual(q.fixes.map(f => f.text), ['每月支出 + 月供 → 15,000', '改月供']);
   const [pro] = only(S0({ view: 'pro', expense: 84000, real: real(M) }), 'A3');
   assert.deepEqual(pro.rel, { sub: true, left: [{ label: '月供', value: 90000, unit: '/年' }], op: '≥', right: { label: '当前年支出', value: 84000 } });
-  assert.equal(pro.chip, '房贷'); assert.equal(pro.fixes[0].text, '改当前年支出');
+  assert.equal(pro.chip, '房贷'); assert.equal(pro.fixes[0].text, '当前年支出 + 月供 → 174,000');
 });
 
 test('A2: with the split, the mortgage may equal the rent part but not exceed it; A3 is not reported beside it', () => {
@@ -66,7 +67,7 @@ test('A4: typed retirement spending must exceed the items; equal blocks; the est
   const [q] = only(typed(74400), 'A4');
   assert.deepEqual(q.rel, { sub: true, left: [{ label: '月供', value: 4000 }, { label: '孩子', value: 2200 }], op: '≥', right: { label: '退休后每月想花', value: 6200 } });
   assert.equal(q.field, 'retExp'); assert.equal(q.chip, '退休后'); assert.equal(q.at, 'retExp');
-  assert.deepEqual(q.fixes, [{ text: '改回估算 ≈ 10,000', reset: 'retExp' }]);
+  assert.deepEqual(q.fixes.map(f => f.text), ['退休后每月想花 + 月供 + 孩子 → 12,400', '改回估算 ≈ 10,000']);
   assert.equal(only(typed(74412), 'A4').length, 0);
   assert.equal(only(S0({ expense: 120000, retExp: 74400, real: items }), 'A4').length, 0);
 });
@@ -82,13 +83,13 @@ test('A5: a half-filled group waits; children counted as 0 need nothing more', (
 
 test('A6: the end year is a whole year from 50 years back to 40 ahead; before this year it has ended', () => {
   const at = endYear => P(S0({ real: real({ monthly: 3000, endYear }) }));
-  assert.deepEqual(at(20)[0].rel, { sub: false, left: [{ label: '还到哪年', value: 20, year: true }], op: '<', right: { label: null, value: 1976 } });
-  assert.deepEqual(at(20)[0].fixes, []); assert.equal(at(20)[0].chip, '房贷');
+  assert.deepEqual(at(20)[0].rel, { sub: false, left: [{ label: '还到哪年', value: 20, year: true }], op: '不在', right: { label: null, range: [1976, 2066] } });
+  assert.deepEqual(at(20)[0].fixes.map(f => f.text), ['→ 2020']); assert.equal(at(20)[0].chip, '房贷');
   assert.equal(at(1975)[0].kind, 'block');
   assert.deepEqual(at(1976)[0].rel, { sub: true, ended: true, label: '月供', value: 3000, fact: '1976 已还完' });
   assert.equal(at(2025)[0].kind, 'ended');
   assert.deepEqual(at(2026), []); assert.deepEqual(at(2066), []);
-  assert.deepEqual(at(2067)[0].rel.right, { label: null, value: 2066 }); assert.equal(at(2067)[0].rel.op, '>');
+  assert.deepEqual(at(2067)[0].rel.right, { label: null, range: [1976, 2066] }); assert.equal(at(2067)[0].rel.op, '不在');
   assert.deepEqual(at(2045.5)[0].rel, { sub: false, left: [{ label: '还到哪年', value: 2045.5, year: true }], op: null, right: null });
 });
 
@@ -346,8 +347,8 @@ test('simple-view monthly numbers are rounded the way the form shows them', () =
 test('A4 fix text is a yearly figure in the professional view; a monthly one in the simple view', () => {
   const items = real({ monthly: 4000, endYear: 2045 }, { count: 1, age: 5, monthly: 2200 });
   const typed = view => S0({ view, expense: 120000, retExp: 74400, touched: { retExp: true }, real: items });
-  assert.deepEqual(fixTexts(typed('pro'), 'A4'), ['改回估算 ≈ 120,000']);
-  assert.deepEqual(fixTexts(typed('simple'), 'A4'), ['改回估算 ≈ 10,000']);
+  assert.deepEqual(fixTexts(typed('pro'), 'A4').slice(1), ['改回估算 ≈ 120,000']);
+  assert.deepEqual(fixTexts(typed('simple'), 'A4').slice(1), ['改回估算 ≈ 10,000']);
 });
 
 test('A8: a fractional youngest child blocks with floor and ceil buttons', () => {
@@ -475,4 +476,58 @@ test('final re-review: a negative spending stays one stop through the mortgage, 
     assert.equal(stops(S).includes('retExp'), false);
     assert.equal(!!S.touched?.retExp, false);
   }
+});
+
+test('A3: the first exit adds the items to spending', () => {
+  const q = only(S0({ expense: 84000, real: real(M) }), 'A3')[0];
+  assert.equal(q.fixes[0].text, '每月支出 + 月供 → 14,500');
+  assert.equal(q.fixes[0].aria, '每月支出加上月供改成 14,500');
+  assert.deepEqual(q.fixes[0].set, { expense: 174000 });
+  assert.deepEqual(q.fixes.slice(1).map(f => f.text), ['改月供']);
+});
+test('A3 with the split on: mortgage into 房租和房贷, children into 其他, no A2 after', () => {
+  let S = S0({ real: real(M, { count: 1, age: 3, monthly: 2000 }) });
+  for (const [k, v] of [['rent', 7500], ['food', 1000], ['other', 500]]) S = setSplit(S, k, String(v), DATA);
+  const q = only(S, 'A3')[0];
+  assert.equal(q.fixes[0].text, '每月支出 + 月供 + 孩子 → 18,500');
+  assert.deepEqual(q.fixes[0].set, { 'split.rent': 15000, 'split.other': 2500 });
+  for (const [k, v] of Object.entries(q.fixes[0].set)) S = setSplit(S, k.split('.')[1], String(v), DATA);
+  assert.equal(S.expense, 18500 * 12);
+  assert.deepEqual(P(S).filter(x => x.kind === 'block'), []);
+});
+test('A4: value exit first, estimate second', () => {
+  const S = S0({ retExp: 72000, touched: { retExp: true }, expense: 216000, real: real(M) });
+  const q = only(S, 'A4')[0];
+  assert.equal(q.fixes[0].text, '退休后每月想花 + 月供 → 13,500');
+  assert.deepEqual(q.fixes[0].set, { retExp: 162000 });
+  assert.match(q.fixes[1].text, /^改回估算 ≈ /);
+});
+test('A11: estimated spending that leaves under a quarter flags under 每月支出', () => {
+  const S = setField(setReal(setReal(S0({}), 'mortgage', 'monthly', '7500', DATA), 'mortgage', 'endYear', '2030', DATA), 'expense', '96000', DATA);
+  const q = only(S, 'A11')[0];
+  assert.equal(q.kind, 'flag'); assert.equal(q.field, 'expense'); assert.equal(q.note, '扣掉月供只剩 500/月');
+  assert.equal(q.fixes[0].text, '每月支出 + 月供 → 15,500'); assert.deepEqual(q.fixes[0].set, { expense: 186000 });
+  assert.deepEqual(P(S).filter(x => x.kind === 'block' || x.kind === 'blank'), []);
+  assert.equal(P({ ...S, view: 'pro' }).find(x => x.rule === 'A11').note, '扣掉月供只剩 6,000/年');
+});
+test('A11: exactly a quarter left does not flag; typed retirement spending does not matter', () => {
+  assert.deepEqual(only(S0({ expense: 120000, real: real(M) }), 'A11'), []);
+  assert.equal(only(S0({ expense: 96000, retExp: 300000, touched: { retExp: true }, real: real(M) }), 'A11').length, 1);
+  assert.deepEqual(only(S0({ expense: 90000, real: real(M) }), 'A11'), []);   // A3 blocks instead
+});
+test('zero: spending 0 blocks with no value button; typed retirement spending 0 is blank', () => {
+  const z = only(S0({ expense: 0 }), 'B2').find(q => q.field === 'expense');
+  assert.equal(z.kind, 'block'); assert.equal(z.rel.op, null); assert.deepEqual(z.fixes, []);
+  assert.ok(P(S0({ retExp: 0, touched: { retExp: true } })).some(q => q.kind === 'blank' && q.field === 'retExp'));
+  assert.ok(!P(S0({ expense: 0, retExp: 0 })).some(q => q.kind === 'blank' && q.field === 'retExp'));
+});
+test('A6: a two-digit year offers 20xx only when it lands in range; the line names the range', () => {
+  const q = only(S0({ real: real({ monthly: 3000, endYear: 35 }) }), 'A6')[0];
+  assert.equal(q.rel.op, '不在'); assert.deepEqual(q.rel.right.range, [1976, 2066]);
+  assert.deepEqual(q.fixes.map(f => [f.text, f.aria]), [['→ 2035', '还到哪年改成 2035']]);
+  assert.deepEqual(only(S0({ real: real({ monthly: 3000, endYear: 80 }) }), 'A6')[0].fixes, []);
+  assert.deepEqual(only(S0({ real: real({ monthly: 3000, endYear: 2200 }) }), 'A6')[0].fixes, []);
+});
+test('relText writes a range as plain years', () => {
+  assert.equal(relText(only(S0({ real: real({ monthly: 3000, endYear: 35 }) }), 'A6')[0].rel), '还到哪年 35 不在 1976–2066');
 });

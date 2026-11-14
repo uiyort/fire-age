@@ -145,7 +145,7 @@ test('fieldLineHtml: a range rule under its own field', () => {
   const [q] = problems({ ...defaultState(DATA), age: 120 }, DATA, 2026);
   assert.equal(fieldLineHtml(q), '<p class="row bad" id="rel-age">年龄 120 &gt; 85 <span class="x" aria-label="拦住">✕</span></p>');
   const far = problems({ ...S, real: { mortgage: { monthly: 3000, endYear: 2200 }, kids: S.real.kids } }, DATA, 2026).find(x => x.rule === 'A6');
-  assert.equal(strip(fieldLineHtml(far)), '还到哪年 2200 > 2066 ✕');
+  assert.equal(strip(fieldLineHtml(far)), '还到哪年 2200 不在 1976–2066 ✕');
 });
 
 test('fixesHtml: the action only in data-fix, nothing when there is no fix', () => {

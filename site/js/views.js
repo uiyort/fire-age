@@ -606,7 +606,8 @@ export function relText(rel) {
   const fmt = left.length === 1 && left[0].year ? plainYear : num;
   const sum = left.reduce((total, x) => total + x.value, 0);
   const lhs = `${left.map(x => x.label).join(' + ')} ${fmt(sum)}${left[0].unit ?? ''}`;
-  const rhs = op ? ` ${op} ${right.label ? `${right.label} ` : ''}${fmt(right.value)}${right.unit ?? ''}` : '';
+  const rhs = !op ? '' : right.range ? ` ${op} ${right.range[0]}–${right.range[1]}`
+    : ` ${op} ${right.label ? `${right.label} ` : ''}${fmt(right.value)}${right.unit ?? ''}`;
   return `${sub ? '└ 其中' : ''}${lhs}${rhs}`;
 }
 
@@ -654,7 +655,9 @@ export function fieldLinesHtml({ rows, list, at, view, wCur, rCur, note = '' }) 
     const sum = split ? `<p class="split-line" id="split-line-${pro ? 'p' : 's'}">${splitLineHtml(split, { view, wCur })}</p>` : '';
     const b14 = list.find(q => q.rule === 'B14');
     const save = b14 ? `<p class="row warn">${WARN} ${liveHtml(b14.rel)}${b14.note ? ` · ${b14.note}` : ''}</p>` : '';
-    return sum + items.join('') + note + save;
+    const a11 = list.find(q => q.rule === 'A11');
+    const spare = a11 ? `<p class="row warn">${OP('└')} ${a11.note} ${WARN}</p>` : '';
+    return sum + items.join('') + spare + note + save;
   }
   const today = rows.find(r => r.key === 'expense')?.value;
   const after = rows.filter(r => r.key.startsWith('after:')).map(r => {

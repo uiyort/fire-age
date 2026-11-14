@@ -313,8 +313,8 @@ test('A3 shows the relation and its three-word exits', async ({ page }) => {
   await expect(page.locator('#lines-expense .x')).toHaveAttribute('aria-label', '拦住');
   await expect(page.locator('#life-mortgage')).toHaveAttribute('aria-describedby', 'rel-mortgage.monthly');
   await noScroll(page);
-  await page.getByRole('button', { name: '改每月支出' }).click();
-  await expect(page.locator('#s-expense')).toBeFocused();
+  await page.getByRole('button', { name: '改月供' }).click();
+  await expect(page.locator('#life-mortgage')).toBeFocused();
 });
 
 test('A2: 房租和房贷 → 9,000 fixes it in one tap', async ({ page }) => {
@@ -399,7 +399,7 @@ test('A5 不算房贷; an ended mortgage is struck through; a range line and its
 test('an end year out of range: the year unwritten in thousands, no value button', async ({ page }) => {
   await page.goto('/'); await roomy(page); await mortgage(page, '4000', '2200');
   const line = page.locator('#rel-mortgage\\.endYear');
-  await expect(line).toHaveText(`还到哪年 2200 > ${new Date().getFullYear() + 40} ✕`);
+  await expect(line).toHaveText(`还到哪年 2200 不在 ${new Date().getFullYear() - 50}–${new Date().getFullYear() + 40} ✕`);
   await expect(page.locator('#life-mortgage-end')).toHaveAttribute('aria-describedby', 'rel-mortgage.endYear');
   await expect(page.locator('.fixes')).toHaveCount(0);
   await expect(page.locator('#lines-expense')).toHaveText('');
@@ -456,7 +456,9 @@ test('the professional view: yearly lines, ≈ and 改回估算 beside 年支出
   await page.fill('#p-retExp', '80000'); await page.locator('#p-retExp').press('Tab');
   await expect(page.locator('#lines-retexp')).toContainText('└ 其中月供 90,000/年 ≥ 年支出 80,000 ✕');
   await expect(pre).toBeHidden();
-  await page.locator('#pro-form .lab [data-fix]').click();
+  // While A4 stops the result the label link is hidden; the estimate button sits in the stop's own line.
+  await expect(page.locator('#pro-form .lab .est-back')).toBeHidden();
+  await page.locator('#lines-retexp .fix', { hasText: '改回估算' }).click();
   await expect(page.locator('#p-retExp')).toHaveValue('180000');
   await expect(pre).toBeVisible();
   await expect(page.locator('.chip')).toHaveCount(0);
