@@ -1,85 +1,85 @@
 {
   "version": "2026-11",
-  "generatedAt": "2026-11-07T18:47:36.994Z",
+  "generatedAt": "2026-11-16T09:05:45.503Z",
   "fx": {
     "CNY": {
       "sourceId": "ecb",
       "url": "https://www.ecb.europa.eu/stats/eurofxref/",
-      "value": 6.671294223018361,
-      "observedAt": "2026-11-06",
-      "fetchedAt": "2026-11-07",
+      "value": 6.671914585595368,
+      "observedAt": "2026-11-13",
+      "fetchedAt": "2026-11-16",
       "status": "official"
     },
     "EUR": {
       "sourceId": "ecb",
       "url": "https://www.ecb.europa.eu/stats/eurofxref/",
-      "value": 0.8956560680698611,
-      "observedAt": "2026-11-06",
-      "fetchedAt": "2026-11-07",
+      "value": 0.9048136083966704,
+      "observedAt": "2026-11-13",
+      "fetchedAt": "2026-11-16",
       "status": "official"
     },
     "GBP": {
       "sourceId": "ecb",
       "url": "https://www.ecb.europa.eu/stats/eurofxref/",
-      "value": 0.7471115091804746,
-      "observedAt": "2026-11-06",
-      "fetchedAt": "2026-11-07",
+      "value": 0.7560532030401738,
+      "observedAt": "2026-11-13",
+      "fetchedAt": "2026-11-16",
       "status": "official"
     },
     "JPY": {
       "sourceId": "ecb",
       "url": "https://www.ecb.europa.eu/stats/eurofxref/",
-      "value": 158.32512315270935,
-      "observedAt": "2026-11-06",
-      "fetchedAt": "2026-11-07",
+      "value": 159.99819037278323,
+      "observedAt": "2026-11-13",
+      "fetchedAt": "2026-11-16",
       "status": "official"
     },
     "HKD": {
       "sourceId": "ecb",
       "url": "https://www.ecb.europa.eu/stats/eurofxref/",
-      "value": 7.83743842364532,
-      "observedAt": "2026-11-06",
-      "fetchedAt": "2026-11-07",
+      "value": 7.846000723850887,
+      "observedAt": "2026-11-13",
+      "fetchedAt": "2026-11-16",
       "status": "official"
     },
     "AUD": {
       "sourceId": "ecb",
       "url": "https://www.ecb.europa.eu/stats/eurofxref/",
-      "value": 1.4554411106135243,
-      "observedAt": "2026-11-06",
-      "fetchedAt": "2026-11-07",
+      "value": 1.4737604053564966,
+      "observedAt": "2026-11-13",
+      "fetchedAt": "2026-11-16",
       "status": "official"
     },
     "CAD": {
       "sourceId": "ecb",
       "url": "https://www.ecb.europa.eu/stats/eurofxref/",
-      "value": 1.406627854903717,
-      "observedAt": "2026-11-06",
-      "fetchedAt": "2026-11-07",
+      "value": 1.4258052841114732,
+      "observedAt": "2026-11-13",
+      "fetchedAt": "2026-11-16",
       "status": "official"
     },
     "SGD": {
       "sourceId": "ecb",
       "url": "https://www.ecb.europa.eu/stats/eurofxref/",
-      "value": 1.2815942678011643,
-      "observedAt": "2026-11-06",
-      "fetchedAt": "2026-11-07",
+      "value": 1.2880926529135,
+      "observedAt": "2026-11-13",
+      "fetchedAt": "2026-11-16",
       "status": "official"
     },
     "MYR": {
       "sourceId": "ecb",
       "url": "https://www.ecb.europa.eu/stats/eurofxref/",
-      "value": 4.059023734885804,
-      "observedAt": "2026-11-06",
-      "fetchedAt": "2026-11-07",
+      "value": 4.087495475931958,
+      "observedAt": "2026-11-13",
+      "fetchedAt": "2026-11-16",
       "status": "official"
     },
     "THB": {
       "sourceId": "ecb",
       "url": "https://www.ecb.europa.eu/stats/eurofxref/",
-      "value": 33.55038065382893,
-      "observedAt": "2026-11-06",
-      "fetchedAt": "2026-11-07",
+      "value": 33.91512848353239,
+      "observedAt": "2026-11-13",
+      "fetchedAt": "2026-11-16",
       "status": "official"
     }
   },
@@ -97,14 +97,16 @@
         "value": 0.5185737471284586,
         "observedAt": "2025",
         "fetchedAt": "2026-11-07",
-        "status": "official"
+        "status": "carried",
+        "note": "本期未取到新数据，沿用上一期。",
+        "carriedSince": "2026-11-16"
       },
       "cpi": {
         "sourceId": "bis",
         "url": "https://data.bis.org/topics/CPI",
         "value": 0.9,
         "observedAt": "2026-09",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "official"
       },
       "target": {
@@ -112,7 +114,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "央行通胀目标或名义目标，用于估算长期通胀。"
       },
@@ -121,7 +123,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "当地常规退休或养老金领取年龄的取整值，可修改。"
       },
@@ -130,7 +132,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "投资税费对年收益的拖累，是本工具的粗略估计，不是税务计算，可修改。"
       },
@@ -140,7 +142,9 @@
         "value": 1.68,
         "observedAt": "2026-09",
         "fetchedAt": "2026-11-07",
-        "status": "official"
+        "status": "carried",
+        "note": "本期未取到新数据，沿用上一期。",
+        "carriedSince": "2026-11-16"
       }
     },
     "US": {
@@ -156,14 +160,16 @@
         "value": 1,
         "observedAt": "2025",
         "fetchedAt": "2026-11-07",
-        "status": "official"
+        "status": "carried",
+        "note": "本期未取到新数据，沿用上一期。",
+        "carriedSince": "2026-11-16"
       },
       "cpi": {
         "sourceId": "bis",
         "url": "https://data.bis.org/topics/CPI",
         "value": 3.737685,
         "observedAt": "2026-09",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "official"
       },
       "target": {
@@ -171,7 +177,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "央行通胀目标或名义目标，用于估算长期通胀。"
       },
@@ -180,7 +186,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "当地常规退休或养老金领取年龄的取整值，可修改。"
       },
@@ -189,16 +195,16 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "投资税费对年收益的拖累，是本工具的粗略估计，不是税务计算，可修改。"
       },
       "y10": {
         "sourceId": "ustreasury",
         "url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve",
-        "value": 4.86,
-        "observedAt": "2026-11-06",
-        "fetchedAt": "2026-11-07",
+        "value": 5.15,
+        "observedAt": "2026-11-13",
+        "fetchedAt": "2026-11-16",
         "status": "official"
       }
     },
@@ -215,14 +221,16 @@
         "value": 0.8026328695000001,
         "observedAt": "2025",
         "fetchedAt": "2026-11-07",
-        "status": "official"
+        "status": "carried",
+        "note": "本期未取到新数据，沿用上一期。",
+        "carriedSince": "2026-11-16"
       },
       "cpi": {
         "sourceId": "bis",
         "url": "https://data.bis.org/topics/CPI",
         "value": 3.770869,
         "observedAt": "2026-09",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "official"
       },
       "target": {
@@ -230,7 +238,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "央行通胀目标或名义目标，用于估算长期通胀。"
       },
@@ -239,7 +247,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "当地常规退休或养老金领取年龄的取整值，可修改。"
       },
@@ -248,16 +256,16 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "投资税费对年收益的拖累，是本工具的粗略估计，不是税务计算，可修改。"
       },
       "y10": {
         "sourceId": "ecb",
         "url": "https://www.ecb.europa.eu/stats/eurofxref/",
-        "value": 3.473,
-        "observedAt": "2026-09",
-        "fetchedAt": "2026-11-07",
+        "value": 3.416,
+        "observedAt": "2026-10",
+        "fetchedAt": "2026-11-16",
         "status": "official"
       }
     },
@@ -274,14 +282,16 @@
         "value": 0.9389883456212912,
         "observedAt": "2025",
         "fetchedAt": "2026-11-07",
-        "status": "official"
+        "status": "carried",
+        "note": "本期未取到新数据，沿用上一期。",
+        "carriedSince": "2026-11-16"
       },
       "cpi": {
         "sourceId": "bis",
         "url": "https://data.bis.org/topics/CPI",
         "value": 3.4458,
         "observedAt": "2026-09",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "official"
       },
       "target": {
@@ -289,7 +299,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "央行通胀目标或名义目标，用于估算长期通胀。"
       },
@@ -298,7 +308,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "当地常规退休或养老金领取年龄的取整值，可修改。"
       },
@@ -307,16 +317,16 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "投资税费对年收益的拖累，是本工具的粗略估计，不是税务计算，可修改。"
       },
       "y10": {
         "sourceId": "boe",
         "url": "https://www.bankofengland.co.uk/boeapps/database/",
-        "value": 5.1364,
-        "observedAt": "2026-11-04",
-        "fetchedAt": "2026-11-07",
+        "value": 5.2044,
+        "observedAt": "2026-11-11",
+        "fetchedAt": "2026-11-16",
         "status": "official"
       }
     },
@@ -333,14 +343,16 @@
         "value": 0.6526859284380834,
         "observedAt": "2025",
         "fetchedAt": "2026-11-07",
-        "status": "official"
+        "status": "carried",
+        "note": "本期未取到新数据，沿用上一期。",
+        "carriedSince": "2026-11-16"
       },
       "cpi": {
         "sourceId": "bis",
         "url": "https://data.bis.org/topics/CPI",
         "value": 2.097902,
         "observedAt": "2026-09",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "official"
       },
       "target": {
@@ -348,7 +360,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "央行通胀目标或名义目标，用于估算长期通胀。"
       },
@@ -357,7 +369,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "当地常规退休或养老金领取年龄的取整值，可修改。"
       },
@@ -366,16 +378,16 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "投资税费对年收益的拖累，是本工具的粗略估计，不是税务计算，可修改。"
       },
       "y10": {
         "sourceId": "mofjp",
         "url": "https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/",
-        "value": 2.806,
-        "observedAt": "2026-11-05",
-        "fetchedAt": "2026-11-07",
+        "value": 2.899,
+        "observedAt": "2026-11-13",
+        "fetchedAt": "2026-11-16",
         "status": "official"
       }
     },
@@ -392,14 +404,16 @@
         "value": 0.7359024871193195,
         "observedAt": "2025",
         "fetchedAt": "2026-11-07",
-        "status": "official"
+        "status": "carried",
+        "note": "本期未取到新数据，沿用上一期。",
+        "carriedSince": "2026-11-16"
       },
       "cpi": {
         "sourceId": "bis",
         "url": "https://data.bis.org/topics/CPI",
         "value": 1.92484,
         "observedAt": "2026-09",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "official"
       },
       "target": {
@@ -407,7 +421,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "央行通胀目标或名义目标，用于估算长期通胀。"
       },
@@ -416,7 +430,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "当地常规退休或养老金领取年龄的取整值，可修改。"
       },
@@ -425,7 +439,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "投资税费对年收益的拖累，是本工具的粗略估计，不是税务计算，可修改。"
       },
@@ -434,7 +448,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "金管局接口的 10 年期基准字段目前为空，也没有其它可再发布的自动来源。3.7% 是本工具按 2026 年 11 月公开市场水平设定的假设，不会自动更新，可在专业模式修改。"
       }
@@ -452,14 +466,16 @@
         "value": 1.0062880520000002,
         "observedAt": "2025",
         "fetchedAt": "2026-11-07",
-        "status": "official"
+        "status": "carried",
+        "note": "本期未取到新数据，沿用上一期。",
+        "carriedSince": "2026-11-16"
       },
       "cpi": {
         "sourceId": "bis",
         "url": "https://data.bis.org/topics/CPI",
         "value": 3.941849,
         "observedAt": "2026-06",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "official"
       },
       "target": {
@@ -467,7 +483,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "央行通胀目标或名义目标，用于估算长期通胀。"
       },
@@ -476,7 +492,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "当地常规退休或养老金领取年龄的取整值，可修改。"
       },
@@ -485,16 +501,16 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "投资税费对年收益的拖累，是本工具的粗略估计，不是税务计算，可修改。"
       },
       "y10": {
         "sourceId": "rba",
         "url": "https://www.rba.gov.au/statistics/tables/",
-        "value": 5.082,
-        "observedAt": "2026-11-04",
-        "fetchedAt": "2026-11-07",
+        "value": 5.044,
+        "observedAt": "2026-11-11",
+        "fetchedAt": "2026-11-16",
         "status": "official"
       }
     },
@@ -511,14 +527,16 @@
         "value": 0.8961026867239733,
         "observedAt": "2025",
         "fetchedAt": "2026-11-07",
-        "status": "official"
+        "status": "carried",
+        "note": "本期未取到新数据，沿用上一期。",
+        "carriedSince": "2026-11-16"
       },
       "cpi": {
         "sourceId": "bis",
         "url": "https://data.bis.org/topics/CPI",
         "value": 3.092784,
         "observedAt": "2026-09",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "official"
       },
       "target": {
@@ -526,7 +544,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "央行通胀目标或名义目标，用于估算长期通胀。"
       },
@@ -535,7 +553,7 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "当地常规退休或养老金领取年龄的取整值，可修改。"
       },
@@ -544,16 +562,16 @@
         "sourceId": "assumption",
         "url": "method.html",
         "observedAt": "2026-11",
-        "fetchedAt": "2026-11-07",
+        "fetchedAt": "2026-11-16",
         "status": "assumed",
         "note": "投资税费对年收益的拖累，是本工具的粗略估计，不是税务计算，可修改。"
       },
       "y10": {
         "sourceId": "boc",
         "url": "https://www.bankofcanada.ca/valet/docs",
-        "value": 3.67,
-        "observedAt": "2026-11-05",
-        "fetchedAt": "2026-11-07",
+        "value": 3.78,
+        "observedAt": "2026-11-12",
+        "fetchedAt": "2026-11-16",
         "status": "official"
       }
     },
@@ -569,7 +587,9 @@
         "value": 0.7988601525273457,
         "observedAt": "2025",
         "fetchedAt": "2026-11-07",
-        "status": "official"
+        "status": "carried",
+        "note": "本期未取到新数据，沿用上一期。",
+        "carriedSince": "2026-11-16"
       }
     },
     "MY": {
@@ -584,7 +604,9 @@
         "value": 0.35245759046023895,
         "observedAt": "2025",
         "fetchedAt": "2026-11-07",
-        "status": "official"
+        "status": "carried",
+        "note": "本期未取到新数据，沿用上一期。",
+        "carriedSince": "2026-11-16"
       }
     },
     "TH": {
@@ -599,7 +621,9 @@
         "value": 0.3161293063558062,
         "observedAt": "2025",
         "fetchedAt": "2026-11-07",
-        "status": "official"
+        "status": "carried",
+        "note": "本期未取到新数据，沿用上一期。",
+        "carriedSince": "2026-11-16"
       }
     }
   },
@@ -624,13 +648,6 @@
       "url": "https://data.bis.org/topics/CPI",
       "license": "可在不向用户额外收费的产品中使用，须注明 BIS 为来源。",
       "termsUrl": "https://data.bis.org/help/legal"
-    },
-    {
-      "id": "oecd",
-      "name": "经合组织（OECD）Financial market statistics: Long-term interest rates (IRLT), China, monthly",
-      "url": "https://data-explorer.oecd.org/",
-      "license": "CC BY 4.0，须注明 OECD 为来源。OECD 未对本工具背书。月度数据，通常晚 1 到 2 个月。",
-      "termsUrl": "https://www.oecd.org/en/about/oecd-open-by-default-policy.html"
     },
     {
       "id": "ustreasury",
@@ -666,6 +683,13 @@
       "url": "https://www.bankofcanada.ca/valet/docs",
       "license": "可自由使用和分发，须注明加拿大央行为来源，不得暗示其背书。",
       "termsUrl": "https://www.bankofcanada.ca/terms/"
+    },
+    {
+      "id": "oecd",
+      "name": "经合组织（OECD）Financial market statistics: Long-term interest rates (IRLT), China, monthly",
+      "url": "https://data-explorer.oecd.org/",
+      "license": "CC BY 4.0，须注明 OECD 为来源。OECD 未对本工具背书。月度数据，通常晚 1 到 2 个月。",
+      "termsUrl": "https://www.oecd.org/en/about/oecd-open-by-default-policy.html"
     },
     {
       "id": "assumption",
