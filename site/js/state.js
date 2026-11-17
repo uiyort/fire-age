@@ -545,8 +545,8 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
     const low = A < LIMITS.age[0], edge = LIMITS.age[low ? 0 : 1];
     one('B3', 'age', A, low ? '<' : '>', { label: null, value: edge }, edge);
   }
-  // B4: working backward, the age to holiday at is above the age and below the plan end; equal blocks.
-  if (bwd && isSet(tAge) && ageOk && tAge <= A) one('B4', 'tAge', tAge, '≤', { label: label('age'), value: A }, A + 1);
+  // B4: working backward, the age to holiday at is from the age itself (stopping today) to below the plan end.
+  if (bwd && isSet(tAge) && ageOk && tAge < A) one('B4', 'tAge', tAge, '<', { label: label('age'), value: A }, A);
   else if (bwd && isSet(tAge) && ageOk && isSet(life) && tAge >= life) one('B4', 'tAge', tAge, '≥', { label: label('life'), value: life }, life - 1);
   // B5: the plan end from age + 2 to 110. Too small goes to 95, or to the least that works; when nothing up to 110
   // works there is no value button.

@@ -245,11 +245,12 @@ test('B3: age from 16 to 85', () => {
   assert.equal(only(S0({ age: 16 }), 'B3').length + only(S0({ age: 85 }), 'B3').length, 0);
 });
 
-test('B4: the age to holiday at sits strictly between age and the plan end; equal blocks', () => {
+test('B4: the age to holiday at is from the age (today) to below the plan end', () => {
   const bwd = o => S0({ mode: 'bwd', ...o });
-  assert.deepEqual(rel(bwd({ tAge: 25 }), 'B4'), { sub: false, left: [{ label: '想几岁放假', value: 25 }], op: '≤', right: { label: '年龄', value: 30 } });
-  assert.deepEqual(fixTexts(bwd({ tAge: 25 }), 'B4'), ['→ 31']);
-  assert.equal(only(bwd({ tAge: 30 }), 'B4').length, 1);
+  assert.deepEqual(rel(bwd({ tAge: 25 }), 'B4'), { sub: false, left: [{ label: '想几岁放假', value: 25 }], op: '<', right: { label: '年龄', value: 30 } });
+  assert.deepEqual(fixTexts(bwd({ tAge: 25 }), 'B4'), ['→ 30']);
+  // Stopping today is a question worth asking: what are the odds with what I have now?
+  assert.equal(only(bwd({ tAge: 30 }), 'B4').length, 0);
   assert.equal(only(bwd({ tAge: 31 }), 'B4').length, 0);
   assert.deepEqual(rel(bwd({ tAge: 95 }), 'B4').right, { label: '规划到', value: 95 });
   assert.deepEqual(fixTexts(bwd({ tAge: 99 }), 'B4'), ['→ 94']);

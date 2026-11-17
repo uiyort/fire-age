@@ -15,7 +15,8 @@ export function buildParams(raw, fx) {
   const p = { ...raw, fx };
   p.age = Math.round(raw.age);
   p.life = Math.max(Math.round(raw.life), p.age + 2);
-  p.tAge = Math.min(Math.max(Math.round(raw.tAge), p.age + 1), p.life - 1);
+  // The target may be today (stopping now, n = 0), never before it.
+  p.tAge = Math.min(Math.max(Math.round(raw.tAge), p.age), p.life - 1);
   p.flexCut = Math.min(Math.max(raw.flexCut ?? 0, 0), 100);
   p.events = Array.isArray(raw.events) ? raw.events : [];
   const w = Math.min(Math.max(raw.eq, 0), 100) / 100;
@@ -135,7 +136,8 @@ export function bwdSolve(p) {
   const need = fiNeed(p, n);
   let G = 0;
   for (let k = 0; k < n; k++) G += Math.pow(1 + g, k) * Math.pow(1 + r, n - 1 - k);
-  const s0 = (need - p.assets * Math.pow(1 + r, n)) / G;
+  // Stopping today leaves no year to save in, so there is no first year's saving to solve for.
+  const s0 = n === 0 ? null : (need - p.assets * Math.pow(1 + r, n)) / G;
 
   const fr = rr => assetsAt(p, n, { r: rr }) - fiNeed(p, n, p.retExp, rr);
   let reqR;

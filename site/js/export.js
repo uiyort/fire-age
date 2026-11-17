@@ -6,7 +6,8 @@ const yearly = ({ p, mc, target }, scale = 1) => mc.bands.map((b, t) => ({
 }));
 
 // Working backward, the saving that gives 8 in 10 at the chosen age.
-const requiredSavings = ({ mode, bwd, odds }) => (mode === 'bwd' ? odds?.s0 ?? Math.max(bwd.s0, 0) : null);
+// Stopping today leaves no year to save in, so it is null (empty in the CSV) rather than 0.
+const requiredSavings = ({ mode, bwd, odds }) => (mode !== 'bwd' || bwd?.n === 0 ? null : odds?.s0 ?? Math.max(bwd.s0, 0));
 
 function assumptionRows(p) {
   const rows = [];
@@ -25,7 +26,7 @@ export function toCsv(result) {
   const meta = [
     `# currency,${cur}`, `# dataVersion,${dataVersion}`, `# seed,${mc.seed}`, `# paths,${mc.paths}`, `# success,${mc.success}`,
     `# mode,${mode}`, `# retireYearIndex,${retireT}`, '# holidayAgeOdds,0.8',
-    ...(mode === 'bwd' ? [`# requiredSavings,${requiredSavings(result)}`] : []),
+    ...(mode === 'bwd' ? [`# requiredSavings,${requiredSavings(result) ?? ''}`] : []),
     ...assumptionRows(p),
   ];
   const header = 'age,p10,p25,p50,p75,p90,target';

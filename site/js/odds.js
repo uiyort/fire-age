@@ -179,6 +179,8 @@ export function bwdOdds(p, { target = ODDS } = {}) {
   const n = p.tAge - p.age;
   return remember('bwd', p, `${target}|${p.tAge}`, () => {
     const success = successAt(p, n, null);
+    // Stopping today: no year to save in, so the odds are those of today's savings and there is no saving to solve for.
+    if (n === 0) return { n, s0: null, success, enough: success >= target };
     if (successAt(p, n, 0) >= target) return { n, s0: 0, success, enough: true };
     let lo = 0, hi = Math.max(p.retExp, p.expense, p.income, 1);
     for (let i = 0; i < 60 && successAt(p, n, hi) < target; i++) hi *= 2;

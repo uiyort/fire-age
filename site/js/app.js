@@ -1493,7 +1493,8 @@ function summaryInput() {
     issued: latest.dataVersion,
     years: latest.mc?.bands?.map(b => b[2]) ?? [],
     enough: latest.odds?.enough ?? bwd.s0 <= 0,
-    monthlyText: wholeMoney(toDisplay((latest.odds?.s0 ?? Math.max(bwd.s0, 0)) / 12, p, cur), cur),
+    // Stopping today has no monthly saving to show.
+    monthlyText: bwd?.n === 0 ? null : wholeMoney(toDisplay((latest.odds?.s0 ?? Math.max(bwd.s0, 0)) / 12, p, cur), cur),
     place: cardPlace(places, S.town, latest.town),
     fifth: fifth && fifthBrief(fifth.base, fifth.story, latestMoney()) ? { ...fifthBrief(fifth.base, fifth.story, latestMoney()), baseName: (latest.names ?? lifeNames(stories))[fifth.baseIndex] } : null,
     // A spending goal is an amount, so a card without money says it was met without the number.

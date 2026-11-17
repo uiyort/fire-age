@@ -295,6 +295,8 @@ export function heroModel({ mode, p, t, bwd, success, need = null, ruler = null 
   const nextMonths = months === null ? null : months < 12 ? 12 : (Math.floor(months / 12) + 1) * 12;
   return {
     reachable,
+    // Working backward to today, the holiday starts today whatever the odds, so the words must not say it is safe.
+    backward,
     startAge: p.age,
     endAge: p.life,
     holidayAge: reachable ? p.age + workYears : null,

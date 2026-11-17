@@ -34,9 +34,10 @@ export const toDisplay = (v, p, cur) => conv(v, p.wCur, cur, p.fx);
 
 function proHeadline({ mode, p, t, odds, dispCur }) {
   if (mode === 'bwd') {
-    const first = toDisplay(odds.s0, p, dispCur);
     const now = `当前计划成功率 ${pct(odds.success, 0)}。`;
-    return odds.enough ? `目标 ${p.tAge} 岁：现有资产已有八成把握。${now}` : `目标 ${p.tAge} 岁：八成把握需第一年储蓄 ${wholeMoney(first, dispCur)}。${now}`;
+    if (odds.enough) return `目标 ${p.tAge} 岁：现有资产已有八成把握。${now}`;
+    if (odds.s0 === null) return `目标 ${p.tAge} 岁（今天）：现有资产不到八成把握。${now}`;
+    return `目标 ${p.tAge} 岁：八成把握需第一年储蓄 ${wholeMoney(toDisplay(odds.s0, p, dispCur), dispCur)}。${now}`;
   }
   if (t === 0) return '已达到财务独立（八成把握）。';
   if (t === null) return '规划期内达不到八成把握。';
@@ -46,7 +47,8 @@ function proHeadline({ mode, p, t, odds, dispCur }) {
 // What to do when the odds for a chosen age are short of 8 in 10: the saving that reaches it, or the age that does.
 function toEight(p, odds, eightAge, dispCur) {
   const ways = [];
-  if (!odds.enough) ways.push(`每月需存 ${wholeMoney(toDisplay(odds.s0 / 12, p, dispCur), dispCur)}`);
+  // Stopping today (s0 null) leaves no month to save in, so only waiting is offered.
+  if (!odds.enough && odds.s0 !== null) ways.push(`每月需存 ${wholeMoney(toDisplay(odds.s0 / 12, p, dispCur), dispCur)}`);
   if (eightAge !== null && eightAge > p.tAge) ways.push(`等到 ${eightAge} 岁`);
   return ways.length ? `要有八成把握，${ways.join('，或者')}。` : '';
 }
@@ -161,10 +163,14 @@ export function solvesHtml({ p, bwd, odds, dispCur }) {
   const rNote = bwd.reqR === Infinity ? '只靠收益补不上，需要别的办法'
     : bwd.reqR === -Infinity ? '收益很低也够了' : `当前假设 ${pct(p.r, 2)}，储蓄不变`;
   const reqR = bwd.reqR === Infinity ? '> 30%' : bwd.reqR === -Infinity ? '< −10%' : pct(bwd.reqR, 2);
-  const rows = [
-    ['多存：第一年需存（八成把握）', odds.enough ? '不用再存' : saveAlone ? `${D(odds.s0)}/年` : '只靠多存做不到',
+  const save = bwd.n === 0
+    // Stopping today: there is no year left to save in.
+    ? ['多存：第一年需存（八成把握）', odds.enough ? '不用再存' : '没有攒钱的时间', odds.enough ? '现有资产已经够了' : '今天就停，存款就是现在这些。晚几年放，或者看下面几条路。']
+    : ['多存：第一年需存（八成把握）', odds.enough ? '不用再存' : saveAlone ? `${D(odds.s0)}/年` : '只靠多存做不到',
       odds.enough ? '现有资产靠复利就能达到' : saveAlone ? `约 ${D(odds.s0 / 12)}/月，储蓄率 ${pct(needRate, 0)}（现在 ${rate === null || rate <= 0 ? '—' : pct(rate, 0)}）`
-        : `要存下的比${p.income > 0 ? '收入' : '现在'}还多，换一条路，或者几条一起走。`],
+        : `要存下的比${p.income > 0 ? '收入' : '现在'}还多，换一条路，或者几条一起走。`];
+  const rows = [
+    save,
     ['多赚：需要的实际年化收益', reqR, `${rNote}。${FIXED}`],
     ['少花：退休后每年最多花', spendAlone ? `${R(bwd.maxE)}/年` : '只靠少花做不到', `${spendAlone ? `约 ${R(bwd.maxE / 12)}/月，` : ''}现在设的是 ${R(p.retExp)}/年。${FIXED}`],
     ['本金：今天需要有', D(bwd.reqA0), `${bwd.reqA0 <= p.assets ? '你已经有了' : `比现在多 ${D(bwd.reqA0 - p.assets)}`}。${FIXED}`],
@@ -927,6 +933,7 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
   let after = '';
   if (unreachable) after = lgRow(`${lgOp()}规划期内到不了八成`);
   // Working backward with savings already enough, the card's words, not a saving of ¥0.
+  else if (bwd && bwdOdds && bwdOdds.s0 === null && !bwdOdds.enough) after = lgRow(`${lgOp('⇒')}今天就停，没有再存的时间`, '', 'sum');
   else if (bwd && bwdOdds && pro) after = lgRow(`${lgOp('⇒')}${bwdOdds.enough ? '现在的存款已经够了' : `要 80%：第一年储蓄 ${wholeMoney(bwdOdds.s0, wCur)}`}`, '', 'sum');
   else if (bwd && bwdOdds) after = lgRow(`${lgOp('⇒')}${bwdOdds.enough ? '现在的存款已经够了' : `要八成：第一年每月存 ${wholeMoney(bwdOdds.s0 / 12, wCur)}`}`, '', 'sum');
   else if (!now) after = lgRow(`${lgOp('⇒')}<b>${pro ? '第一个到 80%' : '第一个到八成'}</b>`, `<b>${holiday} 岁</b>`, 'sum');
@@ -1002,7 +1009,7 @@ export function stickyHtml(h, { p, dispCur, success, pro, chip = '' }) {
     return `<b class="sticky-age">${age}</b><span>放假线 ${money(toDisplay(h.fund.need, p, dispCur), dispCur)}</span>${odds}<span class="sticky-more">实际收益 ${pct(p.r, 2)}</span>`;
   }
   if (!h.reachable) return '<b class="sticky-age">还在路上</b><span>先看提前的办法</span>';
-  const age = h.workYears === 0 ? '现在就能放假' : `${h.holidayAge} 岁放假`;
+  const age = h.workYears === 0 ? (h.backward ? '今天放假' : '现在就能放假') : `${h.holidayAge} 岁放假`;
   const bar = `<span class="sticky-bar-mini" aria-hidden="true"><i style="width:${(h.workYears / (h.workYears + h.holidayYears) * 100).toFixed(1)}%"></i></span>`;
   const odds = h.people === null || !h.label ? '' : `<span>${h.label}</span>`;
   const work = h.workYears ? `<span class="sticky-more">再上 ${h.workYears} 年班</span>` : '';
@@ -1033,7 +1040,7 @@ export function heroHtml(h, { p, dispCur, open = false }) {
   let big;
   // Out of reach, the headline above already says so; the hero starts with what is true today.
   if (!h.reachable) big = '';
-  else if (h.workYears === 0) big = `<span class="hero-rest">现在就能放假 <b>${h.holidayYears}</b> 年</span>`;
+  else if (h.workYears === 0) big = `<span class="hero-rest">${h.backward ? '今天起放假' : '现在就能放假'} <b>${h.holidayYears}</b> 年</span>`;
   else big = `<span class="hero-work">再上 <b>${h.workYears}</b> 年班</span><span class="hero-arrow">→</span><span class="hero-rest">放假 <b>${h.holidayYears}</b> 年</span>`;
   const work = h.workYears ? `<i class="work" style="width:${share(h.workYears)}%"></i>` : '';
   const rest = h.holidayYears ? `<i class="rest" style="width:${share(h.holidayYears)}%"></i>` : '';

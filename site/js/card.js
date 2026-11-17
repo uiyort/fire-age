@@ -32,7 +32,8 @@ export function summaryCardSpec({ mode, type, hero, monthlyText, enough, place, 
   let big, sentence;
   if (mode === 'bwd') {
     big = `${hero.holidayAge} 岁`;
-    sentence = !money ? type.blurb : enough ? '现在的存款已经够了' : `每月存 ${monthlyText}，就有八成把握`;
+    // Stopping today leaves no monthly saving to name (monthlyText null), so the type speaks instead.
+    sentence = !money || (!enough && !monthlyText) ? type.blurb : enough ? '现在的存款已经够了' : `每月存 ${monthlyText}，就有八成把握`;
   } else if (!hero.reachable) {
     big = '还在路上';
     sentence = '一步步提前';
@@ -47,7 +48,7 @@ export function summaryCardSpec({ mode, type, hero, monthlyText, enough, place, 
   const dated = hero.reachable || mode === 'bwd';
   // Under the age, where the person stands today, so the big number is not read as their current age.
   let now = `现在 ${hero.startAge} 岁，`;
-  if (mode === 'bwd') now += enough ? '存款已经够了' : `再上 ${hero.workYears} 年班`;
+  if (mode === 'bwd') now += enough ? '存款已经够了' : hero.workYears === 0 ? '今天就放假' : `再上 ${hero.workYears} 年班`;
   else if (!hero.reachable) now += '规划期内还到不了';
   else now += hero.workYears === 0 ? '已经可以放假' : `再上 ${hero.workYears} 年班`;
   if (!showNow) now = '';
