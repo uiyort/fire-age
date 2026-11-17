@@ -14,7 +14,8 @@ test('sources page marks assumed values and states their basis', async ({ page }
   await expect(page.locator('[data-field="HK.y10"]')).toContainText('见下文');
   await expect(page.locator('main')).toContainText('金管局');
   await expect(page.locator('[data-field="CN.y10"]')).not.toContainText('假设');
-  await expect(page.locator('[data-field="CN.y10"]')).toContainText('官方');
+  // Official data, this month's or carried from the last one when the source had nothing new; never an assumption.
+  await expect(page.locator('[data-field="CN.y10"]')).toContainText(/官方|沿用/);
   await expect(page.locator('[data-source="oecd"]')).toContainText('CC BY 4.0');
 });
 
