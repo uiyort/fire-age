@@ -49,6 +49,10 @@ Open with what the number did to the persona ("这位算例里的 30 岁上班�
 
 A link can carry a worked example in its fragment, which never reaches the server: `https://fire-age.com/?ch=zh#age=30&assets=200000&income=12000&expense=6000`. The keys are `age`, `assets`, `income`, `expense`, `retexp` and `pension` (monthly, as in the simple form, in the currency of the place each belongs to), `tage`, `mode` (`fwd` or `bwd`), `work` and `retire` (country codes from the data). `linkHash()` in `site/js/link.js` writes the fragment. The visitor sees a note that these are the link's numbers, and their own saved numbers are not touched until they change something. Use these links only where links are allowed, never on Xiaohongshu.
 
+Some sites may drop the fragment from an outbound link. The same keys also work in the query, `https://fire-age.com/?ch=db-diary&age=35&assets=1800000&income=6000&expense=6000&tage=35&mode=bwd`, and the page moves them into the fragment as soon as it opens. A query reaches the server, so use it only for published examples, never for someone's own numbers. On Douban, use the query form. Country codes must match the data exactly: `UK`, not `GB`; an unknown code silently falls back to mainland China.
+
+Each opened link counts a `link_open` event. Compared with the `visit` count for the same channel, it shows whether the numbers arrived. Check it the day after posting, and also tap the link once in the platform's own app.
+
 ## Honesty about the numbers
 
 - Results rest on assumptions. Say so when a number is the headline.
