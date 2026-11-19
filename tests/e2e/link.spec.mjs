@@ -57,3 +57,24 @@ test.describe('a first visit on a phone from a link', () => {
     await expect(page.locator('#link-note')).toBeVisible();
   });
 });
+
+test('numbers in the query, for sites that drop the fragment, open the same way and move into the fragment', async ({ page }) => {
+  const sent = [];
+  await page.route('**/api/e', route => { sent.push(JSON.parse(route.request().postData() || '{}')); route.fulfill({ status: 204 }); });
+  await page.goto('/?ch=db-diary&age=35&assets=1800000&income=6000&expense=6000&tage=35&mode=bwd');
+  await expect(page.locator('#headline')).toContainText('2 成');
+  await expect(page.locator('#link-note')).toBeVisible();
+  const url = new URL(page.url());
+  expect(url.search).toBe('?ch=db-diary');
+  expect(url.hash).toBe('#age=35&assets=1800000&income=6000&expense=6000&tage=35&mode=bwd');
+  await expect.poll(() => sent.map(e => e.e)).toContain('link_open');
+  expect(sent.find(e => e.e === 'link_open').c).toBe('db-diary');
+});
+
+test('a visit without numbers does not count as a link opened', async ({ page }) => {
+  const sent = [];
+  await page.route('**/api/e', route => { sent.push(JSON.parse(route.request().postData() || '{}')); route.fulfill({ status: 204 }); });
+  await page.goto('/?ch=db-diary');
+  await expect.poll(() => sent.map(e => e.e)).toContain('visit');
+  expect(sent.map(e => e.e)).not.toContain('link_open');
+});

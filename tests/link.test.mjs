@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import DATA from '../site/js/data-latest.js';
 import { defaultState } from '../site/js/state.js';
-import { linkHash, stateFromLink } from '../site/js/link.js';
+import { linkFromAddress, linkHash, stateFromLink } from '../site/js/link.js';
 
 test('an address without numbers in its fragment is not a link', () => {
   assert.equal(stateFromLink('', DATA), null);
@@ -82,4 +82,17 @@ test('a link can carry a monthly pension, in the retirement currency', () => {
   const S = stateFromLink('#age=35&pension=2000', DATA);
   assert.equal(S.pension, 24000);
   assert.equal(linkHash({ age: 35, pension: 2000 }), '#age=35&pension=2000');
+});
+
+test('a site that drops the fragment can still carry the numbers in the query, which move into a fragment', () => {
+  const moved = linkFromAddress('', '?ch=db-diary&age=35&assets=1800000&tage=35&mode=bwd');
+  assert.deepEqual(moved, { hash: '#age=35&assets=1800000&tage=35&mode=bwd', search: '?ch=db-diary', moved: true });
+  assert.equal(stateFromLink(moved.hash, DATA).assets, 1800000);
+  assert.equal(linkFromAddress('', '?age=35').search, '');
+});
+
+test('the fragment wins over the query, and an address with neither holds no link', () => {
+  assert.deepEqual(linkFromAddress('#age=40', '?ch=zh&age=35'), { hash: '#age=40', search: '?ch=zh&age=35', moved: false });
+  assert.equal(linkFromAddress('', '?ch=zh'), null);
+  assert.equal(linkFromAddress('#about', ''), null);
 });

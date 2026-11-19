@@ -10,9 +10,14 @@ test('stopping today shows its odds, offers waiting and never a saving', async (
   await expect(page.locator('#headline')).toContainText('把握只有 2 成');
   await expect(page.locator('#headline')).toContainText('等到');
   await expect(page.locator('#headline')).not.toContainText('每月需存');
-  await expect(page.locator('#hero')).toContainText('今天起放假');
+  await expect(page.locator('#hero')).toContainText('今天就停，钱要花 60 年');
+  // The fund line carries the article's comparison, 25 against 42.
+  await expect(page.locator('#hero .fund')).toContainText('已有 ¥180万 · 25 倍，需要 ¥305万 · 42 倍');
+  await expect(page.locator('#solve-title')).toHaveText('想今天就放假，这几条路任选其一');
+  await expect(page.locator('#lead-faster')).toContainText('八成把握的年龄能从 51 岁提前到');
   await expect(page.locator('#hero')).not.toContainText('现在就能放假');
-  await expect(page.locator('#solves')).toContainText('没有攒钱的时间');
+  await expect(page.locator('#solves')).not.toContainText('多存');
+  await expect(page.locator('#solves')).toContainText('¥305万');
   await expect(page.locator('#solves')).not.toContainText(/NaN|Infinity|null/);
   await expect(page.locator('[data-chip]')).toHaveCount(0);
   // The ledger has no saving years to tell, and shows the multiple the post quotes.

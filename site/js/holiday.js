@@ -1,7 +1,6 @@
 // Makes a result feel personal: Mondays left, a four-letter holiday type, the same money elsewhere, one drawn life.
 // Pure functions, no DOM. Every label and number comes from the model, with its rule published on the method page.
-import { assetsAt, buildParams, coastNeed, conv, fiNeed, firstDraw, lifePath, savingsRate } from './engine.js';
-import { needLine, oddsSolve, oddsYears } from './odds.js';
+import { assetsAt, buildParams, coastNeed, conv, fiNeed, firstDraw, lifePath, savingsRate } from './engine.js';import { needLine, oddsSolve, oddsYears } from './odds.js';
 
 const DAYS_PER_YEAR = 365.25;
 const WORKDAYS_PER_YEAR = 250;
@@ -91,14 +90,15 @@ export function holidayType(p, data, { workC, retC, retireT, success = null }) {
   // The items (a mortgage, children) do not follow local prices, so only the rest is compared at today's prices.
   const items = itemsOf(p);
   const lifestyle = p.expense > 0 ? (Math.max(conv(p.retExp, p.rCur, p.wCur, p.fx) - items, 0) / priceRatio + items) / p.expense : Infinity;
-  const atHoliday = t === null ? 0 : backward ? needLine(p)[t] : assetsAt(p, t);
+  // Stopping today, the money on the first holiday day is today's savings, all of it.
+  const atHoliday = t === null ? 0 : backward ? (t === 0 ? p.assets : needLine(p)[t]) : assetsAt(p, t);
   const capitalShare = atHoliday > 0 ? Math.min(p.assets * Math.pow(1 + p.r, t) / atHoliday, 1) : 0;
 
   const picks = {
     when: [age !== null && age <= EARLY_AGE ? 'E' : 'L', age === null ? '还没到' : `${age} 岁放假`],
     where: [workC === retC ? 'H' : 'A', data.countries[retC].name],
     pack: [lifestyle <= 1 + SAME_BAND ? 'T' : 'F', packText(lifestyle)],
-    fare: [capitalShare >= GROW_SHARE ? 'G' : 'S', t === null ? '还在攒' : `${percent(capitalShare)} 来自今天已有的存款`],
+    fare: [capitalShare >= GROW_SHARE ? 'G' : 'S', t === null ? '还在攒' : backward && t === 0 ? '全部来自已有的存款' : `${percent(capitalShare)} 来自今天已有的存款`],
   };
   const axes = AXES.map(axis => {
     const [letter, value] = picks[axis.key];
@@ -107,8 +107,13 @@ export function holidayType(p, data, { workC, retC, retireT, success = null }) {
   const code = axes.map(a => a.letter).join('');
   // Working backward to today short of 8 in 10, the person stops today but the money is not yet covered.
   const short = backward && t === 0 && success !== null && success < 0.8;
-  const status = short ? { id: 'today', name: '今天就停', why: `今天就停，现有资产有 ${oddsText(success)}，还不到八成。` } : progress(p, t);
-  const type = { ...BY_CODE[code], axes, status };
+  const eight = short ? oddsSolve(p) : null;
+  const status = short
+    ? { id: 'today', name: '今天就停', why: eight === null ? '哪一年放假都到不了八成把握。' : `等到 ${p.age + eight} 岁再放，就有八成把握。` }
+    : progress(p, t);
+  // The type's own line speaks of a holiday that is safe, which below 8 in 10 it is not (rule 8).
+  const blurb = short ? `今天就停，钱够花到 ${p.life} 岁的把握是 ${oddsText(success).replace('把握', '').trim()}，还不到八成。` : BY_CODE[code].blurb;
+  const type = { ...BY_CODE[code], blurb, axes, status };
   const pensionShare = p.retExp > 0 ? Math.min(p.pension / p.retExp, 1) : 0;
   return { ...type, weakness: weakness(type, { success, pensionShare }) };
 }
@@ -296,6 +301,7 @@ export function heroModel({ mode, p, t, bwd, success, need = null, ruler = null 
   const months = monthSpend > 0 ? Math.floor(p.assets / monthSpend + 1e-9) : null;
   // The next whole year of holiday: a first full year, then each year after.
   const nextMonths = months === null ? null : months < 12 ? 12 : (Math.floor(months / 12) + 1) * 12;
+  const draw = reachable ? firstDraw(p, workYears) : 0;
   return {
     reachable,
     // Working backward to today, the holiday starts today whatever the odds, so the words must not say it is safe.
@@ -312,7 +318,13 @@ export function heroModel({ mode, p, t, bwd, success, need = null, ruler = null 
     label: !reachable ? '' : backward ? oddsText(success) : '八成把握',
     fund: { have: p.assets, need: line, share: line > 0 ? Math.min(p.assets / line, 1) : 1 },
     // The holiday line over what the first holiday year takes from savings (spec §9.2): one denominator with the implied rate.
-    times: reachable && firstDraw(p, workYears) > 0 ? Math.round(line / firstDraw(p, workYears)) : null,
+    times: reachable && draw > 0 ? Math.round(line / draw) : null,
+    // Today's savings on the same divisor, so the fund line sets what there is against what is needed.
+    haveTimes: reachable && draw > 0 ? Math.round(p.assets / draw) : null,
+    // Below 8 in 10, the months the money lasts from the holiday on if it neither grows nor falls: a sum, not a
+    // forecast. The bar is green only that far, since the rest of the holiday depends on returns.
+    held: reachable && success !== null && success !== undefined && success < 0.8 && monthSpend > 0
+      ? Math.floor(assetsAt(p, workYears, { r: 0 }) / monthSpend + 1e-9) : null,
     months,
     // Savings that alone cover every month to the end of the plan, before any return: the count stops meaning anything.
     covered: months !== null && months >= total * 12,

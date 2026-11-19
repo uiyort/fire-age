@@ -11,7 +11,7 @@ import { PARAMS, PARAM_GROUPS } from './params.js';
 import { makeGoal, compareVisit, goalApplies, loadGoal, saveGoal, clearGoal } from './goals.js';
 import { initAnalytics, track } from './analytics.js';
 import { WHY, toolTag } from './tool-notes.js';
-import { stateFromLink } from './link.js';
+import { linkFromAddress, stateFromLink } from './link.js';
 import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
 import { assumptionLine, renderCard, summaryCardSpec, typeCardSpec } from './card.js';
@@ -42,7 +42,10 @@ const started = (() => {
 })();
 // Numbers carried by a link (link.js) open in place of the saved ones, which are not overwritten until the person
 // changes something; the saved goal waits too, since it was set for the saved numbers.
-const linked = stateFromLink(location.hash, DATA);
+// Keys that came in the query move into the fragment first, so the rest of the page sees one kind of link.
+const linkAddress = linkFromAddress(location.hash, location.search);
+if (linkAddress?.moved) history.replaceState(null, '', location.pathname + linkAddress.search + linkAddress.hash);
+const linked = linkAddress ? stateFromLink(linkAddress.hash, DATA) : null;
 let linkHeld = linked !== null;
 let S = linked ?? loadState(DATA, storage);
 let goal = linked ? null : loadGoal(storage);
@@ -523,13 +526,19 @@ function renderFast() {
   $('headline').innerHTML = `<p class="say">${say}</p><p class="say-note">${note}</p>`;
   $('tiles').innerHTML = tilesHtml({ mode: S.mode, p, t, bwd, mc: latest.mc, dispCur: cur, target });
   renderHero();
-  if (S.mode === 'bwd') $('solves').innerHTML = solvesHtml({ p, bwd, odds, dispCur: cur });
+  if (S.mode === 'bwd') {
+    $('solve-title').textContent = `想${p.tAge === p.age ? '今天' : ` ${p.tAge} 岁`}就放假，这几条路任选其一`;
+    $('solves').innerHTML = solvesHtml({ p, bwd, odds, dispCur: cur });
+  }
   // The type is told for the plan as it is; spending that ends can move both the age and the type.
   $('type-now').innerHTML = typeHtml(type) + (p.events.length ? '<p class="fine">算上到期支出，放假可能更早，类型也可能跟着变。</p>' : '');
   document.querySelectorAll('.type-cell').forEach(cell => cell.classList.toggle('mine', cell.dataset.code === type.code));
   const reached = S.mode === 'fwd' && t === 0;
-  $('levers').innerHTML = leversHtml(levers, p, { pro: S.view === 'pro', small, dispCur: cur, reached });
-  $('lead-faster').textContent = fasterLead(levers, { reached });
+  // Stopping today leaves no month to save in, so the small saving step is not offered.
+  const stopToday = S.mode === 'bwd' && bwd.n === 0;
+  $('levers').innerHTML = leversHtml(levers, p, { pro: S.view === 'pro', small: stopToday ? null : small, dispCur: cur, reached });
+  // Working backward, the levers move the 8-in-10 age, not the age asked about, so the lead names both ages.
+  $('lead-faster').textContent = fasterLead(levers, { reached, from: S.mode === 'bwd' ? eightAge : null, age: p.age });
   renderSideLinks();
   renderGoal(p);
   persist();
@@ -1932,6 +1941,8 @@ function init() {
   fitSide();
   initAnalytics(location.href, DATA.version);
   track('visit');
+  // Counted against visits from the same channel, this shows whether a site dropped the link's numbers.
+  if (linked) track('link_open');
 }
 
 init();

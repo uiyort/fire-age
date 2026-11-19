@@ -53,3 +53,8 @@ test('finishing the questions is a countable event, and copying no longer is', a
   assert.ok(EVENTS.has('views_done'));
   assert.ok(!EVENTS.has('copy_text'));
 });
+
+test('opening a link with numbers is a countable event, to tell whether a site dropped them', async () => {
+  const { EVENTS } = await import('../functions/api/e.js');
+  assert.ok(EVENTS.has('link_open'));
+});

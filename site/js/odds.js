@@ -194,6 +194,38 @@ export function bwdOdds(p, { target = ODDS } = {}) {
   });
 }
 
+// Two of the ways to the target year, on the same standard and the same lives as everything else: the most that can
+// be spent each year after stopping, and the savings needed today. Null where no amount reaches the target.
+export function bwdEight(p, { target = ODDS } = {}) {
+  const n = p.tAge - p.age;
+  return remember('bwd8', p, `${target}|${p.tAge}`, () => {
+    // Less spending only ever helps, so the most that still reaches the target is the edge a binary search finds.
+    const spendOk = E => successAt({ ...p, retExp: E }, n, null) >= target;
+    let maxE = null;
+    if (spendOk(0)) {
+      let lo = 0, hi = Math.max(p.retExp, 1);
+      for (let i = 0; i < 40 && spendOk(hi); i++) { lo = hi; hi *= 2; }
+      for (let i = 0; i < 40 && hi - lo > Math.max(12, hi * 1e-4); i++) {
+        const mid = (lo + hi) / 2;
+        if (spendOk(mid)) lo = mid;
+        else hi = mid;
+      }
+      maxE = lo;
+    }
+    // More savings today only ever helps too.
+    const assetsOk = A => successAt(p, n, null, { startAssets: A }) >= target;
+    let lo = 0, hi = Math.max(p.assets, p.retExp * 25, 1);
+    for (let i = 0; i < 40 && !assetsOk(hi); i++) { lo = hi; hi *= 2; }
+    if (assetsOk(0)) hi = 0;
+    for (let i = 0; i < 40 && hi - lo > Math.max(100, hi * 1e-4); i++) {
+      const mid = (lo + hi) / 2;
+      if (assetsOk(mid)) hi = mid;
+      else lo = mid;
+    }
+    return { maxE, reqA0: hi };
+  });
+}
+
 // Outcome of every life, so they can be lined up from hardest to easiest.
 function outcomes(p, retireT, s0, paths, seed) {
   const Y = p.life - p.age;

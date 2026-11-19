@@ -54,10 +54,12 @@ test('the headline offers waiting, never a monthly saving there is no time for',
   assert.doesNotMatch(pro, /储蓄|NaN|null/);
 });
 
-test('the four ways say there is no time to save, and keep the other three', () => {
+test('stopping today, saving more is not one of the ways, and the others are on the 8-in-10 standard', () => {
   const p = plan();
   const html = solvesHtml({ p, bwd: bwdSolve(p), odds: bwdOdds(p), dispCur: 'CNY' });
-  assert.match(html, /没有攒钱的时间/);
+  assert.doesNotMatch(html, /多存|约五成/);
+  assert.match(html, /少花：放假后每年最多花（八成把握）/);
+  assert.match(html, /本金：今天需要有（八成把握）/);
   assert.match(html, /少花/);
   assert.match(html, /本金/);
   assert.doesNotMatch(html, /NaN|null|Infinity/);
@@ -68,8 +70,11 @@ test('the hero says the holiday starts today without claiming it is safe', () =>
   const odds = bwdOdds(p);
   const h = heroModel({ mode: 'bwd', p, t: null, bwd: bwdSolve(p), success: odds.success });
   const html = heroHtml(h, { p, dispCur: 'CNY' });
-  assert.match(html, /今天起放假/);
-  assert.doesNotMatch(html, /现在就能放假/);
+  assert.match(html, /今天就停，钱要花 <b>60<\/b> 年/);
+  assert.doesNotMatch(html, /现在就能放假|今天起放假/);
+  // The bar is green only for the years the money lasts without returns, and says so.
+  assert.match(html, /class="rest-open"/);
+  assert.match(html, /按不涨不跌算，现有的钱够花/);
 });
 
 test('the card says the holiday starts today, not a saving of nothing', () => {
@@ -93,7 +98,9 @@ test('stopping today short of 8 in 10 is never called a holiday already covered'
   const type = holidayType(p, DATA, { workC: 'CN', retC: 'CN', retireT: 0, success: odds.success });
   assert.notEqual(type.status.id, 'reached');
   assert.equal(type.status.name, '今天就停');
-  assert.match(type.status.why, /2 成把握/);
+  assert.match(type.blurb, /把握是 \d 成，还不到八成/);
+  assert.match(type.status.why, /等到 \d+ 岁再放，就有八成把握/);
+  assert.match(type.axes.find(a => a.key === 'fare').value, /全部来自已有的存款/);
   assert.doesNotMatch(type.status.why, /已经够/);
   // With 8 in 10 or better, today is a holiday already covered.
   const rich = plan({ assets: 5000000 });

@@ -41,7 +41,7 @@ test('the fund line is the ledger\'s closed state: no 年的花销, a toggle ins
   const h = heroModel({ mode: 'fwd', p, t, bwd: null, success: 0.8, need });
   const closed = heroHtml(h, { p, dispCur: 'CNY' });
   assert.ok(!closed.includes('年的花销'));
-  assert.match(strip(closed), /放假资金：已有 ¥20万，需要 ¥\d+万（ ?\d+% ?） 怎么算的 ▸/);
+  assert.match(strip(closed), /放假资金：已有 ¥20万 · 1 倍，需要 ¥\d+万 · \d+ 倍 怎么算的 ▸/);
   assert.match(closed, /<button type="button" class="ledger-toggle" aria-expanded="false" aria-controls="ledger">/);
   const open = heroHtml(h, { p, dispCur: 'CNY', open: true });
   assert.match(open, /aria-expanded="true"/); assert.ok(strip(open).includes('怎么算的 ▾'));
@@ -60,7 +60,7 @@ test('ledgerHtml simple: the three sections in the spec\'s words', () => {
   assert.equal(less, Math.round(90000 * Math.pow(1 + p.infl / 100, -19) / 12));
   for (const s of ['① 攒钱', `30 → ${30 + t} 岁`, '已有 ¥20万', '到手 ¥30,000/月', '− 支出 ¥15,000/月', '└ 其中月供 7,500 → 2045', '= 每月存下 ¥15,000', '收入每年 +2% 本工具设定',
     `→ ${29 + t} 岁每月存下`, '② 放假以后 每月花', `${30 + t}–49 退休后 ≈ ¥${fmt(spendOf(p, t, t) / 12)}`, `− 50 起 月供 ≈ ${fmt(less)} = ≈ ¥${fmt(spendOf(p, t, 20) / 12)}`, '63 起 养老金 — ›',
-    `⇒ ${30 + t} 岁放假要有 ¥391万`, `≈ 年支出 ¥${(firstDraw(p, t) / 1e4).toPrecision(3)}万 × ${Math.round(plan.need / firstDraw(p, t))} 倍 · 八成年景够花到 95 岁`, '③ 2,000 种年景', '平均每年 2.9% 本工具设定',
+    `⇒ ${30 + t} 岁放假要有 ¥391万`, `≈ 每年从存款取 ¥${(firstDraw(p, t) / 1e4).toPrecision(3)}万 × ${Math.round(plan.need / firstDraw(p, t))} 倍，相当于每年取 ${(firstDraw(p, t) / plan.need * 100).toFixed(1)}% · 八成年景够花到 95 岁`, '③ 2,000 种年景', '平均每年 2.9% 本工具设定',
     `⇒ 第一个到八成 ${30 + t} 岁`, '≈ 估算 · 按今天的钱', '计算方法 ›']) assert.ok(text.includes(s), s);
   assert.doesNotMatch(html, /<s[ >]/); assert.match(html, /href="method\.html#accumulate"/);
   // ① ends with the simulation's median at the holiday, — until the simulation is in.
@@ -216,7 +216,7 @@ test('ledgerHtml pro: the spec example, each number the engine\'s', () => {
   for (const x of ['① 攒钱', '可投资资产 ¥200,000', '¥360,000', '− 当前年支出', '¥180,000', `t = ${t - 1} 时 ¥${Math.round(90000 * Math.pow(1 + p.infl / 100, -(t - 1))).toLocaleString('en-US')}`,
     `= 年储蓄 t0 → t${t - 1} 180,000 → 301,536`, '② 放假以后 年初取出', `${h}–49 退休后年支出 ≈ ¥180,000`, `月供实际变轻，${h} 岁实付 ¥163,066`, `− 50 起 月供 ≈ ${fmt(spendOf(p, t, 19) - spendOf(p, t, 19, 50))} = ≈ ¥${fmt(spendOf(p, t, 20))}`,
     '→ 63 自缴（工作地中国大陆且填了养老金才计） —', '养老金（超出年支出不计） — ›', '少花（只砍生活费，月供、自缴照付） 0%',
-    `⇒ 放假线（每条路径倒推，取 80 分位） ¥${Math.round(need).toLocaleString('en-US')}`, `≈ 年支出 ¥${fmt(firstDraw(p, t))} × ${Math.round(need / firstDraw(p, t))} 倍 · 反推提取率`,
+    `⇒ 放假线（每条路径倒推，取 80 分位） ¥${Math.round(need).toLocaleString('en-US')}`, `≈ 每年从存款取 ¥${fmt(firstDraw(p, t))} × ${Math.round(need / firstDraw(p, t))} 倍 · 反推提取率`,
     `r = 60% × 5% + 40% × (${p.bondY}% − ${p.infl}%) − ${p.drag}% ${(p.r * 100).toFixed(2)}%`, `σ（股 17% · 债 6% · ρ 0.2） ${(p.sigma * 100).toFixed(1)}%`,
     `⇒ 第一个到 80% ${h} 岁`, `按固定收益算（约五成） ${p.age + fwdSolve(p)} 岁`, `${h} 岁中位资产 —`]) assert.ok(text.includes(x), x);
   for (const o of oddsAround(p, t)) assert.ok(text.includes(`${o.age} 岁 ${o.count.toLocaleString('en-US')} / 2,000 ${(o.share * 100).toFixed(1)}%`), `${o.age}`);
@@ -331,7 +331,7 @@ test('ledger copy: − rows, the named denominator, the bridge line, the FX note
   const mc = { bands: { [plan.t]: [0, 0, 5000000, 0, 0] } };
   const html = strip(ledgerHtml({ rows: storyRows(s, DATA, 2026, plan), odds: oddsAround(plan.p, plan.t), plan, p: plan.p, dispCur: 'CNY', mc }));
   assert.match(html, /− 54 起 孩子 2,000 = ≈ ¥14,152/);
-  assert.match(html, /≈ 年支出 ¥19\.8万 × 21 倍 · 八成年景够花到 95 岁/);
+  assert.match(html, /≈ 每年从存款取 ¥19\.8万 × 21 倍，相当于每年取 4\.8% · 八成年景够花到 95 岁/);
   assert.match(html, /⇒ 50 岁时一般攒到 本工具设定 ¥500万/);
   assert.doesNotMatch(html, /汇率变化/);
   // Beyond the brief: the mortgage's counted amount is lighter than the typed 7,500, so ≈; no strike-through in the ledger.
@@ -347,7 +347,7 @@ test('ledger copy: − rows, the named denominator, the bridge line, the FX note
   const pro = strip(ledgerHtml({ rows: storyRows({ ...s, view: 'pro' }, DATA, 2026, plan), odds: oddsAround(plan.p, plan.t), plan, p: plan.p, view: 'pro', dispCur: 'CNY', mc }));
   assert.doesNotMatch(pro, /一般攒到/);
   assert.match(pro, /− 54 起 孩子 24,000 = ≈ ¥169,825/); assert.match(pro, /− 55 起 月供 ≈ 67,825 = ¥102,000/);
-  assert.match(pro, new RegExp(`≈ 年支出 ¥${fmt(firstDraw(plan.p, plan.t))} × 21 倍 · 反推提取率`));
+  assert.match(pro, new RegExp(`≈ 每年从存款取 ¥${fmt(firstDraw(plan.p, plan.t))} × 21 倍 · 反推提取率`));
 });
 test('two currencies: ② in the work currency, the field lines in the retirement currency, the FX note in pro', () => {
   const s = setRetireCountry(family(), 'TH', DATA); const plan = solve(s); const { p, t } = plan;

@@ -67,9 +67,9 @@ test('hiding the age hides every line that gives it away', () => {
 test('the odds sit with the age, and the assumptions are spelled out', () => {
   const s = summaryCardSpec({ ...summary, odds: '八成把握', assumptions: assumptionLine({ r: 0.029, pension: 0 }) });
   assert.equal(s.odds, '八成把握');
-  assert.equal(assumptionLine({ r: 0.029, pension: 0 }), '按今天的钱算 · 实际收益 2.9%/年 · 未算养老金 / 社保自缴');
-  assert.equal(assumptionLine({ r: 0.029, pension: 0, events: [] }), '按今天的钱算 · 实际收益 2.9%/年 · 未算养老金 / 社保自缴');
-  assert.equal(assumptionLine({ r: 0.029, pension: 0, events: [{ id: 'mortgage' }] }), '按今天的钱算 · 实际收益 2.9%/年 · 未算养老金 / 社保自缴 · 含到期支出');
+  assert.equal(assumptionLine({ r: 0.029, pension: 0 }), '按今天的钱算 · 实际收益 2.9%/年 · 未算养老金和社保自缴');
+  assert.equal(assumptionLine({ r: 0.029, pension: 0, events: [] }), '按今天的钱算 · 实际收益 2.9%/年 · 未算养老金和社保自缴');
+  assert.equal(assumptionLine({ r: 0.029, pension: 0, events: [{ id: 'mortgage' }] }), '按今天的钱算 · 实际收益 2.9%/年 · 未算养老金和社保自缴 · 含到期支出');
   assert.equal(assumptionLine({ r: 0.0286, pension: 36000 }), '按今天的钱算 · 实际收益 2.9%/年 · 含养老金 · 未算社保自缴');
   assert.match(s.assumptions, /按本工具假设模拟，方法见网页『计算方法』$/);
   assert.equal(summaryCardSpec(summary).assumptions, '');
@@ -356,9 +356,9 @@ test('a six-character typed town still fits on the share card', () => {
 });
 
 test('the third assumption item: no pension, pension without self-pay, pension with self-pay', () => {
-  assert.match(assumptionLine({ r: 0.029, pension: 0, selfPay: 0 }), /未算养老金 \/ 社保自缴$/);
+  assert.match(assumptionLine({ r: 0.029, pension: 0, selfPay: 0 }), /未算养老金和社保自缴$/);
   assert.match(assumptionLine({ r: 0.029, pension: 36000, selfPay: 0 }), /含养老金 · 未算社保自缴$/);
   assert.match(assumptionLine({ r: 0.029, pension: 36000, selfPay: 14400 }), /含养老金和社保自缴$/);
-  assert.match(assumptionLine({ r: 0.029, pension: 0, selfPay: 14400 }), /未算养老金 \/ 社保自缴$/);
+  assert.match(assumptionLine({ r: 0.029, pension: 0, selfPay: 14400 }), /未算养老金和社保自缴$/);
   assert.match(assumptionLine({ r: 0.029, pension: 36000 }), /含养老金 · 未算社保自缴$/);
 });

@@ -308,6 +308,8 @@ h3 { font-family: var(--f-display); font-weight: 900; font-size: 16px; margin: 1
 .lifebar i { display: block; height: 100%; }
 .lifebar .work { background: var(--ink-3); }
 .lifebar .rest { background: var(--good); }
+/* Holiday years that depend on returns, below 8 in 10: pale stripes, not the green of money already there. */
+.lifebar .rest-open { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--good) 35%, transparent) 0 5px, transparent 5px 10px); }
 .lifebar-ticks { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-2); gap: 8px; }
 .hero-odds { margin: 4px 0 0; font-size: 14px; }
 .hero-odds summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; }

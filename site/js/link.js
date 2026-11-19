@@ -1,6 +1,8 @@
 // Numbers carried in an address fragment, for a worked example a guide or an answer links to: #age=30&income=12000.
 // The fragment never reaches the server, so the numbers stay in the browser, as typed ones do. Money is monthly where
-// the simple form asks for it monthly, and in the currency of the place it belongs to.
+// the simple form asks for it monthly, and in the currency of the place it belongs to. Some sites drop the fragment
+// from an outbound link, so the same keys are also read from the query (?age=30&income=12000), and the page moves
+// them into the fragment at once. A query does reach the server, so it is for published examples only.
 import { defaultState, setField, setRetireCountry, setWorkCountry } from './state.js';
 
 // Fixed order: places first, since choosing a place converts the money already there.
@@ -8,6 +10,22 @@ const PLACES = { work: setWorkCountry, retire: setRetireCountry };
 const NUMBERS = { age: ['age', 1], assets: ['assets', 1], income: ['income', 12], expense: ['expense', 12], retexp: ['retExp', 12], pension: ['pension', 12], tage: ['tAge', 1] };
 const ORDER = ['age', 'assets', 'income', 'expense', 'retexp', 'pension', 'tage', 'mode', 'work', 'retire'];
 const MODES = ['fwd', 'bwd'];
+
+// Where a link's numbers are: the address's own fragment when it holds link keys, else the link keys found in the
+// query, moved into a fragment, with the query left as it would be without them. Null when neither holds any.
+export function linkFromAddress(hash, search) {
+  const own = String(hash ?? '').replace(/^#/, '');
+  if (ORDER.some(key => new URLSearchParams(own).has(key))) return { hash: '#' + own, search: String(search ?? ''), moved: false };
+  const query = new URLSearchParams(String(search ?? '').replace(/^\?/, ''));
+  if (!ORDER.some(key => query.has(key))) return null;
+  const moved = new URLSearchParams();
+  for (const key of ORDER) {
+    if (query.has(key)) moved.set(key, query.get(key));
+    query.delete(key);
+  }
+  const rest = query.toString();
+  return { hash: '#' + moved.toString(), search: rest ? '?' + rest : '', moved: true };
+}
 
 // The state a fragment describes, built on the examples, or null when the fragment holds none of these keys.
 export function stateFromLink(hash, data) {

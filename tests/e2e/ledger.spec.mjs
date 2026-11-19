@@ -6,7 +6,7 @@ test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true
 test('the fund line is the ledger\'s closed state and opens in place', async ({ page }) => {
   await page.goto('/');
   const fund = page.locator('#hero .fund');
-  await expect(fund).toContainText(/放假资金：已有 ¥[\d.]+万，需要 ¥[\d.]+万（\d+%）/);
+  await expect(fund).toContainText(/放假资金：已有 ¥[\d.]+万 · \d+ 倍，需要 ¥[\d.]+万 · \d+ 倍/);
   await expect(fund).not.toContainText('年的花销');
   const toggle = page.locator('.ledger-toggle').first();
   await expect(toggle).toHaveText('怎么算的 ▸');
@@ -169,7 +169,7 @@ test('the family numbers: ② subtracts each ending item from the engine\'s spen
   const ledger = page.locator('#ledger');
   await expect(ledger).toContainText(/− 减?\s*\d+ 起 孩子 2,000 =\s*剩?\s*(≈\s*)?¥[\d,]+/);
   await expect(ledger).toContainText(/− 减?\s*\d+ 起 月供 ≈ [\d,]+ =\s*剩?\s*(≈\s*)?¥[\d,]+/);
-  await expect(ledger).toContainText(/≈ 年支出 ¥[\d.]+万 × \d+ 倍/);
+  await expect(ledger).toContainText(/≈ 每年从存款取 ¥[\d.]+万 × \d+ 倍，相当于每年取 [\d.]+%/);
   await expect(ledger).toContainText(/⇒ \d+ 岁时一般攒到 本工具设定 ¥[\d.]+万/);
   // The − rows carry no strike-through; the struck names stay in the lines under the field.
   const items = ledger.locator('.lg-row', { hasText: /^\s*− 减?\s*\d+ 起/ });

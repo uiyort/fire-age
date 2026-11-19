@@ -20,7 +20,7 @@ const GROUP_STAMPS = {
 
 // The assumptions a number on the card rests on, in three short items. A pension, and self-paid insurance, change the third.
 export function assumptionLine({ r, pension, selfPay = 0, events = [] }) {
-  const left = !(pension > 0) ? '未算养老金 / 社保自缴' : selfPay > 0 ? '含养老金和社保自缴' : '含养老金 · 未算社保自缴';
+  const left = !(pension > 0) ? '未算养老金和社保自缴' : selfPay > 0 ? '含养老金和社保自缴' : '含养老金 · 未算社保自缴';
   return `按今天的钱算 · 实际收益 ${pct(r, 1)}/年 · ${left}${events.length > 0 ? ' · 含到期支出' : ''}`;
 }
 
@@ -48,7 +48,9 @@ export function summaryCardSpec({ mode, type, hero, monthlyText, enough, place, 
   const dated = hero.reachable || mode === 'bwd';
   // Under the age, where the person stands today, so the big number is not read as their current age.
   let now = `现在 ${hero.startAge} 岁，`;
-  if (mode === 'bwd') now += enough ? '存款已经够了' : hero.workYears === 0 ? '今天就放假' : `再上 ${hero.workYears} 年班`;
+  // Below 8 in 10, stopping today is not a holiday yet (rule 8).
+  const weak = hero.held !== null && hero.held !== undefined;
+  if (mode === 'bwd') now += enough ? '存款已经够了' : hero.workYears === 0 ? (weak ? '今天就停' : '今天就放假') : `再上 ${hero.workYears} 年班`;
   else if (!hero.reachable) now += `到 ${hero.endAge} 岁之前还攒不到`;
   else now += hero.workYears === 0 ? '已经可以放假' : `再上 ${hero.workYears} 年班`;
   if (!showNow) now = '';
@@ -73,7 +75,7 @@ export function summaryCardSpec({ mode, type, hero, monthlyText, enough, place, 
   else if (goalText) note = { label: '小目标达成', main: goalText, detail: '' };
   // A town the person typed is their own plan, so it comes before the lever; its spend was typed, not the same money.
   else if (place?.town) note = { label: '换个地方', main: `去${place.name}放假`, detail: `早 ${trimYears(place.gain)} 年` };
-  else if (lever) note = { label: '提前的办法', main: money || !lever.plain ? lever.action : lever.plain, detail: lever.unlockAge ? `就能在 ${lever.unlockAge} 岁放假` : `早 ${trimYears(lever.gain)} 年放假` };
+  else if (lever) note = { label: '提前的办法', main: money || !lever.plain ? lever.action : lever.plain, detail: lever.unlockAge ? `就能在 ${lever.unlockAge} 岁放假` : mode === 'bwd' ? `八成把握早 ${trimYears(lever.gain)} 年` : `早 ${trimYears(lever.gain)} 年放假` };
   else if (place) note = { label: '同样的钱', main: `去${place.name}放假`, detail: `早 ${trimYears(place.gain)} 年` };
   return {
     kind: 'summary', size: [1080, 1440], brand: BRAND, searchHint: search ? SEARCH_HINT : '', now, odds,
@@ -89,6 +91,7 @@ export function summaryCardSpec({ mode, type, hero, monthlyText, enough, place, 
     mondays: hero.reachable && showNow ? hero.mondays : null,
     months: hero.months ?? null,
     covered: Boolean(hero.covered),
+    weak,
     note,
     boarding,
     barcode,
@@ -390,7 +393,7 @@ function renderSummary(spec, canvas) {
     put(display(44), STUB_INK, spec.mondays.toLocaleString('zh-CN'), mx, valueY);
     put(plain(22), STUB_MUTED, '个', mx + measureAt(display)(spec.mondays.toLocaleString('zh-CN'), 44) + 8, valueY);
   } else {
-    put(bold(34), STUB_INK, '不用再等', mx, valueY);
+    put(bold(34), STUB_INK, spec.weak ? '今天就停' : '不用再等', mx, valueY);
   }
   const hx = colX('months');
   // Months of holiday already saved: a fact, with no amount in it.
