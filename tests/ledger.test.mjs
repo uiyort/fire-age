@@ -41,13 +41,13 @@ test('the fund line is the ledger\'s closed state: no 年的花销, a toggle ins
   const h = heroModel({ mode: 'fwd', p, t, bwd: null, success: 0.8, need });
   const closed = heroHtml(h, { p, dispCur: 'CNY' });
   assert.ok(!closed.includes('年的花销'));
-  assert.match(strip(closed), /放假资金：已有 ¥20万 \/ 需要 ¥\d+万（ ?\d+% ?） 怎么算的 ▸/);
+  assert.match(strip(closed), /放假资金：已有 ¥20万，需要 ¥\d+万（ ?\d+% ?） 怎么算的 ▸/);
   assert.match(closed, /<button type="button" class="ledger-toggle" aria-expanded="false" aria-controls="ledger">/);
   const open = heroHtml(h, { p, dispCur: 'CNY', open: true });
   assert.match(open, /aria-expanded="true"/); assert.ok(strip(open).includes('怎么算的 ▾'));
   assert.ok(strip(heldHeroHtml()).includes('放假资金 — 怎么算的 ▸'));
   const far = heroModel({ mode: 'fwd', p, t: null, bwd: null, success: null, need });
-  assert.ok(strip(heroHtml(far, { p, dispCur: 'CNY' })).includes('放假资金：按现在的节奏到不了 怎么算的 ▸'));
+  assert.ok(strip(heroHtml(far, { p, dispCur: 'CNY' })).includes('放假资金：照现在每月存的钱，攒不到放假线 怎么算的 ▸'));
 });
 
 test('ledgerHtml simple: the three sections in the spec\'s words', () => {
@@ -103,7 +103,7 @@ test('ledgerHtml held, unreachable, today and backward', () => {
   const p = toParams(poor, DATA, 2026); const T = p.life - p.age - 1;
   const unPlan = { p, t: T, need: null, unreachable: true };
   const un = strip(ledgerHtml({ rows: storyRows(poor, DATA, 2026, unPlan), list: [], odds: oddsAround(p, T), plan: unPlan, state: 'unreachable', view: 'simple', mode: 'fwd', p, dispCur: 'CNY' }));
-  for (const x of [`${p.age} → ${p.age + T} 岁`, `② 如果 ${p.age + T} 岁放假`, `${p.age + T} 岁 `, '规划期内到不了八成']) assert.ok(un.includes(x), x);
+  for (const x of [`${p.age} → ${p.age + T} 岁`, `② 如果 ${p.age + T} 岁放假`, `${p.age + T} 岁 `, '哪一年放假都到不了八成']) assert.ok(un.includes(x), x);
   for (const x of ['放假要有', '年支出 ×', `${p.age + T - 1} 岁 ●`, '第一个到八成']) assert.ok(!un.includes(x), x);
 
   const rich = { ...S, assets: 20000000 };

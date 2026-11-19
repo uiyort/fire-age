@@ -77,3 +77,9 @@ test('a link names what it holds in a fixed order and reads back the same', () =
   assert.equal(S.mode, 'bwd');
   assert.throws(() => linkHash({ colour: 'red' }), /colour/);
 });
+
+test('a link can carry a monthly pension, in the retirement currency', () => {
+  const S = stateFromLink('#age=35&pension=2000', DATA);
+  assert.equal(S.pension, 24000);
+  assert.equal(linkHash({ age: 35, pension: 2000 }), '#age=35&pension=2000');
+});

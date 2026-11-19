@@ -72,7 +72,7 @@ test('final review 1: a town spend below the items leaves the items out of that 
   const town = townPlan(p, 2000);
   assert.equal(town.ignored, true);
   assert.deepEqual(town, { age: null, years: null, gain: null, ignored: true });
-  assert.equal(townHtml({ name: '大理', monthly: 2000 }, town, p), '<p class="town-line">在大理每月花 ¥2,000：比月供和孩子的花销还少。把月供和孩子算进这里的花销，再看几岁能放假。</p>');
+  assert.equal(townHtml({ name: '大理', monthly: 2000 }, town, p), '<p class="town-line">在大理每月花 ¥2,000，比月供和孩子的花销还少。把月供和孩子算进这里的花销，再看几岁能放假。</p>');
   assert.ok(!townHtml({ name: '大理', monthly: 2000 }, town, p).includes('这一行没有算'));
   // The card never names such a town: it falls back to the best overseas place, or none.
   assert.equal(cardPlace([{ name: 'X', years: 10, current: true }], { name: '大理' }, town), null);

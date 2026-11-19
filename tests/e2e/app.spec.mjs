@@ -53,7 +53,7 @@ test('simple mode also solves backward', async ({ page }) => {
   await page.goto('/');
   await page.click('#to-bwd');
   await expect(page.locator('#headline')).toContainText('放假');
-  await expect(page.locator('#headline')).toContainText('想');
+  await expect(page.locator('#headline')).toContainText('岁放假，钱够花到');
   await expect(page.locator('#s-tage')).toBeVisible();
 });
 

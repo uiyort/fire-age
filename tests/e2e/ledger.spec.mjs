@@ -6,7 +6,7 @@ test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true
 test('the fund line is the ledger\'s closed state and opens in place', async ({ page }) => {
   await page.goto('/');
   const fund = page.locator('#hero .fund');
-  await expect(fund).toContainText(/放假资金：已有 ¥[\d.]+万 \/ 需要 ¥[\d.]+万（\d+%）/);
+  await expect(fund).toContainText(/放假资金：已有 ¥[\d.]+万，需要 ¥[\d.]+万（\d+%）/);
   await expect(fund).not.toContainText('年的花销');
   const toggle = page.locator('.ledger-toggle').first();
   await expect(toggle).toHaveText('怎么算的 ▸');

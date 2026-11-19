@@ -546,7 +546,10 @@ fieldset, .pen-grid, .split-row, .town-row { grid-auto-flow: row dense; }
 .row .est { color: var(--s1); }
 /* The professional form's read-only 模拟 line. */
 .sim-line { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--ink-2); }
-.tool { display: inline-block; padding: 0 5px; border: 1px dashed var(--ink-3); border-radius: 4px; font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.tool { display: inline-block; padding: 0 5px; border: 1px dashed var(--ink-3); border-radius: 4px; font: inherit; font-size: 11px; line-height: 1.5; color: var(--ink-3); background: transparent; white-space: nowrap; cursor: pointer; }
+.tool:hover, .tool[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+/* The explanation of a 本工具设定 tag, placed under the tag that opened it. */
+.tool-pop { position: absolute; z-index: 60; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 13px; line-height: 1.6; box-shadow: 0 6px 20px rgba(0, 0, 0, .12); }
 .fixes { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 2px 0; }
 .fix { white-space: nowrap; }
 .f-pre.est { color: var(--s1); }

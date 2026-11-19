@@ -6,8 +6,8 @@ const legend = (page, name) => page.locator('#simple-form legend', { hasText: na
 test('stopping today shows its odds, offers waiting and never a saving', async ({ page }) => {
   await page.goto('/#mode=bwd&tage=35&age=35&assets=1800000&income=6000&expense=6000');
   await expect(page.locator('#to-bwd')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#headline')).toContainText('想 35 岁放假');
-  await expect(page.locator('#headline')).toContainText('2 成把握');
+  await expect(page.locator('#headline')).toContainText('如果今天就放假');
+  await expect(page.locator('#headline')).toContainText('把握只有 2 成');
   await expect(page.locator('#headline')).toContainText('等到');
   await expect(page.locator('#headline')).not.toContainText('每月需存');
   await expect(page.locator('#hero')).toContainText('今天起放假');
@@ -15,6 +15,12 @@ test('stopping today shows its odds, offers waiting and never a saving', async (
   await expect(page.locator('#solves')).toContainText('没有攒钱的时间');
   await expect(page.locator('#solves')).not.toContainText(/NaN|Infinity|null/);
   await expect(page.locator('[data-chip]')).toHaveCount(0);
+  // The ledger has no saving years to tell, and shows the multiple the post quotes.
+  await page.click('.ledger-toggle');
+  await expect(page.locator('#ledger')).toContainText('今天就停');
+  await expect(page.locator('#ledger')).not.toContainText('一般攒到');
+  await expect(page.locator('#ledger')).not.toContainText('不用再攒');
+  await expect(page.locator('#ledger')).toContainText('× 42 倍');
 });
 
 test('an age to holiday at before today is stopped, and the fix is today', async ({ page }) => {

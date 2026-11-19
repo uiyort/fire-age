@@ -98,7 +98,7 @@ test('the stamp beside the age is the group seal, never a status that reads as a
 test('a line under the age says where the person stands today', () => {
   assert.equal(summaryCardSpec(summary).now, '现在 30 岁，再上 13 年班');
   assert.equal(summaryCardSpec({ ...summary, hero: { ...hero, workYears: 0, holidayAge: 30 } }).now, '现在 30 岁，已经可以放假');
-  assert.equal(summaryCardSpec({ ...summary, hero: { ...hero, reachable: false } }).now, '现在 30 岁，规划期内还到不了');
+  assert.equal(summaryCardSpec({ ...summary, hero: { ...hero, reachable: false } }).now, '现在 30 岁，到 95 岁之前还攒不到');
   assert.equal(summaryCardSpec({ ...summary, mode: 'bwd', enough: true }).now, '现在 30 岁，存款已经够了');
   assert.equal(summaryCardSpec({ ...summary, mode: 'bwd', monthlyText: '8,600', enough: false }).now, '现在 30 岁，再上 13 年班');
 });

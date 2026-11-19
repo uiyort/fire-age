@@ -12,7 +12,7 @@ export const PARAMS = [
     improve: '先把账户盘点清楚，再把长期闲置的钱纳入长期规划。', noRangeReason: PERSONAL },
   { id: 'income', name: '税后收入', what: '到手的收入。它和支出的差额决定你每年能存多少。',
     improve: '提升收入通常比压缩支出的空间更大，比如技能升级、换更好的工作机会。', noRangeReason: PERSONAL },
-  { id: 'expense', name: '当前支出', what: '现在一年实际花多少。它影响两件事：每年能存多少，以及退休后需要多少。',
+  { id: 'expense', name: '当前支出', what: '现在一年实际花多少。它既决定每年能存多少，也决定放假后需要多少。',
     improve: '先记一个月的账，优先看房租、交通、保险、订阅这类固定支出，砍一次长期有效。', noRangeReason: PERSONAL },
   { id: 'growth', name: '收入实际增长', what: '扣掉通胀后，收入每年多涨多少。工作前期通常更快，后期会放缓。',
     improve: '不要按最好的年份估算。保守一点，结果更可靠。', noRangeReason: PERSONAL },

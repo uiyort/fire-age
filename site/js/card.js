@@ -49,7 +49,7 @@ export function summaryCardSpec({ mode, type, hero, monthlyText, enough, place, 
   // Under the age, where the person stands today, so the big number is not read as their current age.
   let now = `现在 ${hero.startAge} 岁，`;
   if (mode === 'bwd') now += enough ? '存款已经够了' : hero.workYears === 0 ? '今天就放假' : `再上 ${hero.workYears} 年班`;
-  else if (!hero.reachable) now += '规划期内还到不了';
+  else if (!hero.reachable) now += `到 ${hero.endAge} 岁之前还攒不到`;
   else now += hero.workYears === 0 ? '已经可以放假' : `再上 ${hero.workYears} 年班`;
   if (!showNow) now = '';
   const barcode = ['FIRE AGE', ...(dated ? [hero.holidayAge] : [])].join(' · ');
@@ -60,7 +60,7 @@ export function summaryCardSpec({ mode, type, hero, monthlyText, enough, place, 
     route: !showNow ? '' : !dated ? `${hero.startAge} → ? → ${hero.endAge}` : hero.workYears === 0 ? `${hero.startAge} → ${hero.endAge}` : `${hero.startAge} → ${hero.holidayAge} → ${hero.endAge}`,
   };
   // The departure field would repeat the big age, so it states the rule that made the letter.
-  const departs = !dated ? '规划期内还到不了' : type.axes[0]?.letter === 'E' ? '50 岁前' : '50 岁后';
+  const departs = !dated ? `${hero.endAge} 岁前还攒不到` : type.axes[0]?.letter === 'E' ? '50 岁前' : '50 岁后';
   let note = null;
   // With money off, a note told in money gives way to the next one.
   if (fifth?.amount && !money) fifth = null;

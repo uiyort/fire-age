@@ -43,7 +43,7 @@ test.describe('mortgage and children', () => {
     await fold.locator('summary').click();
     await expect(fold).toContainText('月供和孩子的花销，算在每月支出里，也算在退休后每月想花里。到期以后，这部分自动减掉。');
     await expect(fold).not.toContainText('这些已经算在上面的每月支出里');
-    await expect(fold).toContainText('没算：给孩子买房或婚嫁、赡养父母、出国读书、提前还款或利率变化。');
+    await expect(fold).toContainText('这里没算给孩子买房或婚嫁、赡养父母、出国读书、提前还款或利率变化。');
     await expect(page.locator('#life-issue, #life-after')).toHaveCount(0);
     await expect(fold).not.toContainText('后面的版本');
     await page.locator('#life-mortgage').press('Enter');
@@ -184,7 +184,7 @@ test.describe('mortgage and children', () => {
     const line = page.locator('#town-result');
     // A spend that holds the mortgage gives an age, so the check below can tell an age from none.
     await page.fill('#town-monthly', '12000');
-    await expect(line).toHaveText(/\d+ 岁放假/);
+    await expect(line).toHaveText(/\d+ 岁就有八成把握/);
     await page.fill('#town-monthly', '3000');
     await expect(line).toContainText('比月供和孩子的花销还少');
     // The sentence asks to add the items back; it gives no age.

@@ -268,11 +268,11 @@ test('the all-types list shows no code as text', () => {
 
 test('the variants table says how Lean and Fat differ from the English-speaking usage', () => {
   const p = person().p;
-  assert.ok(variantsHtml({ p, dispCur: 'CNY' }).includes('英文圈的 Lean / Fat 多按绝对金额分'));
+  assert.ok(variantsHtml({ p, dispCur: 'CNY' }).includes('英文圈的 Lean 和 Fat 多按绝对金额分'));
 });
 
 const WEAK = {
-  waiting: '按现在的节奏还到不了，最要紧的是让每个月能存下钱。',
+  waiting: '现在还攒不到放假线，最要紧的是让每个月能存下钱。',
   thin: '把握还不到八成，最怕放假头几年就撞上大跌。',
   pension: '一半以上的开销指望养老金，最怕领取年龄再推迟，或者待遇不如预期。',
   far: '换了地方生活，最怕汇率和当地物价一起涨，还有签证和医保。',
@@ -339,9 +339,9 @@ test('a typed town name is escaped and its sentence names the age and the direct
   const html = townHtml({ name: '<b>清迈</b>', monthly: p.retExp / 24 }, plan, p);
   assert.ok(!html.includes('<b>'), html);
   assert.match(html, /&lt;b&gt;清迈/);
-  assert.match(html, /岁放假，早 \d+(\.\d)? 年（八成把握）/);
+  assert.match(html, /，\d+ 岁就有八成把握，早 \d+(\.\d)? 年。/);
   assert.equal(townHtml({ name: '', monthly: null }, { age: null, years: null, gain: null }, p), '');
-  assert.match(townHtml({ name: '大理', monthly: 1e9 }, { age: null, years: null, gain: null }, p), /还到不了/);
+  assert.match(townHtml({ name: '大理', monthly: 1e9 }, { age: null, years: null, gain: null }, p), /钱够花的把握到不了八成/);
   const later = townHtml({ name: '大理', monthly: 1 }, { age: 50, years: 20, gain: -2.4 }, p);
   assert.match(later, /晚 2\.4 年/);
 });
@@ -366,5 +366,5 @@ test('the tag lists only the counted items, without an amount; the gain is told 
   assert.equal(lifeGainText(null), '');
   assert.equal(lifeGainText({ years: 3 }), '算上到期，比不算早 3 年放假。');
   assert.equal(lifeGainText({ years: 0 }), '算上到期，放假年龄没变。');
-  assert.equal(lifeGainText({ unreachableWithout: true }), '不算到期的话，按现在的计划到不了。');
+  assert.equal(lifeGainText({ unreachableWithout: true }), '不算到期后省下的钱，就到不了八成把握。');
 });

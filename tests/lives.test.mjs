@@ -189,7 +189,7 @@ test('the pension line says how far a pension moves the holiday, in months when 
  const { dualOdds } = await import('../site/js/odds.js');
   const note = q => headlineText({ mode: 'fwd', p: q, t: fwdSolve(q), bwd: bwdSolve(q), dual: dualOdds(q), dispCur: 'CNY' }).note;
   assert.match(note(person({ pension: 6000 })), /^养老金 \d+ 岁才开始领，(只让放假提前 \d+ 个月|对 \d+ 岁放假几乎没有影响)。$/);
-  assert.match(note(person({ pension: 120000 })), /^算上养老金 \d+ 岁 \/ 不算养老金 \d+ 岁$/);
+  assert.match(note(person({ pension: 120000 })), /^算上养老金，\d+ 岁就有八成把握；不算养老金要到 \d+ 岁。$/);
   assert.equal(note(person({ pension: 12000, assets: 50000000 })), '现在就能放假，养老金是额外的保障。');
   assert.equal(note(person()), '填上养老金，看看能提前多少。');
 });
@@ -209,7 +209,7 @@ test('a slider shows its current value before it is moved, and the change after'
   const p = person();
   const range = tryRange(p, 'retExp');
   const before = tryHtml('retExp', range, range.value, { mode: 'fwd', p });
-  assert.match(before, /<output>现在 .+：\d+ 岁放假<\/output>/);
+  assert.match(before, /<output>现在 .+，\d+ 岁放假<\/output>/);
   const moved = tryHtml('retExp', range, range.value * 0.5, { mode: 'fwd', p });
   assert.match(moved, /<output>.+ → .+：放假 \d+ → \d+ 岁/);
 });
@@ -302,16 +302,16 @@ test('the fifth life walks the same years as the life it rewrites', () => {
 
 test('the fifth life sentence counts the holiday that has money, not the years after it runs dry', () => {
   const base = story({ outcome: 'ruined', ruinAge: 71 });
-  assert.equal(fifthSentence(base, story({ outcome: 'ruined', ruinAge: 71, retireAge: 41 })), '同样的年景，有钱花的假期从 28 年变成 30 年：早 2 年放假，71 岁花完');
-  assert.equal(fifthSentence(base, story({ outcome: 'lasted', retireAge: 41 })), '同样的年景，有钱花的假期从 28 年变成 54 年：早 2 年放假，钱撑到 95 岁');
-  assert.equal(fifthSentence(base, story({ outcome: 'lasted', retireAge: 45 })), '同样的年景，有钱花的假期从 28 年变成 50 年：晚 2 年放假，钱撑到 95 岁');
-  assert.equal(fifthSentence(base, story({ outcome: 'lasted' })), '同样的年景，有钱花的假期从 28 年变成 52 年：钱撑到 95 岁');
+  assert.equal(fifthSentence(base, story({ outcome: 'ruined', ruinAge: 71, retireAge: 41 })), '同样的年景，早 2 年放假，71 岁花完，有钱花的假期从 28 年变成 30 年');
+  assert.equal(fifthSentence(base, story({ outcome: 'lasted', retireAge: 41 })), '同样的年景，早 2 年放假，钱撑到 95 岁，有钱花的假期从 28 年变成 54 年');
+  assert.equal(fifthSentence(base, story({ outcome: 'lasted', retireAge: 45 })), '同样的年景，晚 2 年放假，钱撑到 95 岁，有钱花的假期从 28 年变成 50 年');
+  assert.equal(fifthSentence(base, story({ outcome: 'lasted' })), '同样的年景，钱撑到 95 岁，有钱花的假期从 28 年变成 52 年');
   assert.equal(fifthSentence(base, base), '同样的年景，结局没有变，换个选择再试试');
 });
 
 test('an earlier holiday that runs dry just as early is not sold as a gain', () => {
   const s = fifthSentence(story({ outcome: 'ruined', retireAge: 49, ruinAge: 88 }), story({ outcome: 'ruined', retireAge: 46, ruinAge: 85 }));
-  assert.equal(s, '同样的年景，有钱花的假期还是 39 年：早 3 年放假，85 岁花完');
+  assert.equal(s, '同样的年景，早 3 年放假，85 岁花完，有钱花的假期还是 39 年');
   assert.ok(!/变成 \d+ 岁花完/.test(s));
 });
 
@@ -417,7 +417,7 @@ test('slider choices join the views carried into the professional view', () => {
 
 test('a written life that runs dry sooner says so plainly', () => {
   const base = story({ outcome: 'ruined', ruinAge: 71 });
-  assert.equal(fifthSentence(base, story({ outcome: 'ruined', ruinAge: 68 })), '同样的年景，有钱花的假期从 28 年变成 25 年：68 岁花完');
+  assert.equal(fifthSentence(base, story({ outcome: 'ruined', ruinAge: 68 })), '同样的年景，68 岁花完，有钱花的假期从 28 年变成 25 年');
 });
 
 test('the written life is compared against the dashed life it rewrites', () => {
@@ -451,9 +451,9 @@ test('the pension line says so plainly when pension plus self-pay makes the holi
   const p = toParams(setField(defaultState(DATA), 'pension', '36000'), DATA);
   const note = dual => headlineText({ mode: 'fwd', p, t: 10, bwd: bwdSolve(p), dual, dispCur: 'CNY' }).note;
   const later = note({ withPension: 47, withoutPension: 45, gain: -2 });
-  assert.match(later, /^算上养老金 47 岁，比不算养老金的 45 岁还晚/);
-  assert.ok(!/NaN|undefined|null/.test(later));
-  assert.match(note({ withPension: null, withoutPension: 45, gain: null }), /不算养老金 45 岁/);
+  assert.equal(later, '算上养老金要到 47 岁，比不算还晚 2 年，因为放假后自缴的社保比领到的养老金还多。');
+  assert.equal(note({ withPension: null, withoutPension: 45, gain: null }), '算上养老金和放假后自缴的社保，反而到不了八成把握；不算养老金，45 岁就有。');
+  assert.equal(note({ withPension: 46, withoutPension: null, gain: null }), '算上养老金，46 岁就有八成把握；不算养老金，到 95 岁之前都到不了。');
 });
 
 test('the sensitivity table writes a negative non-money value with U+2212', async () => {

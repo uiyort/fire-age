@@ -2,6 +2,7 @@
 import { DEFAULT_PATHS, DEFAULT_SEED, coastNeed, conv, bwdSolve, firstDraw, fwdSolve, savingsAt, savingsRate, buildParams, swrFor } from './engine.js';
 import { AXES, GROUPS, TYPES, holidayYearsOf, lifeName, lifeRibbon, mondaysIn, oddsBand, oddsText, peopleOf } from './holiday.js';
 import { needLine, oddsSolve, oddsYears } from './odds.js';
+import { WHY, toolTag } from './tool-notes.js';
 import { MIN_SHOWN, SCENARIOS, answerValues, scenarioOptions } from './scenario.js';
 import { impactOf, lifeChoices, tryParam } from './levers.js';
 import { FIELD_LABEL, LIMITS, itemsYearly, num, problems, splitOn } from './state.js';
@@ -34,26 +35,30 @@ export const toDisplay = (v, p, cur) => conv(v, p.wCur, cur, p.fx);
 
 function proHeadline({ mode, p, t, odds, dispCur }) {
   if (mode === 'bwd') {
-    const now = `当前计划成功率 ${pct(odds.success, 0)}。`;
-    if (odds.enough) return `目标 ${p.tAge} 岁：现有资产已有八成把握。${now}`;
-    if (odds.s0 === null) return `目标 ${p.tAge} 岁（今天）：现有资产不到八成把握。${now}`;
-    return `目标 ${p.tAge} 岁：八成把握需第一年储蓄 ${wholeMoney(toDisplay(odds.s0, p, dispCur), dispCur)}。${now}`;
+    // One decimal: 29.7% printed as 30% would read as a mistake beside 2 成 (tenths round down).
+    const now = `当前计划成功率 ${pct(odds.success, 1)}。`;
+    if (odds.enough) return `目标 ${p.tAge} 岁，现有资产已有八成把握。${now}`;
+    if (odds.s0 === null) return `目标就是今天（${p.tAge} 岁），现有资产不到八成把握。${now}`;
+    return `目标 ${p.tAge} 岁，要有八成把握，第一年需储蓄 ${wholeMoney(toDisplay(odds.s0, p, dispCur), dispCur)}。${now}`;
   }
   if (t === 0) return '已达到财务独立（八成把握）。';
   if (t === null) return '规划期内达不到八成把握。';
   return `财务独立年龄 ${p.age + t} 岁（第 ${t} 年，八成把握）。`;
 }
 
-// What to do when the odds for a chosen age are short of 8 in 10: the saving that reaches it, or the age that does.
+// What reaches 8 in 10 when the chosen age is short of it: the saving, or the later age, then what they reach.
+// Stopping today (s0 null) leaves no month to save in, so waiting comes with keeping some income instead.
 function toEight(p, odds, eightAge, dispCur) {
-  const ways = [];
-  // Stopping today (s0 null) leaves no month to save in, so only waiting is offered.
-  if (!odds.enough && odds.s0 !== null) ways.push(`每月需存 ${wholeMoney(toDisplay(odds.s0 / 12, p, dispCur), dispCur)}`);
-  if (eightAge !== null && eightAge > p.tAge) ways.push(`等到 ${eightAge} 岁`);
-  return ways.length ? `要有八成把握，${ways.join('，或者')}。` : '';
+  const save = !odds.enough && odds.s0 !== null ? `每月存够 ${wholeMoney(toDisplay(odds.s0 / 12, p, dispCur), dispCur)}` : null;
+  const wait = eightAge !== null && eightAge > p.tAge ? `等到 ${eightAge} 岁再放` : null;
+  const income = odds.s0 === null ? '放假后保留一些收入' : null;
+  const reach = [save, wait].filter(Boolean).join('，或者');
+  if (reach) return `${reach}，就有八成把握${income ? `；也可以${income}` : ''}。`;
+  return income ? `${income}，能让钱撑得更久。` : '';
 }
 
-const THIN = '钱够花的把握不到一半：晚几年放，或者放假后留一点收入。';
+// The odds as a figure for the sentence: 4 成, or 不到 1 成.
+const chengOf = success => (peopleOf(success) === 0 ? '不到 1 成' : `${peopleOf(success)} 成`);
 
 // The slogan is only for odds of 8 in 10 or better, judged on the success rate itself.
 export function headlineText({ mode, p, t, odds = null, eightAge = null, dual, dispCur, view = 'simple' }) {
@@ -61,21 +66,23 @@ export function headlineText({ mode, p, t, odds = null, eightAge = null, dual, d
   if (view === 'pro') {
     say = proHeadline({ mode, p, t, odds, dispCur });
   } else if (mode === 'bwd') {
+    // One condition, one fact, then what reaches 8 in 10: no colons, and the odds said once.
     const band = oddsBand(odds.success);
-    const lead = `想 ${p.tAge} 岁放假：按现在的计划，`;
-    if (band === 'sure') say = `${lead}有 ${oddsText(odds.success)}。从 ${p.tAge} 岁起，余生皆假期。`;
-    else if (band === 'hedge') say = `${lead}有 ${oddsText(odds.success)}，可以放，但要带着后手放。${toEight(p, odds, eightAge, dispCur)}`;
-    else say = `${lead}${odds.success < 0.1 ? '' : '只有 '}${oddsText(odds.success)}。${THIN}${toEight(p, odds, eightAge, dispCur)}`;
+    const fact = `${p.tAge === p.age ? '如果今天就放假' : `如果 ${p.tAge} 岁放假`}，钱够花到 ${p.life} 岁的把握`;
+    const cheng = chengOf(odds.success);
+    if (band === 'sure') say = `${fact}有 ${cheng}。从 ${p.tAge} 岁起，余生皆假期。`;
+    else if (band === 'hedge') say = `${fact}有 ${cheng}，可以放，但最好留条后路。${toEight(p, odds, eightAge, dispCur)}`;
+    else say = `${fact}${peopleOf(odds.success) === 0 ? '' : '只有 '}${cheng}。${toEight(p, odds, eightAge, dispCur)}`;
   } else if (t === 0) {
-    say = '恭喜，现在就可以放假，八成把握。从今天起，余生皆假期。';
+    say = `恭喜，现在就能放假，钱够花到 ${p.life} 岁的把握已有八成。从今天起，余生皆假期。`;
   } else if (t !== null && savingsAt(p, 0) <= 0) {
-    say = `目前存不下钱，按现在的节奏要到 ${p.age + t} 岁才有八成把握放假。先让收入超过支出，每一步都算数。`;
+    say = `目前每月存不下钱，只靠现有存款增长，放假年龄是 ${p.age + t} 岁。先让收入超过支出，每一步都算数。`;
   } else if (t !== null) {
-    say = `你的放假年龄是 ${p.age + t} 岁。八成把握：再坚持 ${t} 年，从 ${p.age + t} 岁起，余生皆假期。`;
+    say = `你的放假年龄是 ${p.age + t} 岁。再坚持 ${t} 年，钱够花到 ${p.life} 岁的把握就有八成。从 ${p.age + t} 岁起，余生皆假期。`;
   } else if (savingsAt(p, 0) <= 0) {
-    say = '目前存不下钱，所以先从下面提前的办法开始，每一步都算数。';
+    say = `目前每月存不下钱，哪一年放假，钱够花到 ${p.life} 岁的把握都不到八成。先让收入超过支出，下面有提前的办法。`;
   } else {
-    say = '按现在的节奏，规划期内还到不了八成把握。先试试下面提前的办法，一步步来。';
+    say = `照现在每月存的钱，哪一年放假，钱够花到 ${p.life} 岁的把握都不到八成。先试试下面提前的办法，一步步来。`;
   }
   return { say, note: pensionNote(p, dual) };
 }
@@ -83,13 +90,14 @@ export function headlineText({ mode, p, t, odds = null, eightAge = null, dual, d
 // A pension starts late, so for an early holiday it often moves the date by months, not years.
 function pensionNote(p, { withPension: w, withoutPension: wo, gain }) {
   if (!(p.pension > 0)) return '填上养老金，看看能提前多少。';
-  if (w === null && wo !== null) return `算上养老金和社保自缴，反而到不了八成把握；不算养老金 ${wo} 岁。`;
+  // Each age says what it is the age of (copy framework rule 5); no slash or colon (rules 9, 10).
+  if (w === null && wo !== null) return `算上养老金和放假后自缴的社保，反而到不了八成把握；不算养老金，${wo} 岁就有。`;
   if (w === null) return '算上养老金也还到不了八成把握。';
-  if (wo === null) return `算上养老金 ${w} 岁放假；不算养老金还到不了。`;
+  if (wo === null) return `算上养老金，${w} 岁就有八成把握；不算养老金，到 ${p.life} 岁之前都到不了。`;
   if (w === p.age && wo === p.age) return '现在就能放假，养老金是额外的保障。';
-  if (w > wo) return `算上养老金 ${w} 岁，比不算养老金的 ${wo} 岁还晚：放假后自缴的社保，比养老金帮上的忙还多。`;
+  if (w > wo) return `算上养老金要到 ${w} 岁，比不算还晚 ${w - wo} 年，因为放假后自缴的社保比领到的养老金还多。`;
   const months = Math.round((gain ?? 0) * 12);
-  if (months >= 12) return `算上养老金 ${w} 岁 / 不算养老金 ${wo} 岁`;
+  if (months >= 12) return `算上养老金，${w} 岁就有八成把握；不算养老金要到 ${wo} 岁。`;
   if (months < 1) return `养老金 ${p.pAge} 岁才开始领，对 ${w} 岁放假几乎没有影响。`;
   return `养老金 ${p.pAge} 岁才开始领，只让放假提前 ${months} 个月。`;
 }
@@ -110,10 +118,7 @@ export function pensionEstimateHtml(result, { used = false, held = false, proble
        ${stop}${used ? '<p class="fine pen-used">已填进上面的养老金和领取年龄。</p>' : '<button type="button" class="primary" data-pen-use>用这个结果</button>'}`
     : `<p class="pen-short">累计缴费不满 ${est.minYears ?? '最低'} 年，不能按月领取${held ? '。上面的养老金还是之前填的，要按 0 算请清空它。' : '，这里按 0 算。'}</p>
        <p class="fine">法定领取年龄 ${age}。</p>${stop}`;
-  return `${body}<div class="pen-set"><b>本工具设定</b><ul>
-    <li>计发基数按今天的钱算，只跟物价涨；个人账户记账利率与通胀持平。</li>
-    <li>累计缴费年限默认“已缴年数 + 距领取的年数”，可以改。</li>
-    <li>领取年龄不是整岁时，向上取整岁放进模型，计发月数按已满的整岁查表。</li></ul></div>`;
+  return `${body}<p class="pen-set">估算用了几项假设 ${toolTag(WHY.pension())}</p>`;
 }
 
 export function statusPill(success) {
@@ -195,7 +200,7 @@ export const fasterLead = (levers, { reached = false } = {}) => {
   if (reached) return '已经到了，不用再提前。';
   const top = levers[0];
   if (!top) return '先让收入超过支出，这里才会有答案。';
-  return top.unlocks ? `最有效的一步：${top.label}，就能看到放假那天。` : `最有效的一步：${top.label}，提前 ${yearsText(top.gainYears)}。`;
+  return top.unlocks ? `最有效的一步是${top.label}，做到就能放假。` : `最有效的一步是${top.label}，能提前 ${yearsText(top.gainYears)}。`;
 };
 
 // The small step comes first in the simple view: an amount this month, counted in Mondays, not years.
@@ -272,7 +277,7 @@ export function trackStyle(range, value) {
 
 function tryNow(p, id, range) {
   const { age } = tryParam(p, id, range.value);
-  return `现在 ${tryValueText(range.value, range.unit, p, id)}：${age === null ? '还到不了放假' : `${age} 岁放假`}`;
+  return `现在 ${tryValueText(range.value, range.unit, p, id)}，${age === null ? '还到不了放假' : `${age} 岁放假`}`;
 }
 
 export function trySentence(p, id, value, range) {
@@ -369,7 +374,7 @@ export function variantsHtml({ p, dispCur }) {
   }
   const coastDone = p.assets >= coast;
   h += `<tr><td><b>Coast FIRE</b></td><td>此后不再储蓄，靠复利在 ${p.pAge} 岁达到标准 FIRE</td><td class="num">${money(p.retExp, p.rCur)}</td><td class="num">${D(coast)}</td><td class="num">${coastDone ? '已达成' : `还差 ${D(coast - p.assets)}`}</td></tr>`;
-  return `${h}</tbody><tfoot><tr><td colspan="5" class="fine">英文圈的 Lean / Fat 多按绝对金额分；本工具的轻装 / 宽裕按“和现在比”来分。</td></tr></tfoot>`;
+  return `${h}</tbody><tfoot><tr><td colspan="5" class="fine">英文圈的 Lean 和 Fat 多按绝对金额分；本工具的轻装和宽裕按“和现在比”来分。</td></tr></tfoot>`;
 }
 
 export function heatHtml({ p, dispCur }) {
@@ -427,11 +432,11 @@ export function townHtml(town, plan, p) {
   if (!town?.name || !(town.monthly > 0)) return '';
   const where = `在${escapeHtml(town.name)}每月花 ${wholeMoney(town.monthly, p.rCur)}`;
   // A spend below the mortgage and children's costs cannot hold them, so no age is given.
-  if (plan.ignored) return `<p class="town-line">${where}：比月供和孩子的花销还少。把月供和孩子算进这里的花销，再看几岁能放假。</p>`;
-  if (plan.age === null) return `<p class="town-line">${where}：按这个花销还到不了。</p>`;
+  if (plan.ignored) return `<p class="town-line">${where}，比月供和孩子的花销还少。把月供和孩子算进这里的花销，再看几岁能放假。</p>`;
+  if (plan.age === null) return `<p class="town-line">${where}，钱够花的把握到不了八成。</p>`;
   const years = Math.round(Math.abs(plan.gain) * 10) / 10;
   const move = plan.gain === null || years === 0 ? '' : plan.gain > 0 ? `，早 ${years} 年` : `，晚 ${years} 年`;
-  return `<p class="town-line">${where}：${plan.age} 岁放假${move}（八成把握）。</p>`;
+  return `<p class="town-line">${where}，${plan.age} 岁就有八成把握${move}。</p>`;
 }
 
 // The tag under the big age: the items that are counted, without an amount (the amount after they end is on the
@@ -445,7 +450,7 @@ export function lifeTagText(rows) {
 // What counting the end of the items changes; told only inside the fold, never beside the big age.
 export function lifeGainText(gain) {
   if (!gain) return '';
-  if (gain.unreachableWithout) return '不算到期的话，按现在的计划到不了。';
+  if (gain.unreachableWithout) return '不算到期后省下的钱，就到不了八成把握。';
   return gain.years >= 1 ? `算上到期，比不算早 ${gain.years} 年放假。` : '算上到期，放假年龄没变。';
 }
 
@@ -546,7 +551,7 @@ export function fifthOddsHtml(f) {
     const was = before && before !== odds ? `（原来${/^\d/.test(before) ? ' ' : ''}${before}）` : '';
     when = odds ? `${f.age} 岁放假，${odds}${was}` : `${f.age} 岁放假`;
   } else if (f.age === null) {
-    when = '规划期内到不了八成把握';
+    when = '哪一年放假都到不了八成把握';
   } else {
     const was = !known(f.baseAge) ? '' : f.baseAge === f.age ? '，和原来一样' : `（原来 ${f.baseAge} 岁）`;
     when = `八成把握的放假年龄是 ${f.age} 岁${was}`;
@@ -574,7 +579,7 @@ export const fifthSentence = (base, fifth, D = wan) => {
   }
   const years = before === after ? `有钱花的假期还是 ${after} 年` : `有钱花的假期从 ${before} 年变成 ${after} 年`;
   const when = diff ? [`${diff > 0 ? '早' : '晚'} ${Math.abs(diff)} 年放假`] : [];
-  return `同样的年景，${years}：${[...when, end].join('，')}`;
+  return `同样的年景，${[...when, end].filter(Boolean).join('，')}，${years}`;
 };
 
 export function labChangesHtml(labels) {
@@ -622,7 +627,7 @@ const liveHtml = rel => relText(rel).replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const X = '<span class="x" aria-label="拦住">✕</span>';
 const WARN = '<span aria-label="提示">!</span>';
 const NONE = '<span aria-label="没有数">—</span>';
-const TOOL_TAG = '<span class="tool">本工具设定</span>';
+// Each 本工具设定 is a button carrying its own explanation (tool-notes.js).
 
 // A range rule, drawn under its own field; the field points at it with aria-describedby.
 export const fieldLineHtml = q => `<p class="row bad" id="rel-${q.field}">${liveHtml(q.rel)} ${X}</p>`;
@@ -653,7 +658,7 @@ export function fieldLinesHtml({ rows, list, at, view, wCur, rCur, note = '' }) 
     if (r.status === 'block') return `<p class="row">${liveHtml({ ...r.rel, op: null })}</p>`;
     const [name, end] = r.label.split(' → ');
     const amount = r.value === null ? NONE : `${num(r.value)}${unit}`;
-    return `<p class="row">${OP('└')} 其中${name} ${amount}${end ? ` ${OP('→')} ${end}` : ''}${r.tag ? ` ${TOOL_TAG}` : ''}</p>`;
+    return `<p class="row">${OP('└')} 其中${name} ${amount}${end ? ` ${OP('→')} ${end}` : ''}${r.tag ? ` ${toolTag(r.tag)}` : ''}</p>`;
   };
   const items = rows.filter(r => r.op === '└' && r.under === at).map(item);
   if (at === 'expense') {
@@ -669,7 +674,7 @@ export function fieldLinesHtml({ rows, list, at, view, wCur, rCur, note = '' }) 
   const today = rows.find(r => r.key === 'expense')?.value;
   const after = rows.filter(r => r.key.startsWith('after:')).map(r => {
     const money = r.value === null ? NONE : wholeMoney(r.value, rCur);
-    const low = pro && today !== null && today !== undefined ? ` &lt; 现在 ${wholeMoney(today, wCur)} × ${num(LIMITS.low * 100)}% ${TOOL_TAG}` : '';
+    const low = pro && today !== null && today !== undefined ? ` &lt; 现在 ${wholeMoney(today, wCur)} × ${num(LIMITS.low * 100)}% ${toolTag(WHY.low(LIMITS.low))}` : '';
     const amount = r.status === 'flag' && r.value !== null ? `<span class="warn">${WARN} ${money}</span>${low}` : money;
     return `<p class="row after"><span>${OP('→')} ${r.ages[0]} 岁起</span> <span class="amt">${amount}</span></p>`;
   });
@@ -764,7 +769,7 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
         const amount = signed(r.value, c);
         return lgRow(`${lgOp('=')}<b>${r.label}</b>`, r.status === 'flag' ? flagged(amount) : `<b>${amount}</b>`, 'sum');
       }
-      case 'growth': return lgRow(`${lgOp()}${r.label} ${TOOL_TAG}`);
+      case 'growth': return lgRow(`${lgOp()}${r.label} ${toolTag(r.tag)}`);
       // Below zero it is written with U+2212 and the orange ! of the 每月存下 row.
       case 'saveLate': return lgRow(`${lgOp()}${r.label.replace(/^→ /, `${OP('→')} `)}`, r.value < 0 ? flagged(signed(r.value, c)) : signed(r.value, c));
       case 'retExp': {
@@ -792,7 +797,7 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
   const proRow = r => {
     if (r.value === 0 && !['pension', 'flexCut', 'fxDrift'].includes(r.key)) return '';
     const c = curOf(r);
-    const tag = r.tag ? ` ${TOOL_TAG}` : '';
+    const tag = r.tag ? ` ${toolTag(r.tag)}` : '';
     switch (r.key) {
       case 'have': return lgRow(`${lgOp()}${fieldLink(r.field, r.label)}`, signed(r.value, c));
       // 税后年收入 · 实际增长 +2%/年: each part goes back to its own field.
@@ -850,7 +855,7 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
   const sec = (body, cls = '') => `<div class="lg-sec${cls ? ` ${cls}` : ''}">${body}</div>`;
   const more = id => `<div class="lg-more">${methodLink(id)}</div>`;
   const foot = id => (pro
-    ? `<div class="lg-foot"><span>${TOOL_TAG} · 按今天的钱 · 实际收益</span> ${methodLink(id)}</div>`
+    ? `<div class="lg-foot"><span>${toolTag(WHY.legend())} · 按今天的钱 · 实际收益</span> ${methodLink(id)}</div>`
     : `<div class="lg-foot"><span><span class="est">≈</span> 估算 · 按今天的钱</span> ${methodLink(id)}</div>`);
   const none = (label, op) => lgRow(`${lgOp(op)}${label}`, NONE, 'wait');
   const saveLabel = pro ? '年储蓄' : '每月存下';
@@ -871,7 +876,7 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
         const all = s => rows.filter(r => r.section === s && shown(r)).map(rowHtml).join('');
         const needLabel = rows.find(r => r.key === 'need')?.label ?? '';
         return sec(head('① 攒钱') + all('now')) + sec(head('② 放假以后', afterRight) + all('after') + none(needLabel, '⇒'))
-          + sec(head(PRO_THIRD, TOOL_TAG) + stopRow(stopped) + none('③ 放假年龄', '⇒')) + foot(METHOD.odds);
+          + sec(head(PRO_THIRD, toolTag(WHY.sim(DEFAULT_PATHS, DEFAULT_SEED))) + stopRow(stopped) + none('③ 放假年龄', '⇒')) + foot(METHOD.odds);
       }
       // A stop on a field with no row of its own (the age, say) stands first, in its own words.
       drawn = stopped ? [stopped] : [];
@@ -903,9 +908,10 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
   // The simple ① ends with what the simulation's median life holds at the holiday (the professional 中位资产), once
   // the simulation of these numbers is in; not when the holiday is today or out of reach.
   const bridge = pro || now || unreachable ? ''
-    : lgRow(`${lgOp('⇒')}${holiday} 岁时一般攒到 ${TOOL_TAG}`, mc?.bands?.[t] ? roughMoney(mc.bands[t][2], wCur) : NONE);
+    : lgRow(`${lgOp('⇒')}${holiday} 岁时一般攒到 ${toolTag(WHY.median(holiday))}`, mc?.bands?.[t] ? roughMoney(mc.bands[t][2], wCur) : NONE);
   const first = now
-    ? sec(head('① 攒钱', '不用再攒'))
+    // Backward to today the money may not be enough, so ① says the person stops, not that saving is done.
+    ? sec(head('① 攒钱', bwd ? '今天就停' : '不用再攒'))
     : sec(head('① 攒钱', span) + draw('now') + bridge + more(METHOD.now));
   const needRow = rows.find(r => r.key === 'need');
   // N 倍 and its denominator: what the first holiday year takes from savings (spec §9.2), named.
@@ -931,13 +937,13 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
     ? lgRow(`${lgOp()}<span class="lg-year">${yearLabel(o)}</span> ${o.count.toLocaleString('en-US')} / ${PATHS_TEXT}`, pct(o.share, 1), pick(o) ? 'pick' : '')
     : lgRow(`${lgOp()}<span class="lg-year">${yearLabel(o)}</span> ${dotsHtml(o.count)}`, chengText(o.share), pick(o) ? 'pick' : ''))).join('');
   let after = '';
-  if (unreachable) after = lgRow(`${lgOp()}规划期内到不了八成`);
+  if (unreachable) after = lgRow(`${lgOp()}${pro ? '规划期内到不了八成' : '哪一年放假都到不了八成'}`);
   // Working backward with savings already enough, the card's words, not a saving of ¥0.
   else if (bwd && bwdOdds && bwdOdds.s0 === null && !bwdOdds.enough) after = lgRow(`${lgOp('⇒')}今天就停，没有再存的时间`, '', 'sum');
   else if (bwd && bwdOdds && pro) after = lgRow(`${lgOp('⇒')}${bwdOdds.enough ? '现在的存款已经够了' : `要 80%：第一年储蓄 ${wholeMoney(bwdOdds.s0, wCur)}`}`, '', 'sum');
   else if (bwd && bwdOdds) after = lgRow(`${lgOp('⇒')}${bwdOdds.enough ? '现在的存款已经够了' : `要八成：第一年每月存 ${wholeMoney(bwdOdds.s0 / 12, wCur)}`}`, '', 'sum');
   else if (!now) after = lgRow(`${lgOp('⇒')}<b>${pro ? '第一个到 80%' : '第一个到八成'}</b>`, `<b>${holiday} 岁</b>`, 'sum');
-  if (!pro) return first + second + sec(head('③ 2,000 种年景', `平均每年 ${pct(p.r, 1)} ${TOOL_TAG}`) + oddsRows + after) + foot(METHOD.odds);
+  if (!pro) return first + second + sec(head('③ 2,000 种年景', `平均每年 ${pct(p.r, 1)} ${toolTag(WHY.ret(p))}`) + oddsRows + after) + foot(METHOD.odds);
 
   // The professional ③: the return and the spread as the engine forms them, the counts, the year picked, the
   // interpolated years with the median at the holiday, and the fixed-return age for comparison.
@@ -950,7 +956,7 @@ export function ledgerHtml({ rows, list = [], odds = [], plan = null, state = 'o
   const medianRow = unreachable ? '' : lgRow(`${lgOp()}${lerp === null ? '' : `插值 ${lerp.toFixed(1)} 年 · `}${holiday} 岁中位资产`, median);
   const fixed = fwdSolve(p);
   const fixedRow = lgRow(`${lgOp()}按固定收益算（约五成）`, fixed === null ? NONE : `${p.age + fixed} 岁`);
-  return first + second + sec(head(PRO_THIRD, TOOL_TAG) + rRow + sRow + oddsRows + after + medianRow + fixedRow) + foot(METHOD.odds);
+  return first + second + sec(head(PRO_THIRD, toolTag(WHY.sim(DEFAULT_PATHS, DEFAULT_SEED))) + rRow + sRow + oddsRows + after + medianRow + fixedRow) + foot(METHOD.odds);
 }
 
 // The professional fund line, the ledger closed (spec §7.1): the line and the odds; held, no number; out of reach, the
@@ -1061,13 +1067,13 @@ export function heroHtml(h, { p, dispCur, open = false }) {
   const span = m => (m < 12 ? `<b>${m}</b> 个月` : `<b>${Math.floor(m / 12)}</b> 年${m % 12 ? ` <b>${m % 12}</b> 个月` : ''}`);
   let months = '';
   if (h.covered) months = `<p class="hero-months">攒下的钱，不算收益也够花到 ${h.endAge} 岁。</p>`;
-  else if (h.months === 0 && h.next) months = `<p class="hero-months">还没开始攒假：存下 ${D(h.next.gap)}，就攒够一整年的假。</p>`;
+  else if (h.months === 0 && h.next) months = `<p class="hero-months">还没开始攒假。存下 ${D(h.next.gap)}，就攒够一整年的假。</p>`;
   else if (h.months !== null) months = `<p class="hero-months">你已经攒够了 ${span(h.months)}的假${next}。</p>`;
   const R = v => roughMoney(toDisplay(v, p, dispCur), dispCur);
   // The fund line is the ledger closed; out of reach there is no line to measure against.
   const fund = h.reachable
-    ? `<div class="fund-bar" role="img" aria-label="放假资金已攒到 ${fundPct}%"><i style="width:${fundPct}%"></i></div><p>放假资金：已有 ${R(h.fund.have)} / 需要 ${R(h.fund.need)}（<b>${fundPct}%</b>） ${ledgerToggleHtml(open)}</p>`
-    : `<p>放假资金：按现在的节奏到不了 ${ledgerToggleHtml(open)}</p>`;
+    ? `<div class="fund-bar" role="img" aria-label="放假资金已攒到 ${fundPct}%"><i style="width:${fundPct}%"></i></div><p>放假资金：已有 ${R(h.fund.have)}，需要 ${R(h.fund.need)}（<b>${fundPct}%</b>） ${ledgerToggleHtml(open)}</p>`
+    : `<p>放假资金：照现在每月存的钱，攒不到放假线 ${ledgerToggleHtml(open)}</p>`;
   return `${big ? `<div class="hero-big">${big}</div>` : ''}${sure}${ruler}${months}
     <div class="lifebar" role="img" aria-label="人生进度：上班 ${h.workYears} 年，放假 ${h.holidayYears} 年">${work}${rest}</div>
     <div class="lifebar-ticks"><span>${h.startAge} 岁 · 今天</span>${mid}<span>${h.endAge} 岁</span></div>
@@ -1082,8 +1088,8 @@ function personSvg(on) {
 export function livesSummary(stories, mc, life = 95) {
   if (stories.every(s => s.outcome === 'working')) return '这几条人生都还没到放假那天。先用上面提前的办法，再回来看。';
   const n = mc?.success == null ? null : peopleOf(mc.success);
-  const share = n === null ? '' : `全部模拟里，${n === 0 ? '不到 1 成' : `${n} 成`}的钱够花到 ${life} 岁。`;
-  return `这几条人生是从全部 ${(mc?.paths ?? 2000).toLocaleString('en-US')} 次模拟里挑出来讲故事的：最难的、偏难的、中间的、顺的。${share}`;
+  const share = n === null ? '' : `全部模拟里，钱够花到 ${life} 岁的有 ${n === 0 ? '不到 1 成' : `${n} 成`}。`;
+  return `这几条人生是从全部 ${(mc?.paths ?? 2000).toLocaleString('en-US')} 次模拟里挑出来的，分别是最难的、偏难的、中间的和顺的。${share}`;
 }
 
 export function storyHtml(story, { p, dispCur }) {

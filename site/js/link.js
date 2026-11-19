@@ -5,8 +5,8 @@ import { defaultState, setField, setRetireCountry, setWorkCountry } from './stat
 
 // Fixed order: places first, since choosing a place converts the money already there.
 const PLACES = { work: setWorkCountry, retire: setRetireCountry };
-const NUMBERS = { age: ['age', 1], assets: ['assets', 1], income: ['income', 12], expense: ['expense', 12], retexp: ['retExp', 12], tage: ['tAge', 1] };
-const ORDER = ['age', 'assets', 'income', 'expense', 'retexp', 'tage', 'mode', 'work', 'retire'];
+const NUMBERS = { age: ['age', 1], assets: ['assets', 1], income: ['income', 12], expense: ['expense', 12], retexp: ['retExp', 12], pension: ['pension', 12], tage: ['tAge', 1] };
+const ORDER = ['age', 'assets', 'income', 'expense', 'retexp', 'pension', 'tage', 'mode', 'work', 'retire'];
 const MODES = ['fwd', 'bwd'];
 
 // The state a fragment describes, built on the examples, or null when the fragment holds none of these keys.

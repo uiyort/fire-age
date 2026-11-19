@@ -57,7 +57,7 @@ test('someone who never gets there: no line repeating the headline, and no zero 
   const html = heroHtml(h, { p: never, dispCur: 'CNY' });
   assert.doesNotMatch(html, /hero-big|还没看到放假那天/);
   assert.doesNotMatch(html, />0<\/b> 个月/);
-  assert.match(html, /还没开始攒假：存下 ¥10\.8万，就攒够一整年的假/);
+  assert.match(html, /还没开始攒假。存下 ¥10\.8万，就攒够一整年的假/);
 });
 
 test('a lab step that cannot reach the holiday says so instead of stopping mid-sentence', () => {
@@ -81,7 +81,7 @@ test('backward paths print plain amounts, and say when one path alone cannot do 
 test('the backward headline spaces the odds like the rest of the page', () => {
   const p = make({ tAge: 45 });
   const { say } = headlineText({ mode: 'bwd', p, t: oddsSolve(p), odds: bwdOdds(p), eightAge: null, dual: { withPension: null, withoutPension: null }, dispCur: 'CNY' });
-  assert.match(say, /有 (?:不到 1|\d+) 成把握/);
+  assert.match(say, /把握(?:只有 |有 )?(?:不到 1|\d+) 成/);
 });
 
 test('simple-view lab amounts are per month, as they were typed', () => {

@@ -161,6 +161,9 @@ test('the professional 现在 row at 1024 px and wider: Tab goes income → grow
   await page.goto('/'); await page.click('#to-pro');
   await expect(page.locator('#p-income')).toBeVisible();
   await page.locator('#p-income').focus(); await page.keyboard.press('Tab');
+  // The growth field's 本工具设定 is a button in its label, so the keyboard reaches its explanation first.
+  await expect(page.locator('button.tool:focus')).toHaveCount(1);
+  await page.keyboard.press('Tab');
   await expect(page.locator('#p-growth')).toBeFocused();
 });
 

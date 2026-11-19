@@ -18,7 +18,7 @@ const GROW_SHARE = 0.5;
 export const AXES = [
   { key: 'when', name: '启程', poles: { E: '早班', L: '正点' }, rule: '放假年龄在 50 岁前（含 50 岁）是早班，50 岁后或还到不了是正点。' },
   { key: 'where', name: '目的地', poles: { H: '在地', A: '远方' }, rule: '在现在生活的地方放假是在地，换个地方是远方。' },
-  { key: 'pack', name: '行李', poles: { T: '轻装', F: '宽裕' }, rule: '放假后的生活和现在比（按两地物价折算）：不比现在宽裕是轻装，比现在宽裕是宽裕。' },
+  { key: 'pack', name: '行李', poles: { T: '轻装', F: '宽裕' }, rule: '放假后的生活和现在比（按两地物价折算），不比现在宽裕是轻装，比现在宽裕是宽裕。' },
   { key: 'fare', name: '路费', poles: { S: '现攒', G: '老本' }, rule: '放假那天的钱，一半以上来自今天已有的存款（连同它的收益）是老本，否则是现攒。' },
 ];
 
@@ -56,7 +56,7 @@ function progress(p, t) {
   if (t === 0) return { id: 'reached', name: '假期中', why: '现有资产已经够覆盖放假所需。' };
   if (t === null) {
     const saving = (savingsRate(p) ?? 0) > 0;
-    return { id: 'waiting', name: '待发车', why: saving ? '按现在的节奏，规划期内还到不了放假线。' : '目前存不下钱，第一步是让收入超过支出。' };
+    return { id: 'waiting', name: '待发车', why: saving ? `照现在每月存的钱，到 ${p.life} 岁之前都攒不到放假线。` : '目前存不下钱，第一步是让收入超过支出。' };
   }
   if (p.assets >= coastNeed(p)) return { id: 'coast', name: '滑行中', why: `今天起不再存钱，靠复利到 ${Math.max(p.pAge, p.age)} 岁也能到站。` };
   return { id: 'onway', name: '在路上', why: `还有 ${t} 年到站。` };
@@ -73,7 +73,7 @@ function packText(lifestyle) {
 // One sentence on what this holiday is most exposed to. The first rule that fits wins; the table is on the method page.
 export function weakness(type, { success = null, pensionShare = 0 } = {}) {
   const letters = type.code ?? '';
-  if (type.status?.id === 'waiting') return '按现在的节奏还到不了，最要紧的是让每个月能存下钱。';
+  if (type.status?.id === 'waiting') return '现在还攒不到放假线，最要紧的是让每个月能存下钱。';
   if (success !== null && success < 0.8) return '把握还不到八成，最怕放假头几年就撞上大跌。';
   if (pensionShare >= 0.5) return '一半以上的开销指望养老金，最怕领取年龄再推迟，或者待遇不如预期。';
   if (letters[1] === 'A') return '换了地方生活，最怕汇率和当地物价一起涨，还有签证和医保。';
@@ -105,7 +105,10 @@ export function holidayType(p, data, { workC, retC, retireT, success = null }) {
     return { key: axis.key, name: axis.name, poles: axis.poles, letter, pole: axis.poles[letter], value };
   });
   const code = axes.map(a => a.letter).join('');
-  const type = { ...BY_CODE[code], axes, status: progress(p, t) };
+  // Working backward to today short of 8 in 10, the person stops today but the money is not yet covered.
+  const short = backward && t === 0 && success !== null && success < 0.8;
+  const status = short ? { id: 'today', name: '今天就停', why: `今天就停，现有资产有 ${oddsText(success)}，还不到八成。` } : progress(p, t);
+  const type = { ...BY_CODE[code], axes, status };
   const pensionShare = p.retExp > 0 ? Math.min(p.pension / p.retExp, 1) : 0;
   return { ...type, weakness: weakness(type, { success, pensionShare }) };
 }

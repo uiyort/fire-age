@@ -10,6 +10,7 @@ import { SCENARIOS, answerValues, baselineOf, cleanAnswers, countBody } from './
 import { PARAMS, PARAM_GROUPS } from './params.js';
 import { makeGoal, compareVisit, goalApplies, loadGoal, saveGoal, clearGoal } from './goals.js';
 import { initAnalytics, track } from './analytics.js';
+import { WHY, toolTag } from './tool-notes.js';
 import { stateFromLink } from './link.js';
 import { drawChart, drawLivesChart } from './chart.js';
 import { toCsv, toJson } from './export.js';
@@ -194,7 +195,7 @@ const SIMPLE_FIELDS = [
 
 const PRO_FIELDS = [
   { legend: '地区与币种', grp: 'region', fields: [
-    { id: 'work', label: '工作/储蓄地', select: 'work' },
+    { id: 'work', label: '工作地', select: 'work' },
     { id: 'ret', label: '退休地', select: 'retire' },
     { id: 'disp', label: '显示币种', select: 'currency', full: true },
   ] },
@@ -231,7 +232,7 @@ const PRO_FIELDS = [
     { id: 'flexCut', label: '一年跌 ≥ 15% 后少花', unit: '%', step: 5 },
   ] },
   // Read only: the target, the runs and the seed the tool sets.
-  { legend: '模拟', grp: 'sim', fields: [], html: `<p class="sim-line">八成 · ${DEFAULT_PATHS.toLocaleString('en-US')} 次 · 种子 ${DEFAULT_SEED} <span class="tool">本工具设定</span></p>` },
+  { legend: '模拟', grp: 'sim', fields: [], html: `<p class="sim-line">八成 · ${DEFAULT_PATHS.toLocaleString('en-US')} 次 · 种子 ${DEFAULT_SEED} ${toolTag(WHY.sim(DEFAULT_PATHS, DEFAULT_SEED))}</p>` },
 ];
 
 // An empty money field reads as 0 to the eye; the result still waits for it to be filled in.
@@ -256,7 +257,7 @@ function fieldHtml(prefix, f) {
     : f.id === 'retExp' ? `<span class="f-box">${EST_PRE}${control}</span>` : control;
   const back = f.id === 'retExp' ? EST_BACK : '';
   // A value the tool sets by default says so by its label (the income growth, spec §8.3).
-  const tool = f.tool ? ' <span class="tool">本工具设定</span>' : '';
+  const tool = f.tool ? ` ${toolTag(f.id === 'growth' ? WHY.growthField() : WHY.legend())}` : '';
   const wrap = `<div class="${cls}"${flags}><div class="lab"><label for="${id}">${f.label} ${unit}</label>${tool}${back}${help}</div>${box}${note}</div>`;
   const extra = f.id === 'expense' ? splitHtml(prefix) : f.id === 'pension' ? penFoldHtml(prefix) : '';
   return (hasCard ? `${wrap}<div class="lcard" id="card-${f.id}" hidden></div>` : wrap) + extra;
@@ -486,7 +487,7 @@ function renderEstimate(p) {
     setEstimate(`<h3 class="grp-legend"><label for="s-retexp">退休后每月想花</label><span class="grp-status" data-grp="retire"></span></h3>
       <div class="grp-body" id="side-s-retire"><div class="f"><div class="lab"><span class="u">${p.rCur}</span>${EST_BACK}</div>
       <span class="f-box">${EST_PRE}<input type="number" inputmode="decimal" id="s-retexp" step="500" placeholder="0" value="${S.retExp === null ? '' : Math.round(S.retExp / 12)}"></span></div>
-      <p class="fine mix-note">组合按股票 ${mix.stock}% / 债券 ${mix.bond}% 估算（常见的基准组合，不是建议），扣掉通胀后约 ${fig('r', 1)}/年。<a href="sources.html">数据来源</a>，专业模式可以改。</p>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}</div>`);
+      <p class="fine mix-note">组合按股票 ${mix.stock}%、债券 ${mix.bond}% 估算（常见的基准组合，不是建议），扣掉通胀后约 ${fig('r', 1)}/年。<a href="sources.html">数据来源</a>，专业模式可以改。</p>${S.notice ? `<p class="notice">${S.notice}</p>` : ''}</div>`);
   }
   placeRetLines();
   renderLines();
@@ -621,7 +622,8 @@ function ledgerNow() {
   const unreachable = mode !== 'bwd' && t === null;
   const T = mode === 'bwd' ? bwd.n : unreachable ? p.life - p.age - 1 : t;
   const plan = unreachable ? { p, t: T, need: null, unreachable: true } : { p, t: T, need: target[T] };
-  const state = unreachable ? 'unreachable' : mode !== 'bwd' && T === 0 ? 'now' : 'ok';
+  // Forward at 0 years, or backward to today: there are no saving years to tell.
+  const state = unreachable ? 'unreachable' : T === 0 ? 'now' : 'ok';
   // The flags the professional ledger draws (B13 on the r row), from the page's own list. The median waits for the
   // simulation of these numbers; one from numbers before is never shown.
   const list = view === 'pro' ? problems(S, DATA, year).filter(q => q.kind === 'flag') : [];
@@ -677,10 +679,10 @@ function renderSimulationCore() {
     money: v => money(v, cur),
   });
   $('chart-sub').textContent = retireT === null
-    ? '按现在的计划继续积累，规划期内还不放假。'
+    ? `照你填的数字一直攒下去，到 ${p.life} 岁之前都不放假。`
     : mode === 'bwd'
-      ? `按现在的计划存到 ${p.tAge} 岁，之后每年取出退休支出（扣除养老金）。`
-      : `按现在的计划存到 ${p.age + retireT} 岁，之后每年取出退休支出（扣除养老金）。`;
+      ? `照你填的数字攒到 ${p.tAge} 岁，之后每年从存款里取出放假后的花销，扣掉养老金。`
+      : `照你填的数字攒到 ${p.age + retireT} 岁，之后每年从存款里取出放假后的花销，扣掉养老金。`;
   $('mc-note').textContent = `蒙特卡洛模拟 ${mc.paths.toLocaleString('zh-CN')} 次，随机种子 ${mc.seed}，结果可复现。金额都按今天的购买力计算。`;
   $('pct-table').innerHTML = pctTableHtml({ p, mc, target, dispCur: cur });
 }
@@ -981,7 +983,7 @@ function syncSide() {
     const [name, sum, status, arrow] = head.children;
     setHtml(name, sideHeadName(row, S));
     setHtml(sum, sideSummary(row, at));
-    setHtml(status, row === 'sim' ? '<span class="tool">本工具设定</span>' : groupStatusHtml(states[row], { version: DATA.version, mark: true, month: false }));
+    setHtml(status, row === 'sim' ? toolTag(WHY.sim(DEFAULT_PATHS, DEFAULT_SEED)) : groupStatusHtml(states[row], { version: DATA.version, mark: true, month: false }));
     arrow.textContent = open ? '▾' : '›';
   }
 }
@@ -1550,7 +1552,41 @@ function download(name, type, text) {
   URL.revokeObjectURL(url);
 }
 
+// 本工具设定: one popover for every tag. A click on the tag opens or closes it; a click elsewhere, Escape or a change
+// of numbers closes it.
+let toolOpen = null;
+let toolWidth = 0;
+function closeTool() {
+  if (!toolOpen) return;
+  toolOpen.setAttribute('aria-expanded', 'false');
+  toolOpen = null;
+  $('tool-pop').hidden = true;
+}
+function openTool(btn) {
+  closeTool();
+  const pop = $('tool-pop');
+  pop.textContent = btn.dataset.why;
+  pop.hidden = false;
+  btn.setAttribute('aria-expanded', 'true');
+  toolOpen = btn;
+  const page = document.documentElement.clientWidth;
+  toolWidth = page;
+  const width = Math.min(300, page - 32);
+  const r = btn.getBoundingClientRect();
+  pop.style.width = `${width}px`;
+  pop.style.left = `${Math.min(Math.max(16, r.left), page - width - 16) + scrollX}px`;
+  pop.style.top = `${r.bottom + scrollY + 6}px`;
+}
+
 function onClick(ev) {
+  const tool = ev.target.closest?.('button.tool[data-why]');
+  if (tool) {
+    ev.preventDefault();
+    if (toolOpen === tool) closeTool();
+    else openTool(tool);
+    return;
+  }
+  if (toolOpen && !ev.target.closest?.('#tool-pop')) closeTool();
   if (ev.target.id === 'link-back') {
     history.replaceState(null, '', location.pathname + location.search);
     location.reload();
@@ -1785,9 +1821,10 @@ function init() {
   fillCountrySelects();
   $('data-version').textContent = DATA.version;
   const wide = window.matchMedia('(min-width: 900px)');
-  if (returning && !wide.matches) $('inputs-box').open = false;
+  if ((returning || linked) && !wide.matches) $('inputs-box').open = false;
   // A first visit on a phone starts with the numbers; a computer shows them beside the result.
-  if (!started && !returning && !wide.matches) startIntro();
+  // A link already carries numbers, so it opens on their result rather than the start screen.
+  if (!started && !returning && !wide.matches && !linked) startIntro();
   wide.addEventListener('change', ev => {
     if (!ev.matches) return;
     $('inputs-box').open = true;
@@ -1805,6 +1842,10 @@ function init() {
   if (linkHeld) showLinkNote();
   // Captured first, so the handlers below already save the change.
   document.addEventListener('input', releaseLink, true);
+  document.addEventListener('input', closeTool, true);
+  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeTool(); });
+  // A phone's address bar showing or hiding resizes the window while scrolling; only a change of width moves the tag.
+  window.addEventListener('resize', () => { if (toolOpen && document.documentElement.clientWidth !== toolWidth) closeTool(); });
   document.addEventListener('change', releaseLink, true);
   document.addEventListener('input', onInput);
   document.addEventListener('change', ev => {

@@ -1,5 +1,6 @@
 // Input state for the calculator: what the person typed, before it becomes model parameters.
 import { buildParams, firstDraw, longRunInflation, planFlows, savingsAt } from './engine.js';
+import { WHY } from './tool-notes.js';
 
 const STORAGE_KEY = 'fire-age-v1';
 const MONEY_FIELDS = ['assets', 'income', 'expense', 'retExp', 'pension', 'selfPension', 'selfMedical'];
@@ -618,7 +619,7 @@ export function problems(S, data, thisYear = new Date().getFullYear(), { last = 
 // worked out twice. Amounts are in the view's units (simple monthly, professional yearly) and rounded; cur says which
 // currency. plan = { p, t, need, unreachable } once the result is solved (t the holiday year, need the line at t), null
 // while it is blocked or blank. A row that is blocked carries the very relation problems() draws under the field.
-const TOOL = '本工具设定';
+// A row tag is its 本工具设定 explanation (tool-notes.js).
 const ITEM_NAME = { mortgage: '月供', kids: '孩子' };
 // The engine's spending at plan year y (work currency, today's money) for a holiday in year t, before pension and self-pay.
 const spendAt = (p, t, y) => planFlows({ ...p, pension: 0, selfPay: 0 }, t, null).full[y];
@@ -658,9 +659,9 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
   // ① Saving.
   add('have', 'now', pro ? '可投资资产' : '已有', isSet(S.assets) ? whole(S.assets) : null, { cur: 'work', field: 'assets', ...stop(['assets']) });
   add('income', 'now', pro ? `税后年收入 · 实际增长 ${pct(growth)}/年` : '到手', yearly(S.income),
-    { cur: 'work', per, field: 'income', tag: pro ? TOOL : null, ...stop(['income']) });
+    { cur: 'work', per, field: 'income', tag: pro ? WHY.income(growth) : null, ...stop(['income']) });
   add('expense', 'now', pro ? '当前年支出 · 按今天的钱不变' : '支出', yearly(S.expense),
-    { op: '−', cur: 'work', per, field: 'expense', tag: pro ? TOOL : null, ...stop(['expense']) });
+    { op: '−', cur: 'work', per, field: 'expense', tag: pro ? WHY.expense() : null, ...stop(['expense']) });
   if (splitOn(S)) {
     const sp = cleanSplit(S.split);
     const parts = SPLIT_PARTS.map(x => sp[x] ?? 0);
@@ -683,7 +684,7 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
     if (kOn || kStop || kEnd) {
       const value = kEnd ? kEnd.rel.value : kOn ? k.count * k.monthly : k.monthly;
       add('kids', 'now', pro ? `${ITEM_NAME.kids} → ${KIDS_END} 岁（按最小的）` : ITEM_NAME.kids, monthly(value),
-        { ...item, field: 'kids.monthly', end: KIDS_END, tag: pro ? TOOL : null, ...(kStop ?? (kEnd ? { status: 'ended', rel: kEnd.rel } : {})) });
+        { ...item, field: 'kids.monthly', end: KIDS_END, tag: pro ? WHY.kids(KIDS_END) : null, ...(kStop ?? (kEnd ? { status: 'ended', rel: kEnd.rel } : {})) });
     }
   }
   // The real payment at t − 1, while the mortgage still runs in that year.
@@ -697,11 +698,11 @@ export function storyRows(S, data, thisYear = new Date().getFullYear(), plan = n
     op: '=', cur: 'work', per, ...(b14 ? { status: 'flag', rel: b14.rel } : {}),
     ...(pro && plan && t >= 1 ? { values: [whole(savingsAt(p, 0)), whole(savingsAt(p, t - 1))] } : {}),
   });
-  if (!pro) add('growth', 'now', `收入每年 ${pct(growth)}`, null, { tag: TOOL, views: 'simple' });
+  if (!pro) add('growth', 'now', `收入每年 ${pct(growth)}`, null, { tag: WHY.growth(growth), views: 'simple' });
   if (!pro && plan && t > 1) {
     add('saveLate', 'now', `→ ${p.age + t - 1} 岁每月存下`, whole(savingsAt(p, t - 1) / 12), { cur: 'work', per, views: 'simple' });
   }
-  if (pro) add('floor', 'now', '年末存入 · 资产不低于 0', null, { tag: TOOL, views: 'pro' });
+  if (pro) add('floor', 'now', '年末存入 · 资产不低于 0', null, { tag: WHY.floor(), views: 'pro' });
 
   // ② After the holiday. The ages come from the items' end ages (at most two, C23) and the claim age. The section
   // starts at the holiday: an item that has ended by then is already out of the first row's amount (struck there),

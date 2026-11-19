@@ -44,3 +44,16 @@ test('an ordinary fragment is not a link', async ({ page }) => {
   await expect(page.locator('#link-note')).toBeHidden();
   await expect(page.locator('#s-age')).toHaveValue('30');
 });
+
+test.describe('a first visit on a phone from a link', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, storageState: { cookies: [], origins: [] } });
+
+  test('goes straight to the result of the link\'s numbers, without the start screen', async ({ page }) => {
+    await page.goto('/#mode=bwd&tage=35&age=35&assets=1800000&income=6000&expense=6000&pension=2000');
+    await expect(page.locator('#start-calc')).toBeHidden();
+    await expect(page.locator('#hero')).toBeVisible();
+    await expect(page.locator('#headline')).toBeInViewport();
+    await expect(page.locator('#headline')).toContainText('如果今天就放假');
+    await expect(page.locator('#link-note')).toBeVisible();
+  });
+});

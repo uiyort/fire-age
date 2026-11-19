@@ -532,12 +532,12 @@ test('a typed town shows the age it gives and goes away when the spend is cleare
   await page.fill('#town-name', '大理');
   await page.fill('#town-monthly', '4000');
   await expect(page.locator('#town-result')).toContainText('大理');
-  await expect(page.locator('#town-result')).toContainText('岁放假');
+  await expect(page.locator('#town-result')).toContainText('岁就有八成把握');
   await expect(page.locator('#places-fold')).toContainText('本工具不提供各城市的参考值');
   await page.fill('#town-monthly', '');
   await expect(page.locator('#town-result')).toHaveText('');
   await page.fill('#town-monthly', '4000');
-  await expect(page.locator('#town-result')).toContainText('岁放假');
+  await expect(page.locator('#town-result')).toContainText('岁就有八成把握');
   await page.getByRole('button', { name: /卡片|放假卡/ }).click();
   expect(errors).toEqual([]);
 });

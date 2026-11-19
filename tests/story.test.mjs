@@ -26,7 +26,7 @@ test('storyRows: section ① follows the engine', () => {
   assert.equal(row(rows, 'have').value, 200000); assert.equal(row(rows, 'income').value, 30000); assert.equal(row(rows, 'expense').value, 15000);
   assert.deepEqual([row(rows, 'mortgage').value, row(rows, 'mortgage').end, row(rows, 'mortgage').under], [7500, 2045, 'expense']);
   assert.equal(row(rows, 'save').value, 15000);
-  assert.equal(row(rows, 'growth').label, '收入每年 +2%'); assert.equal(row(rows, 'growth').tag, '本工具设定');
+  assert.equal(row(rows, 'growth').label, '收入每年 +2%'); assert.match(row(rows, 'growth').tag, /^收入每年比物价多涨 2%，/);
   assert.equal(row(rows, 'saveLate').label, `→ ${30 + t - 1} 岁每月存下`);
   assert.equal(row(rows, 'saveLate').value, Math.round(savingsAt(p, t - 1) / 12));
 });

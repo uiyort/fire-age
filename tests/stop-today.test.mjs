@@ -47,7 +47,7 @@ test('the headline offers waiting, never a monthly saving there is no time for',
   const p = plan();
   const odds = bwdOdds(p);
   const { say } = headlineText({ mode: 'bwd', p, t: null, odds, eightAge: 50, dual: dualOdds(p), dispCur: 'CNY' });
-  assert.match(say, /想 35 岁放假/);
+  assert.match(say, /如果今天就放假/);
   assert.match(say, /等到 50 岁/);
   assert.doesNotMatch(say, /每月需存/);
   const { say: pro } = headlineText({ mode: 'bwd', p, t: null, odds, eightAge: 50, dual: dualOdds(p), dispCur: 'CNY', view: 'pro' });
@@ -84,4 +84,24 @@ test('the export leaves the saving out when there is no year to save in', () => 
   const p = plan();
   const csv = toCsv({ p, mc: { seed: 1, paths: 2000, success: 0.3, bands: [] }, retireT: 0, dataVersion: DATA.version, mode: 'bwd', bwd: bwdSolve(p), odds: bwdOdds(p) });
   assert.match(csv, /# requiredSavings,\r?\n/);
+});
+
+test('stopping today short of 8 in 10 is never called a holiday already covered', async () => {
+  const { holidayType } = await import('../site/js/holiday.js');
+  const p = plan();
+  const odds = bwdOdds(p);
+  const type = holidayType(p, DATA, { workC: 'CN', retC: 'CN', retireT: 0, success: odds.success });
+  assert.notEqual(type.status.id, 'reached');
+  assert.equal(type.status.name, '今天就停');
+  assert.match(type.status.why, /2 成把握/);
+  assert.doesNotMatch(type.status.why, /已经够/);
+  // With 8 in 10 or better, today is a holiday already covered.
+  const rich = plan({ assets: 5000000 });
+  assert.equal(holidayType(rich, DATA, { workC: 'CN', retC: 'CN', retireT: 0, success: bwdOdds(rich).success }).status.id, 'reached');
+});
+
+test('the professional headline gives the odds to one decimal, so 29.7% does not read as 30% beside 2 in 10', () => {
+  const p = plan();
+  const { say } = headlineText({ mode: 'bwd', p, t: null, odds: bwdOdds(p), eightAge: 51, dual: dualOdds(p), dispCur: 'CNY', view: 'pro' });
+  assert.match(say, /29\.7%/);
 });
