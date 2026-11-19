@@ -47,7 +47,7 @@ Open with what the number did to the persona ("这位算例里的 30 岁上班�
 
 ## Links that fill in the numbers
 
-A link can carry a worked example in its fragment, which never reaches the server: `https://fire-age.com/?ch=zh#age=30&assets=200000&income=12000&expense=6000`. The keys are `age`, `assets`, `income`, `expense` and `retexp` (monthly, as in the simple form, in the currency of the place each belongs to), `tage`, `mode` (`fwd` or `bwd`), `work` and `retire` (country codes from the data). `linkHash()` in `site/js/link.js` writes the fragment. The visitor sees a note that these are the link's numbers, and their own saved numbers are not touched until they change something. Use these links only where links are allowed, never on Xiaohongshu.
+A link can carry a worked example in its fragment, which never reaches the server: `https://fire-age.com/?ch=zh#age=30&assets=200000&income=12000&expense=6000`. The keys are `age`, `assets`, `income`, `expense`, `retexp` and `pension` (monthly, as in the simple form, in the currency of the place each belongs to), `tage`, `mode` (`fwd` or `bwd`), `work` and `retire` (country codes from the data). `linkHash()` in `site/js/link.js` writes the fragment. The visitor sees a note that these are the link's numbers, and their own saved numbers are not touched until they change something. Use these links only where links are allowed, never on Xiaohongshu.
 
 ## Honesty about the numbers
 
